@@ -12,6 +12,7 @@ venv/
 .mypy_cache/
 .env
 .env.*
+!.env.example
 CLAUDE.local.md
 .claude/settings.local.json
 
