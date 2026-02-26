@@ -10,3 +10,7 @@ build/
 venv/
 *.so
 .mypy_cache/
+.env
+.env.*
+CLAUDE.local.md
+.claude/settings.local.json

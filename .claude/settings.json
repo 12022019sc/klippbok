@@ -1,0 +1,26 @@
+{
+  "_readme": "Claude Code configuration. Machine-specific overrides go in settings.local.json (gitignored).",
+  "permissions": {
+    "allow": [
+      "Skill",
+      "WebFetch",
+      "WebSearch",
+      "Bash(git:*)",
+      "Bash(make:*)",
+      "Bash(pip:*)",
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(pytest:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(rm -rf ~)",
+      "Bash(rm -rf .)",
+      "Bash(git push --force)",
+      "Bash(git push -f)",
+      "Bash(git reset --hard)"
+    ]
+  }
+}
