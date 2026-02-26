@@ -14,3 +14,44 @@ venv/
 .env.*
 CLAUDE.local.md
 .claude/settings.local.json
+
+# Added by starter kit conversion
+# Environment & Secrets
+.env.local
+.env.production
+.env.staging
+secrets.json
+credentials.json
+service-account.json
+# Claude Code personal overrides
+# Dependencies
+node_modules/
+# Build output
+.next/
+out/
+# TypeScript
+*.tsbuildinfo
+# Testing
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+# OS
+.DS_Store
+Thumbs.db
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+# Temporary AI research files
+_ai_temp/
+# Misc
+*.bak
+*.tmp
