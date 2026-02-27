@@ -5,33 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** Take raw images/video of any size and produce correctly bucketed, captioned, training-ready datasets for any supported diffusion model through an intuitive web interface.
-**Current focus:** Phase 1 - Architecture Foundation
+**Current focus:** Phase 1 - Architecture Foundation (COMPLETE)
 
 ## Current Position
 
 Phase: 1 of 8 (Architecture Foundation)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-02-27 -- Completed 01-01-PLAN.md (service layer extraction) and 01-02-PLAN.md (image domain module)
+Plan: 3 of 3 in current phase
+Status: Phase complete
+Last activity: 2026-02-27 -- Completed 01-03-PLAN.md (unified SamplePair)
 
-Progress: [██░░░░░░░░] ~13% (2 of ~15 estimated plans)
+Progress: [███░░░░░░░] ~20% (3 of ~15 estimated plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
+- Total plans completed: 3
 - Average duration: ~4min
-- Total execution time: ~8min
+- Total execution time: ~12min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-architecture-foundation | 2 | ~8min | ~4min |
+| 01-architecture-foundation | 3 | ~12min | ~4min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (~5min), 01-02 (4min)
-- Trend: -
+- Last 5 plans: 01-01 (~5min), 01-02 (4min), 01-03 (4min)
+- Trend: Stable
 
 *Updated after each plan completion*
 
@@ -51,10 +51,13 @@ Recent decisions affecting current work:
 - [01-02]: Reused video/models.py IssueCode enum for image codes (single source of truth)
 - [01-02]: Pillow verify+re-open pattern for corruption detection
 - [01-02]: RGBA triggers warning not error -- auto-flatten to RGB during export
+- [01-03 UNI-01]: Type discriminator defaults to "video" for zero breakage
+- [01-03 UNI-02]: target_type parameter with video/image/mixed values for discovery
+- [01-03 UNI-03]: SUPPORTED_IMAGE_EXTENSIONS imported from image module with fallback
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
@@ -64,6 +67,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-27T21:55:00Z
-Stopped at: Completed 01-01-PLAN.md (service layer extraction) and 01-02-PLAN.md (image domain module)
+Last session: 2026-02-27T22:07:47Z
+Stopped at: Completed 01-03-PLAN.md (unified SamplePair) -- Phase 1 complete
 Resume file: None
