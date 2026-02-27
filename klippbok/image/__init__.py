@@ -14,6 +14,7 @@ Quick start:
     images = discover_images("./dataset/")
 """
 
+from klippbok.image.discover import discover_images
 from klippbok.image.errors import (
     ImageError,
     ImageProbeError,
@@ -25,6 +26,8 @@ from klippbok.image.models import (
     ImageMetadata,
     ImageValidation,
 )
+from klippbok.image.probe import probe_image
+from klippbok.image.validate import validate_image
 
 __all__ = [
     # Models
@@ -32,6 +35,12 @@ __all__ = [
     "ImageValidation",
     "SUPPORTED_IMAGE_FORMATS",
     "SUPPORTED_IMAGE_EXTENSIONS",
+    # Probe
+    "probe_image",
+    # Validate
+    "validate_image",
+    # Discovery
+    "discover_images",
     # Errors
     "ImageError",
     "ImageProbeError",

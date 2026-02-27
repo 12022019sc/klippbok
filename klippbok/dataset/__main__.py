@@ -157,16 +157,18 @@ def _format_validate_hint(dataset_path: Path) -> str:
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
-    """Run the validate command."""
-    from klippbok.config.data_schema import KlippbokDataConfig, QualityConfig
+    """Run the validate command.
+
+    Delegates business logic to the service layer, keeping only
+    argument parsing and output formatting here.
+    """
+    from klippbok.config.data_schema import KlippbokDataConfig
     from klippbok.dataset.manifest import build_manifest, write_manifest
     from klippbok.dataset.report import (
-        format_bucketing_plaintext,
-        format_report_plaintext,
         print_bucketing_report,
         print_validation_report,
     )
-    from klippbok.dataset.validate import validate_all
+    from klippbok.services import dataset_service
 
     dataset_path = Path(args.path).resolve()
 
@@ -185,24 +187,13 @@ def cmd_validate(args: argparse.Namespace) -> int:
             datasets=[{"path": str(dataset_path)}],
         )
 
-    # Apply CLI overrides
-    if args.quality:
-        config = config.model_copy(update={
-            "quality": config.quality.model_copy(update={
-                "blur_threshold": config.quality.blur_threshold or 50.0,
-                "exposure_range": config.quality.exposure_range or (0.05, 0.95),
-            }),
-        })
-    if args.duplicates:
-        config = config.model_copy(update={
-            "quality": config.quality.model_copy(update={
-                "check_duplicates": True,
-            }),
-        })
-
-    # Run validation
+    # Run validation via service layer (handles quality/duplicate overrides)
     try:
-        report = validate_all(config, config_dir=config_dir)
+        report = dataset_service.validate(
+            config, config_dir,
+            quality=args.quality,
+            duplicates=args.duplicates,
+        )
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
@@ -214,10 +205,9 @@ def cmd_validate(args: argparse.Namespace) -> int:
     else:
         print_validation_report(report)
 
-    # Bucketing preview
+    # Bucketing preview via service layer
     if args.buckets:
-        from klippbok.dataset.bucketing import preview_bucketing
-        bucket_result = preview_bucketing(
+        bucket_result = dataset_service.preview_bucketing(
             report,
             min_bucket_size=config.bucketing.min_bucket_size,
         )
@@ -240,7 +230,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
         else:
             print_bucketing_report(bucket_result)
 
-    # Write manifest
+    # Write manifest (backwards-compatible klippbok_manifest.json)
     if args.manifest:
         manifest_path = dataset_path / "klippbok_manifest.json"
         if not dataset_path.is_dir():
@@ -255,62 +245,17 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return 0 if report.is_valid else 1
 
 
-def _resolve_concepts(
-    source_path: Path,
-    concepts_str: str,
-) -> list[Path]:
-    """Resolve concept names to subdirectory paths.
-
-    Scans source_path for subdirectories matching the requested concept
-    names. Returns the matched paths or raises with a helpful error
-    listing what's actually available.
-
-    Args:
-        source_path: Parent triage directory (e.g. sorted/).
-        concepts_str: Comma-separated concept names (e.g. "holly,cat").
-
-    Returns:
-        List of resolved subdirectory paths.
-
-    Raises:
-        SystemExit via print + return: if concepts don't match.
-    """
-    requested = [c.strip() for c in concepts_str.split(",") if c.strip()]
-
-    # Find all subdirectories in source
-    available = sorted(
-        d.name for d in source_path.iterdir()
-        if d.is_dir() and not d.name.startswith(".")
-    )
-
-    matched: list[Path] = []
-    unmatched: list[str] = []
-
-    for name in requested:
-        concept_dir = source_path / name
-        if concept_dir.is_dir():
-            matched.append(concept_dir)
-        else:
-            unmatched.append(name)
-
-    if unmatched:
-        available_str = ", ".join(available) if available else "(no subfolders found)"
-        msg = (
-            f"Concept folder(s) not found: {', '.join(unmatched)}\n"
-            f"Available in {source_path}: {available_str}"
-        )
-        raise ValueError(msg)
-
-    return matched
-
-
 def cmd_organize(args: argparse.Namespace) -> int:
-    """Run the organize command."""
+    """Run the organize command.
+
+    Delegates business logic to the service layer, keeping only
+    argument parsing and output formatting here.
+    """
     from klippbok.config.data_schema import KlippbokDataConfig
     from klippbok.dataset.errors import OrganizeError
     from klippbok.dataset.models import OrganizeLayout
-    from klippbok.dataset.organize import organize_dataset
-    from klippbok.dataset.report import format_organize_plaintext, print_organize_report
+    from klippbok.dataset.report import print_organize_report
+    from klippbok.services import dataset_service
 
     source_path = Path(args.path).resolve()
     output_path = Path(args.output).resolve()
@@ -324,32 +269,10 @@ def cmd_organize(args: argparse.Namespace) -> int:
         from klippbok.config.loader import load_config
         config = load_config(str(Path(args.config).resolve()))
 
-    # Concepts filtering: resolve concept names to subdirectory paths
-    # and build a multi-source config pointing at those folders
-    if args.concepts:
-        try:
-            concept_dirs = _resolve_concepts(source_path, args.concepts)
-        except ValueError as e:
-            print(f"Error: {e}", file=sys.stderr)
-            return 1
-
-        # Show which concepts were selected
-        names = [d.name for d in concept_dirs]
-        print(f"Concepts: {', '.join(names)}")
-
-        # Build config with concept dirs as separate dataset sources
-        if config is None:
-            config = KlippbokDataConfig(
-                datasets=[{"path": str(d)} for d in concept_dirs],
-            )
-        else:
-            # Override datasets in existing config with concept dirs
-            config = config.model_copy(update={
-                "datasets": [{"path": str(d)} for d in concept_dirs],
-            })
-
+    # Delegate to service layer (handles concept resolution, config
+    # construction, and organize_dataset call)
     try:
-        result = organize_dataset(
+        result = dataset_service.organize(
             source_dir=source_path,
             output_dir=output_path,
             layout=layout,
@@ -358,15 +281,25 @@ def cmd_organize(args: argparse.Namespace) -> int:
             include_warnings=not args.strict,
             dry_run=args.dry_run,
             trainers=args.trainers,
+            concepts=args.concepts,
         )
+    except ValueError as e:
+        # Concept resolution errors
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
     except OrganizeError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
+    # Show which concepts were selected (after successful resolution)
+    if args.concepts:
+        names = [c.strip() for c in args.concepts.split(",") if c.strip()]
+        print(f"Concepts: {', '.join(names)}")
+
     # Report
     print_organize_report(result)
 
-    # Manifest
+    # Manifest (backwards-compatible klippbok_manifest.json)
     if args.manifest and not args.dry_run:
         from klippbok.dataset.manifest import write_manifest
         from klippbok.dataset.validate import validate_all
