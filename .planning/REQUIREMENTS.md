@@ -119,67 +119,67 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| IMG-01 | TBD | Pending |
-| IMG-02 | TBD | Pending |
-| IMG-03 | TBD | Pending |
-| IMG-04 | TBD | Pending |
-| IMG-05 | TBD | Pending |
-| IMG-06 | TBD | Pending |
-| IMG-07 | TBD | Pending |
-| IMG-08 | TBD | Pending |
-| CROP-01 | TBD | Pending |
-| CROP-02 | TBD | Pending |
-| CROP-03 | TBD | Pending |
-| CROP-04 | TBD | Pending |
-| CROP-05 | TBD | Pending |
-| CROP-06 | TBD | Pending |
-| CROP-07 | TBD | Pending |
-| CROP-08 | TBD | Pending |
-| CROP-09 | TBD | Pending |
-| MODL-01 | TBD | Pending |
-| MODL-02 | TBD | Pending |
-| MODL-03 | TBD | Pending |
-| MODL-04 | TBD | Pending |
-| MODL-05 | TBD | Pending |
-| MODL-06 | TBD | Pending |
-| CAPT-01 | TBD | Pending |
-| CAPT-02 | TBD | Pending |
-| CAPT-03 | TBD | Pending |
-| CAPT-04 | TBD | Pending |
-| CAPT-05 | TBD | Pending |
-| CAPT-06 | TBD | Pending |
-| CAPT-07 | TBD | Pending |
-| CAPT-08 | TBD | Pending |
-| GUI-01 | TBD | Pending |
-| GUI-02 | TBD | Pending |
-| GUI-03 | TBD | Pending |
-| GUI-04 | TBD | Pending |
-| GUI-05 | TBD | Pending |
-| GUI-06 | TBD | Pending |
-| GUI-07 | TBD | Pending |
-| GUI-08 | TBD | Pending |
-| GUI-09 | TBD | Pending |
-| EXPT-01 | TBD | Pending |
-| EXPT-02 | TBD | Pending |
-| EXPT-03 | TBD | Pending |
-| EXPT-04 | TBD | Pending |
-| EXPT-05 | TBD | Pending |
-| EXPT-06 | TBD | Pending |
-| EXPT-07 | TBD | Pending |
-| ARCH-01 | TBD | Pending |
-| ARCH-02 | TBD | Pending |
-| ARCH-03 | TBD | Pending |
-| ARCH-04 | TBD | Pending |
-| ARCH-05 | TBD | Pending |
-| ARCH-06 | TBD | Pending |
-| ARCH-07 | TBD | Pending |
-| ARCH-08 | TBD | Pending |
+| IMG-01 | Phase 3 | Pending |
+| IMG-02 | Phase 3 | Pending |
+| IMG-03 | Phase 3 | Pending |
+| IMG-04 | Phase 3 | Pending |
+| IMG-05 | Phase 3 | Pending |
+| IMG-06 | Phase 3 | Pending |
+| IMG-07 | Phase 3 | Pending |
+| IMG-08 | Phase 3 | Pending |
+| CROP-01 | Phase 5 | Pending |
+| CROP-02 | Phase 5 | Pending |
+| CROP-03 | Phase 5 | Pending |
+| CROP-04 | Phase 5 | Pending |
+| CROP-05 | Phase 5 | Pending |
+| CROP-06 | Phase 5 | Pending |
+| CROP-07 | Phase 5 | Pending |
+| CROP-08 | Phase 5 | Pending |
+| CROP-09 | Phase 5 | Pending |
+| MODL-01 | Phase 2 | Pending |
+| MODL-02 | Phase 2 | Pending |
+| MODL-03 | Phase 2 | Pending |
+| MODL-04 | Phase 2 | Pending |
+| MODL-05 | Phase 2 | Pending |
+| MODL-06 | Phase 2 | Pending |
+| CAPT-01 | Phase 6 | Pending |
+| CAPT-02 | Phase 6 | Pending |
+| CAPT-03 | Phase 6 | Pending |
+| CAPT-04 | Phase 6 | Pending |
+| CAPT-05 | Phase 6 | Pending |
+| CAPT-06 | Phase 6 | Pending |
+| CAPT-07 | Phase 6 | Pending |
+| CAPT-08 | Phase 6 | Pending |
+| GUI-01 | Phase 4 | Pending |
+| GUI-02 | Phase 4 | Pending |
+| GUI-03 | Phase 4 | Pending |
+| GUI-04 | Phase 6 | Pending |
+| GUI-05 | Phase 5 | Pending |
+| GUI-06 | Phase 6 | Pending |
+| GUI-07 | Phase 8 | Pending |
+| GUI-08 | Phase 7 | Pending |
+| GUI-09 | Phase 4 | Pending |
+| EXPT-01 | Phase 8 | Pending |
+| EXPT-02 | Phase 8 | Pending |
+| EXPT-03 | Phase 8 | Pending |
+| EXPT-04 | Phase 8 | Pending |
+| EXPT-05 | Phase 8 | Pending |
+| EXPT-06 | Phase 8 | Pending |
+| EXPT-07 | Phase 8 | Pending |
+| ARCH-01 | Phase 1 | Pending |
+| ARCH-02 | Phase 1 | Pending |
+| ARCH-03 | Phase 1 | Pending |
+| ARCH-04 | Phase 1 | Pending |
+| ARCH-05 | Phase 1 | Pending |
+| ARCH-06 | Phase 4 | Pending |
+| ARCH-07 | Phase 1 | Pending |
+| ARCH-08 | Phase 7 | Pending |
 
 **Coverage:**
-- v1 requirements: 50 total
-- Mapped to phases: 0
-- Unmapped: 50 (pending roadmap creation)
+- v1 requirements: 55 total
+- Mapped to phases: 55
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-27*
-*Last updated: 2026-02-27 after initial definition*
+*Last updated: 2026-02-27 after roadmap creation*
