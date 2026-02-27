@@ -20,6 +20,7 @@ from klippbok.config.data_schema import (
 from klippbok.dataset.discover import (
     VIDEO_EXTENSIONS,
     IMAGE_EXTENSIONS,
+    _classify_extension,
     detect_structure,
     discover_all_datasets,
     discover_dataset,
@@ -385,3 +386,119 @@ class TestDiscoverAllDatasets:
         assert len(results) == 2
         assert results[0].total_samples == 1
         assert results[1].total_samples == 2
+
+
+# ---------------------------------------------------------------------------
+# _classify_extension with target_type
+# ---------------------------------------------------------------------------
+
+class TestClassifyExtensionTargetType:
+    """Tests for _classify_extension with different target_type values."""
+
+    def test_video_mode_mp4_is_target(self, tmp_path: Path):
+        assert _classify_extension(Path("clip.mp4"), target_type="video") == "target"
+
+    def test_video_mode_png_is_reference(self, tmp_path: Path):
+        assert _classify_extension(Path("img.png"), target_type="video") == "reference"
+
+    def test_video_mode_txt_is_caption(self, tmp_path: Path):
+        assert _classify_extension(Path("clip.txt"), target_type="video") == "caption"
+
+    def test_video_mode_unknown_is_other(self, tmp_path: Path):
+        assert _classify_extension(Path("readme.md"), target_type="video") == "other"
+
+    def test_image_mode_png_is_target(self):
+        assert _classify_extension(Path("img.png"), target_type="image") == "target"
+
+    def test_image_mode_jpg_is_target(self):
+        assert _classify_extension(Path("img.jpg"), target_type="image") == "target"
+
+    def test_image_mode_webp_is_target(self):
+        assert _classify_extension(Path("img.webp"), target_type="image") == "target"
+
+    def test_image_mode_mp4_is_other(self):
+        assert _classify_extension(Path("clip.mp4"), target_type="image") == "other"
+
+    def test_image_mode_txt_is_caption(self):
+        assert _classify_extension(Path("img.txt"), target_type="image") == "caption"
+
+    def test_mixed_mode_mp4_is_target(self):
+        assert _classify_extension(Path("clip.mp4"), target_type="mixed") == "target"
+
+    def test_mixed_mode_png_is_target(self):
+        assert _classify_extension(Path("img.png"), target_type="mixed") == "target"
+
+    def test_mixed_mode_txt_is_caption(self):
+        assert _classify_extension(Path("clip.txt"), target_type="mixed") == "caption"
+
+    def test_mixed_mode_md_is_other(self):
+        assert _classify_extension(Path("notes.md"), target_type="mixed") == "other"
+
+
+# ---------------------------------------------------------------------------
+# discover_files with target_type
+# ---------------------------------------------------------------------------
+
+class TestDiscoverFilesTargetType:
+    """Tests for discover_files with target_type parameter."""
+
+    def test_image_target_type_flat(self, tmp_path: Path):
+        """With target_type='image', images become targets."""
+        _touch(tmp_path / "img.png")
+        _touch(tmp_path / "img.txt", b"caption")
+        _touch(tmp_path / "clip.mp4")
+        files = discover_files(tmp_path, StructureType.FLAT, target_type="image")
+        assert len(files["targets"]) == 1
+        assert files["targets"][0].name == "img.png"
+        # Videos are "other" in image mode
+        assert any(f.name == "clip.mp4" for f in files["other"])
+
+    def test_mixed_target_type_flat(self, tmp_path: Path):
+        """With target_type='mixed', both images and videos are targets."""
+        _touch(tmp_path / "img.png")
+        _touch(tmp_path / "clip.mp4")
+        files = discover_files(tmp_path, StructureType.FLAT, target_type="mixed")
+        assert len(files["targets"]) == 2
+
+    def test_default_target_type_is_video(self, tmp_path: Path):
+        """Default behavior classifies images as references."""
+        _touch(tmp_path / "clip.mp4")
+        _touch(tmp_path / "clip.png")
+        files = discover_files(tmp_path, StructureType.FLAT)
+        assert len(files["targets"]) == 1
+        assert files["targets"][0].name == "clip.mp4"
+        assert len(files["references"]) == 1
+
+
+# ---------------------------------------------------------------------------
+# discover_dataset with target_type
+# ---------------------------------------------------------------------------
+
+class TestDiscoverDatasetTargetType:
+    """Tests for discover_dataset with target_type parameter."""
+
+    def test_image_target_type(self, tmp_path: Path):
+        """discover_dataset with target_type='image' finds image targets."""
+        _touch(tmp_path / "img.png")
+        _touch(tmp_path / "img.txt", b"A caption")
+        config = _default_config()
+        result = discover_dataset(tmp_path, config, target_type="image")
+        assert result.total_samples == 1
+        assert result.samples[0].stem == "img"
+
+    def test_image_target_type_empty_message(self, tmp_path: Path):
+        """Empty dataset error message mentions images when target_type='image'."""
+        config = _default_config()
+        result = discover_dataset(tmp_path, config, target_type="image")
+        assert not result.is_valid
+        empty_issues = [i for i in result.dataset_issues if i.code == IssueCode.DATASET_EMPTY]
+        assert len(empty_issues) == 1
+        assert "image" in empty_issues[0].message.lower()
+
+    def test_default_target_type_unchanged(self, tmp_path: Path):
+        """Default discover_dataset behavior unchanged (video targets)."""
+        _make_flat_dataset(tmp_path, ["a"])
+        config = _default_config()
+        result = discover_dataset(tmp_path, config)
+        assert result.total_samples == 1
+        assert result.is_valid is True

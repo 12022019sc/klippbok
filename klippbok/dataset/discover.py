@@ -24,6 +24,11 @@ from klippbok.dataset.models import (
 )
 from klippbok.video.models import IssueCode, Severity, ValidationIssue
 
+try:
+    from klippbok.image.models import SUPPORTED_IMAGE_EXTENSIONS
+except ImportError:
+    SUPPORTED_IMAGE_EXTENSIONS: set[str] = {".png", ".jpg", ".jpeg", ".webp"}
+
 
 # ---------------------------------------------------------------------------
 # File classification constants
@@ -134,12 +139,37 @@ def detect_structure(directory: Path) -> StructureType:
 # File classification
 # ---------------------------------------------------------------------------
 
-def _classify_extension(path: Path) -> str:
+def _classify_extension(path: Path, target_type: str = "video") -> str:
     """Classify a file by its extension into a role.
+
+    Args:
+        path: File path to classify.
+        target_type: Controls how images are classified:
+            - "video": images are references (existing behavior, default)
+            - "image": images are targets, videos are "other"
+            - "mixed": both images and videos are targets
 
     Returns one of: 'target', 'caption', 'reference', 'other'.
     """
     ext = path.suffix.lower()
+
+    if target_type == "image":
+        # Image-only mode: images are targets, videos are "other"
+        if ext in SUPPORTED_IMAGE_EXTENSIONS:
+            return "target"
+        if ext in CAPTION_EXTENSIONS:
+            return "caption"
+        return "other"
+
+    if target_type == "mixed":
+        # Mixed mode: both images and videos are targets
+        if ext in VIDEO_EXTENSIONS or ext in SUPPORTED_IMAGE_EXTENSIONS:
+            return "target"
+        if ext in CAPTION_EXTENSIONS:
+            return "caption"
+        return "other"
+
+    # Default "video" mode: videos are targets, images are references
     if ext in VIDEO_EXTENSIONS:
         return "target"
     if ext in CAPTION_EXTENSIONS:
@@ -152,6 +182,7 @@ def _classify_extension(path: Path) -> str:
 def discover_files(
     directory: Path,
     structure: StructureType | None = None,
+    target_type: str = "video",
 ) -> dict[str, list[Path]]:
     """Scan a directory and classify files by role.
 
@@ -162,6 +193,10 @@ def discover_files(
     Args:
         directory: Path to the dataset source folder.
         structure: Detected structure type. Auto-detected if None.
+        target_type: Controls how images are classified:
+            - "video": images are references (existing behavior, default)
+            - "image": images are targets, videos are "other"
+            - "mixed": both images and videos are targets
 
     Returns:
         Dict with keys 'targets', 'captions', 'references', 'other'.
@@ -185,9 +220,16 @@ def discover_files(
 
         if targets_dir.is_dir():
             for f in sorted(targets_dir.iterdir()):
-                if f.is_file() and f.suffix.lower() in VIDEO_EXTENSIONS:
+                if not f.is_file():
+                    continue
+                ext = f.suffix.lower()
+                if target_type == "video" and ext in VIDEO_EXTENSIONS:
                     result["targets"].append(f)
-                elif f.is_file():
+                elif target_type == "image" and ext in SUPPORTED_IMAGE_EXTENSIONS:
+                    result["targets"].append(f)
+                elif target_type == "mixed" and (ext in VIDEO_EXTENSIONS or ext in SUPPORTED_IMAGE_EXTENSIONS):
+                    result["targets"].append(f)
+                else:
                     result["other"].append(f)
 
         if captions_dir.is_dir():
@@ -209,7 +251,7 @@ def discover_files(
             for f in sorted(directory.iterdir()):
                 if not f.is_file():
                     continue
-                role = _classify_extension(f)
+                role = _classify_extension(f, target_type=target_type)
                 if role == "target":
                     result["targets"].append(f)
                 elif role == "caption":
@@ -322,6 +364,7 @@ def pair_samples(
 def discover_dataset(
     directory: str | Path,
     config: KlippbokDataConfig,
+    target_type: str = "video",
 ) -> DatasetValidation:
     """Discover and pair all files in a single dataset source folder.
 
@@ -331,6 +374,10 @@ def discover_dataset(
     Args:
         directory: Path to the dataset source folder.
         config: The data config (controls whether captions/references are required).
+        target_type: Controls how images are classified:
+            - "video": images are references (existing behavior, default)
+            - "image": images are targets, videos are "other"
+            - "mixed": both images and videos are targets
 
     Returns:
         DatasetValidation with discovered samples and any discovery-time issues.
@@ -343,7 +390,7 @@ def discover_dataset(
         )
 
     structure = detect_structure(directory)
-    files = discover_files(directory, structure)
+    files = discover_files(directory, structure, target_type=target_type)
 
     caption_required = config.controls.text.required
     reference_required = config.controls.images.reference.required
@@ -360,12 +407,22 @@ def discover_dataset(
     dataset_issues: list[ValidationIssue] = []
 
     if not samples:
+        if target_type == "image":
+            ext_list = ", ".join(sorted(SUPPORTED_IMAGE_EXTENSIONS))
+            file_kind = "image"
+        elif target_type == "mixed":
+            ext_list = ", ".join(sorted(list(VIDEO_EXTENSIONS)[:5]) + sorted(SUPPORTED_IMAGE_EXTENSIONS))
+            file_kind = "image or video"
+        else:
+            ext_list = ", ".join(sorted(VIDEO_EXTENSIONS)[:5]) + "..."
+            file_kind = "video"
+
         dataset_issues.append(ValidationIssue(
             code=IssueCode.DATASET_EMPTY,
             severity=Severity.ERROR,
             message=(
-                f"No video files found in '{directory}'. "
-                f"Expected video files ({', '.join(sorted(VIDEO_EXTENSIONS)[:5])}...) "
+                f"No {file_kind} files found in '{directory}'. "
+                f"Expected files ({ext_list}) "
                 f"in {'training/targets/' if structure == StructureType.DIMLJUS else 'the directory'}."
             ),
             field="dataset",

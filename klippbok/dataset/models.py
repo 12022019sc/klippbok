@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from enum import Enum
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -59,10 +60,14 @@ class StructureType(str, Enum):
 # ---------------------------------------------------------------------------
 
 class SamplePair(BaseModel):
-    """A single training sample: one target video paired with its signals.
+    """A single training sample: one target (image or video) paired with its signals.
 
-    The stem (filename without extension) is the join key — all files
+    The stem (filename without extension) is the join key -- all files
     belonging to the same sample share the same stem.
+
+    The ``type`` field discriminates between image and video targets.
+    It defaults to ``"video"`` so all existing code that constructs
+    SamplePair without specifying type continues to work unchanged.
 
     Issues are collected during validation and attached here so the report
     can show per-sample problems.
@@ -72,8 +77,12 @@ class SamplePair(BaseModel):
     stem: str
     """Filename stem that joins this sample's files (e.g. 'clip_001')."""
 
+    type: Literal["image", "video"] = "video"
+    """Whether this sample's target is an image or video file.
+    Defaults to 'video' for backwards compatibility."""
+
     target: Path
-    """Path to the target video file."""
+    """Path to the target file (image or video)."""
 
     caption: Path | None = None
     """Path to the caption .txt file, or None if missing."""
@@ -84,18 +93,25 @@ class SamplePair(BaseModel):
     issues: list[ValidationIssue] = Field(default_factory=list)
     """Validation issues found for this sample."""
 
-    # Video metadata cached during validation (optional — populated by validator)
+    # Video metadata cached during validation (optional -- populated by validator)
     width: int | None = None
-    """Video width in pixels (populated during validation)."""
+    """Target width in pixels (populated during validation)."""
 
     height: int | None = None
-    """Video height in pixels (populated during validation)."""
+    """Target height in pixels (populated during validation)."""
 
     frame_count: int | None = None
-    """Video frame count (populated during validation)."""
+    """Video frame count (populated during validation). None for images."""
 
     fps: float | None = None
-    """Video FPS (populated during validation)."""
+    """Video FPS (populated during validation). None for images."""
+
+    # Image-specific metadata (None for videos)
+    format: str | None = None
+    """Image format: 'png', 'jpeg', 'webp'. None for video samples."""
+
+    color_mode: str | None = None
+    """Image color mode: 'RGB', 'RGBA', 'L', etc. None for video samples."""
 
     @property
     def is_valid(self) -> bool:
