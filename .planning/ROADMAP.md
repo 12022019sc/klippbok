@@ -33,12 +33,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A unified SamplePair model can represent both image and video targets with type discrimination
   4. Image-specific validation produces structured ValidationIssue results (resolution, format, quality) without failing fast
   5. Existing CLI commands (`klippbok dataset`, `klippbok video`) continue to work identically after changes
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: Service layer and project manifest
-- [ ] 01-02: Image domain module with models and validation
-- [ ] 01-03: Unified SamplePair and dependency groups
+- [ ] 01-01-PLAN.md -- Service layer extraction (dataset_service, project_service) and CLI refactor
+- [ ] 01-02-PLAN.md -- Image domain module (models, probe, validate, discover) and IssueCode extension
+- [ ] 01-03-PLAN.md -- Unified SamplePair with type discriminator, discovery target_type, dependency groups
 
 ### Phase 2: Model Configuration
 **Goal**: Users can select a target model (SD1.5, SDXL, Flux, custom) and get correct resolution presets, bucket sizes, and captioning defaults automatically -- with full override capability
