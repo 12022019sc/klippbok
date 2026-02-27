@@ -82,6 +82,13 @@ class IssueCode(str, Enum):
     DATASET_EMPTY = "DATASET_EMPTY"
     BUCKET_UNDERSIZED = "BUCKET_UNDERSIZED"
 
+    # Image-specific issues
+    IMAGE_FORMAT_UNSUPPORTED = "IMAGE_FORMAT_UNSUPPORTED"
+    IMAGE_CORRUPT = "IMAGE_CORRUPT"
+    IMAGE_RGBA_CONVERSION = "IMAGE_RGBA_CONVERSION"
+    IMAGE_NO_VALID_BUCKET = "IMAGE_NO_VALID_BUCKET"
+    IMAGE_BELOW_MIN_RESOLUTION = "IMAGE_BELOW_MIN_RESOLUTION"
+
 
 # ---------------------------------------------------------------------------
 # Video metadata from ffprobe
