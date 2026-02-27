@@ -12,7 +12,7 @@ Klippbok v2 extends the existing video-only LoRA dataset tool into a unified ima
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Architecture Foundation** - Service layer, image domain module, unified models, and dependency structure
+- [x] **Phase 1: Architecture Foundation** - Service layer, image domain module, unified models, and dependency structure
 - [ ] **Phase 2: Model Configuration** - Model profiles with resolution presets, bucket sizes, and caption style defaults
 - [ ] **Phase 3: Image Import and Quality** - Batch image import with validation, bucketing, quality filtering, and duplicate detection
 - [ ] **Phase 4: Web GUI Foundation** - FastAPI+React shell, image gallery, thumbnails, and progress indicators
@@ -36,9 +36,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md -- Service layer extraction (dataset_service, project_service) and CLI refactor
-- [ ] 01-02-PLAN.md -- Image domain module (models, probe, validate, discover) and IssueCode extension
-- [ ] 01-03-PLAN.md -- Unified SamplePair with type discriminator, discovery target_type, dependency groups
+- [x] 01-01-PLAN.md -- Service layer extraction (dataset_service, project_service) and CLI refactor
+- [x] 01-02-PLAN.md -- Image domain module (models, probe, validate, discover) and IssueCode extension
+- [x] 01-03-PLAN.md -- Unified SamplePair with type discriminator, discovery target_type, dependency groups
 
 ### Phase 2: Model Configuration
 **Goal**: Users can select a target model (SD1.5, SDXL, Flux, custom) and get correct resolution presets, bucket sizes, and captioning defaults automatically -- with full override capability
@@ -162,7 +162,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Architecture Foundation | 0/3 | Not started | - |
+| 1. Architecture Foundation | 3/3 | Complete | 2026-02-27 |
 | 2. Model Configuration | 0/2 | Not started | - |
 | 3. Image Import and Quality | 0/3 | Not started | - |
 | 4. Web GUI Foundation | 0/3 | Not started | - |

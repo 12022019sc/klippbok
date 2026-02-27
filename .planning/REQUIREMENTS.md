@@ -72,13 +72,13 @@
 
 ### Architecture
 
-- [ ] **ARCH-01**: Service layer shared by both CLI and API (no duplicated business logic)
-- [ ] **ARCH-02**: New image domain module (`klippbok/image/`) following existing module patterns
-- [ ] **ARCH-03**: Unified SamplePair model supporting both image and video targets
-- [ ] **ARCH-04**: Image-specific validation (resolution, format, quality) using accumulative ValidationIssue pattern
-- [ ] **ARCH-05**: GUI dependencies as optional `[gui]` extra group
+- [x] **ARCH-01**: Service layer shared by both CLI and API (no duplicated business logic)
+- [x] **ARCH-02**: New image domain module (`klippbok/image/`) following existing module patterns
+- [x] **ARCH-03**: Unified SamplePair model supporting both image and video targets
+- [x] **ARCH-04**: Image-specific validation (resolution, format, quality) using accumulative ValidationIssue pattern
+- [x] **ARCH-05**: GUI dependencies as optional `[gui]` extra group
 - [ ] **ARCH-06**: Server-side thumbnail generation for gallery (browser canvas pixel limits)
-- [ ] **ARCH-07**: Existing CLI commands continue to work unchanged
+- [x] **ARCH-07**: Existing CLI commands continue to work unchanged
 - [ ] **ARCH-08**: Existing CLIP triage extended to work with standalone images
 
 ## v2 Requirements
@@ -166,13 +166,13 @@
 | EXPT-05 | Phase 8 | Pending |
 | EXPT-06 | Phase 8 | Pending |
 | EXPT-07 | Phase 8 | Pending |
-| ARCH-01 | Phase 1 | Pending |
-| ARCH-02 | Phase 1 | Pending |
-| ARCH-03 | Phase 1 | Pending |
-| ARCH-04 | Phase 1 | Pending |
-| ARCH-05 | Phase 1 | Pending |
+| ARCH-01 | Phase 1 | Complete |
+| ARCH-02 | Phase 1 | Complete |
+| ARCH-03 | Phase 1 | Complete |
+| ARCH-04 | Phase 1 | Complete |
+| ARCH-05 | Phase 1 | Complete |
 | ARCH-06 | Phase 4 | Pending |
-| ARCH-07 | Phase 1 | Pending |
+| ARCH-07 | Phase 1 | Complete |
 | ARCH-08 | Phase 7 | Pending |
 
 **Coverage:**
