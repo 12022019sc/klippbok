@@ -42,20 +42,28 @@ dataset = [
     "filetype>=1.2",
     "rich>=13.0",
 ]
+image = [
+    "Pillow>=9.0",
+]
 triage = [
+    "klippbok[image]",
     "torch>=2.0",
     "transformers>=4.30",
-    "Pillow>=9.0",
+]
+gui = [
+    # Placeholder for Phase 4 GUI dependencies
 ]
 all = [
     "klippbok[video]",
     "klippbok[caption]",
     "klippbok[dataset]",
+    "klippbok[image]",
     "klippbok[triage]",
 ]
 dev = [
     "pytest>=7.0",
     "pytest-tmp-files>=0.0.2",
+    "Pillow>=9.0",
 ]
 
 [project.urls]
