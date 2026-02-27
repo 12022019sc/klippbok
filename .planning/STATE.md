@@ -12,25 +12,25 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 Phase: 1 of 8 (Architecture Foundation)
 Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-02-27 -- Completed 01-02-PLAN.md (image domain module)
+Last activity: 2026-02-27 -- Completed 01-01-PLAN.md (service layer extraction) and 01-02-PLAN.md (image domain module)
 
-Progress: [██░░░░░░░░] ~7% (1 of ~15 estimated plans)
+Progress: [██░░░░░░░░] ~13% (2 of ~15 estimated plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 4min
-- Total execution time: 4min
+- Total plans completed: 2
+- Average duration: ~4min
+- Total execution time: ~8min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-architecture-foundation | 1 | 4min | 4min |
+| 01-architecture-foundation | 2 | ~8min | ~4min |
 
 **Recent Trend:**
-- Last 5 plans: 01-02 (4min)
+- Last 5 plans: 01-01 (~5min), 01-02 (4min)
 - Trend: -
 
 *Updated after each plan completion*
@@ -45,6 +45,9 @@ Recent decisions affecting current work:
 - [Roadmap]: 8 phases derived from 55 requirements; research suggested 5 phases but comprehensive depth warranted finer granularity
 - [Roadmap]: Phase 6 (Captioning) depends on Phase 2 (Model Config) + Phase 4 (GUI) -- not Phase 5 (Crop) -- enabling parallel work streams
 - [Roadmap]: Phase 7 (Video/CLIP) is independent of Phases 5-6, can be reordered if priorities shift
+- [01-01 SVC-01]: Module-level stateless functions for services (no classes)
+- [01-01 SVC-02]: Concept resolution moved to dataset_service.py as private helper
+- [01-01 SVC-03]: Project manifest (.klippbok/manifest.json) separate from validation manifest (klippbok_manifest.json)
 - [01-02]: Reused video/models.py IssueCode enum for image codes (single source of truth)
 - [01-02]: Pillow verify+re-open pattern for corruption detection
 - [01-02]: RGBA triggers warning not error -- auto-flatten to RGB during export
@@ -61,6 +64,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-27T21:59:07Z
-Stopped at: Completed 01-02-PLAN.md (image domain module)
+Last session: 2026-02-27T21:55:00Z
+Stopped at: Completed 01-01-PLAN.md (service layer extraction) and 01-02-PLAN.md (image domain module)
 Resume file: None
