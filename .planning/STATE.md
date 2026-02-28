@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 ## Current Position
 
 Phase: 4 of 8 (Web GUI Foundation) -- In progress
-Plan: 2 of 5 in phase 4
+Plan: 3 of 5 in phase 4
 Status: In progress
-Last activity: 2026-02-28 -- Completed 04-02-PLAN.md (React SPA scaffold with routing, NavBar, Zustand, TanStack Query)
+Last activity: 2026-02-28 -- Completed 04-03-PLAN.md (Image gallery page with masonry grid, status strip, duplicate borders, lightbox)
 
-Progress: [█████████░] ~63% (10 of ~16 estimated plans)
+Progress: [██████████░] ~69% (11 of ~16 estimated plans)
 
 ## Performance Metrics
 
@@ -30,11 +30,11 @@ Progress: [█████████░] ~63% (10 of ~16 estimated plans)
 | 01-architecture-foundation | 3 | ~12min | ~4min |
 | 02-model-configuration | 2 | ~7min | ~3.5min |
 | 03-image-import-quality | 3 | ~5min | ~5min |
-| 04-web-gui-foundation | 2 | ~4min | ~2min |
+| 04-web-gui-foundation | 3 | ~6min | ~2min |
 
 **Recent Trend:**
-- Last 5 plans: 03-01 (5min), 03-02 (5min), 03-03 (5min), 04-01 (~2min), 04-02 (~2min)
-- Trend: Fast -- frontend scaffold tasks execute quickly
+- Last 5 plans: 03-02 (5min), 03-03 (5min), 04-01 (~2min), 04-02 (~2min), 04-03 (~2min)
+- Trend: Fast -- frontend gallery build tasks execute quickly
 
 *Updated after each plan completion*
 
@@ -82,12 +82,18 @@ Recent decisions affecting current work:
 - [04-02]: NavLink className receives { isActive } function -- no activeClassName prop in v7
 - [04-02]: Zustand store is flat (not nested) for importOperationId and importProgress
 - [04-02]: Plain CSS (App.css + index.css) for styling -- no Tailwind or CSS modules in scaffold
+- [04-03 GAL-01]: masonic render prop receives a Component (not function) -- CardRenderer defined inside MasonryGrid, captures onItemClick via closure
+- [04-03 GAL-02]: Lightbox slideFooter finds current item by matching slide.src to items array (same order)
+- [04-03 GAL-03]: Duplicate border applied as inline style (borderLeft) not CSS class -- enables dynamic color
+- [04-03 GAL-04]: Caption truncation at 40 chars done in StatusStrip, not in hook/types -- keeps data layer clean
+- [04-03 GAL-05]: GalleryPage uses selectedIndex: number | null (not separate open boolean) -- single state source
 
 03-01 SUMMARY: TIFF format support, 5 new IssueCodes, ImageImportEntry/ImageImportReport models, n_frames field
 03-02 SUMMARY: assign_to_bucket (argmin AR), needs_upscale, compute_blur_score (scipy Laplacian), is_blurry (threshold 100.0)
 03-03 SUMMARY: compute_phash (imagehash pHash hex), are_near_duplicates (Hamming <= 10), select_keeper (resolution + format), batch_import_images (full pipeline), save_image_entries (manifest persistence)
 04-01 SUMMARY: FastAPI app factory (create_app), SHA256[:16] image ID, gallery+thumbnail endpoints, klippbok serve CLI, uvicorn/fastapi/sse-starlette installed
 04-02 SUMMARY: Vite+React+TS SPA at frontend/, React Router v7 layout routing, dark NavBar, GalleryPage/ImportPage/SettingsPage stubs, useAppStore (Zustand), QueryClientProvider (TanStack Query), /api proxy
+04-03 SUMMARY: Virtualized masonry gallery (masonic), ThumbnailCard with aspect-ratio heights and colored duplicate borders, StatusStrip (resolution/quality/bucket/caption preview), ImageLightbox (yet-another-react-lightbox with metadata footer), useImages TanStack Query hook, GalleryItem/GalleryResponse types
 
 ### Pending Todos
 
@@ -101,6 +107,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-28T17:09:57Z
-Stopped at: Completed 04-02-PLAN.md (2/5 in Phase 4 -- In progress)
+Last session: 2026-02-28T17:15:52Z
+Stopped at: Completed 04-03-PLAN.md (3/5 in Phase 4 -- In progress)
 Resume file: None
