@@ -1,0 +1,59 @@
+"""Server-side thumbnail generation with disk cache.
+
+Thumbnails are generated on demand and cached to disk as JPEG files.
+The cache key is a SHA256 hash of the absolute image path, so moving
+the project directory invalidates the cache gracefully.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import logging
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+THUMB_MAX_SIZE = (300, 300)
+"""Maximum thumbnail dimensions. Pillow thumbnail() preserves aspect ratio."""
+
+
+def get_thumbnail(image_path: Path, cache_dir: Path) -> Path:
+    """Return the cached JPEG thumbnail for the given image, generating it if needed.
+
+    The cache key is a SHA256 hash of the absolute resolved path, so path
+    changes invalidate the cache. Alpha channels are stripped before saving
+    to ensure JPEG compatibility.
+
+    Args:
+        image_path: Absolute path to the source image file.
+        cache_dir: Directory where thumbnail JPEG files are cached.
+
+    Returns:
+        Path to the cached JPEG thumbnail file.
+
+    Raises:
+        FileNotFoundError: If image_path does not exist.
+        OSError: If the cache directory cannot be created or the thumbnail
+            cannot be written.
+    """
+    from PIL import Image
+
+    # Compute cache key from absolute path
+    abs_path = image_path.resolve()
+    path_hash = hashlib.sha256(str(abs_path).encode()).hexdigest()[:16]
+    thumb_path = cache_dir / f"{path_hash}.jpg"
+
+    if thumb_path.exists():
+        logger.debug("Thumbnail cache hit: %s -> %s", abs_path.name, thumb_path)
+        return thumb_path
+
+    # Generate thumbnail
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    with Image.open(abs_path) as img:
+        img = img.convert("RGB")  # strip alpha for JPEG safety
+        img.thumbnail(THUMB_MAX_SIZE, Image.LANCZOS)
+        img.save(thumb_path, format="JPEG", quality=85, optimize=True)
+
+    logger.debug("Thumbnail generated: %s -> %s", abs_path.name, thumb_path)
+    return thumb_path
