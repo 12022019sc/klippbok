@@ -65,12 +65,12 @@ Plans:
   3. Images are automatically grouped into aspect ratio buckets based on the selected model, with bucket distribution visible (count per bucket, imbalance flags)
   4. Near-duplicate images are detected via perceptual hashing and flagged with a visual indicator
   5. Basic quality issues (blur, exposure) are detected with pass/fail per image, and upscale-required images show a clear red warning
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 03-01: Image loader with format validation and error handling
-- [ ] 03-02: Resolution analysis and model-aware bucketing
-- [ ] 03-03: Quality filtering, duplicate detection, and upscale warnings
+- [ ] 03-01-PLAN.md -- TIFF format support, new IssueCode values, and import result models
+- [ ] 03-02-PLAN.md -- Bucket assignment and blur detection modules
+- [ ] 03-03-PLAN.md -- Perceptual hash dedup and full batch import pipeline
 
 ### Phase 4: Web GUI Foundation
 **Goal**: Users can launch the web interface with a single command and browse their imported images in a responsive gallery with per-image status at a glance
