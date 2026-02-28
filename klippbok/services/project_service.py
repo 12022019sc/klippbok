@@ -105,6 +105,58 @@ def manifest_exists(project_dir: Path) -> bool:
     return (project_dir / MANIFEST_DIR / MANIFEST_FILE).exists()
 
 
+def save_image_entries(
+    project_dir: Path,
+    entries: list[dict],
+    *,
+    version: str = "1",
+) -> Path:
+    """Save image import entries to the 'images' key in manifest.
+
+    Loads the existing manifest (if any), updates the "images" key with
+    new entries, and writes it back. Preserves existing "samples" and
+    other keys.
+
+    Args:
+        project_dir: Root of the project directory.
+        entries: List of image entry dicts (see image_service._entry_to_dict).
+        version: Manifest schema version.
+
+    Returns:
+        Path to the written manifest file.
+    """
+    manifest_dir = project_dir / MANIFEST_DIR
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = manifest_dir / MANIFEST_FILE
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Load existing manifest to preserve other keys
+    existing = load_manifest(project_dir)
+    if existing:
+        data = dict(existing)
+        data["updated"] = now
+    else:
+        data = {
+            "version": version,
+            "created": now,
+            "updated": now,
+            "samples": [],
+        }
+
+    # Build existing images list preserving entries not covered by new batch
+    # (entries for images already in manifest are NOT re-added here -- they're skipped
+    #  by batch_import_images and only fresh entries are passed in)
+    existing_images: list[dict] = data.get("images", [])
+    data["images"] = existing_images + entries
+
+    manifest_path.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    return manifest_path
+
+
 def sample_to_manifest_entry(
     sample: SamplePair,
     project_dir: Path,
