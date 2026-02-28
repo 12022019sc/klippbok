@@ -30,6 +30,7 @@ node_modules/
 # Build output
 .next/
 out/
+klippbok/api/static/
 # TypeScript
 *.tsbuildinfo
 # Testing
