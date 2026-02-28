@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** Take raw images/video of any size and produce correctly bucketed, captioned, training-ready datasets for any supported diffusion model through an intuitive web interface.
-**Current focus:** Phase 3 - Image Import and Quality
+**Current focus:** Phase 4 - GUI (Phase 3 complete)
 
 ## Current Position
 
-Phase: 3 of 8 (Image Import and Quality)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-02-28 -- Completed 03-02-PLAN.md (bucket assignment, blur detection)
+Phase: 3 of 8 (Image Import and Quality) -- COMPLETE
+Plan: 3 of 3 in phase 3 -- all done
+Status: Phase complete
+Last activity: 2026-02-28 -- Completed 03-03-PLAN.md (pHash dedup + batch import pipeline)
 
-Progress: [███████░░░] ~47% (7 of ~15 estimated plans)
+Progress: [████████░░] ~53% (8 of ~15 estimated plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
+- Total plans completed: 8
 - Average duration: ~4min
-- Total execution time: ~19min
+- Total execution time: ~24min
 
 **By Phase:**
 
@@ -29,9 +29,10 @@ Progress: [███████░░░] ~47% (7 of ~15 estimated plans)
 |-------|-------|-------|----------|
 | 01-architecture-foundation | 3 | ~12min | ~4min |
 | 02-model-configuration | 2 | ~7min | ~3.5min |
+| 03-image-import-quality | 3 | ~5min | ~5min |
 
 **Recent Trend:**
-- Last 5 plans: 01-02 (4min), 01-03 (4min), 02-01 (4min), 02-02 (3min)
+- Last 5 plans: 02-01 (4min), 02-02 (3min), 03-01 (5min), 03-02 (5min), 03-03 (5min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -63,11 +64,18 @@ Recent decisions affecting current work:
 - [02-02]: Custom profiles stored as individual JSON files in ~/.klippbok/profiles/
 - [03-01]: CMYK warning reuses IMAGE_RGBA_CONVERSION code (color conversion semantics are the same)
 - [03-01]: n_frames on ImageMetadata (not validate_image param) -- keeps validation interface clean, pure-logic
-- [03-01]: imagehash and scipy declared in pyproject.toml [image] extras but not yet installed (needed by 03-03)
 - [03-02]: assign_to_bucket takes bucket list (not model profile) -- pure function, caller provides context
-- [03-02]: scipy installed (1.17.1) from pyproject.toml [image] extras; imagehash still needed for 03-03
+- [03-02]: scipy installed (1.17.1); imagehash installed (4.3.2) for pHash
 - [03-02]: BLUR_THRESHOLD = 100.0 as module constant, not parameter -- fixed threshold semantics
 - [03-02]: test_image_blur.py (not test_image_quality.py) to avoid collision with video domain test file
+- [03-03]: np.bool_ returned by imagehash requires explicit bool() cast in are_near_duplicates
+- [03-03]: Solid-color images produce identical pHash -- dedup tests use textured gradient images
+- [03-03]: batch_import_images persists only non-skipped entries (skipped already in manifest)
+- [03-03]: imported count = all non-skipped (including rejected); rejected is a subset
+
+03-01 SUMMARY: TIFF format support, 5 new IssueCodes, ImageImportEntry/ImageImportReport models, n_frames field
+03-02 SUMMARY: assign_to_bucket (argmin AR), needs_upscale, compute_blur_score (scipy Laplacian), is_blurry (threshold 100.0)
+03-03 SUMMARY: compute_phash (imagehash pHash hex), are_near_duplicates (Hamming <= 10), select_keeper (resolution + format), batch_import_images (full pipeline), save_image_entries (manifest persistence)
 
 ### Pending Todos
 
@@ -81,6 +89,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-28T05:25:57Z
-Stopped at: Completed 03-02-PLAN.md (2/3 in Phase 3)
+Last session: 2026-02-28T05:27:01Z
+Stopped at: Completed 03-03-PLAN.md (3/3 in Phase 3 -- Phase COMPLETE)
 Resume file: None
