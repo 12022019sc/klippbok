@@ -261,3 +261,154 @@ def reset_override_field(
 
     save_model_config(project_dir, updated)
     return updated
+
+
+# ─── Custom Profile CRUD ───
+
+
+def save_custom_profile(
+    profile: ModelProfile,
+    based_on: str = "",
+) -> Path:
+    """Save a custom profile to ~/.klippbok/profiles/{name}.json.
+
+    Creates the profiles directory if it doesn't exist. The profile is
+    serialized to JSON with an optional based_on metadata field.
+
+    Args:
+        profile: The ModelProfile to save.
+        based_on: Name of the profile this was derived from (metadata only).
+
+    Returns:
+        Path to the written profile file.
+    """
+    _USER_PROFILES_DIR.mkdir(parents=True, exist_ok=True)
+    profile_path = _USER_PROFILES_DIR / f"{profile.name}.json"
+
+    data = profile.model_dump(mode="json")
+    if based_on:
+        data["based_on"] = based_on
+
+    profile_path.write_text(json.dumps(data, indent=2) + "\n")
+    logger.debug("Saved custom profile '%s' to %s", profile.name, profile_path)
+    return profile_path
+
+
+def delete_custom_profile(name: str) -> None:
+    """Delete a custom profile by name.
+
+    Args:
+        name: Name of the custom profile to delete.
+
+    Raises:
+        ValueError: If name refers to a built-in profile.
+        FileNotFoundError: If no custom profile with that name exists.
+    """
+    if name in BUILTIN_PROFILES:
+        raise ValueError(
+            f"Cannot delete built-in profile '{name}'. "
+            f"Only custom profiles can be deleted."
+        )
+
+    profile_path = _USER_PROFILES_DIR / f"{name}.json"
+    if not profile_path.is_file():
+        raise FileNotFoundError(
+            f"Custom profile '{name}' not found at {profile_path}"
+        )
+
+    profile_path.unlink()
+    logger.debug("Deleted custom profile '%s'", name)
+
+
+def _load_custom_profile(name: str) -> ModelProfile:
+    """Load a single custom profile from disk.
+
+    Args:
+        name: Name of the custom profile.
+
+    Returns:
+        The loaded ModelProfile.
+
+    Raises:
+        FileNotFoundError: If the profile file doesn't exist.
+    """
+    profile_path = _USER_PROFILES_DIR / f"{name}.json"
+    if not profile_path.is_file():
+        raise FileNotFoundError(
+            f"Custom profile '{name}' not found at {profile_path}"
+        )
+
+    data = json.loads(profile_path.read_text())
+    # Remove metadata fields not part of ModelProfile
+    data.pop("based_on", None)
+    return ModelProfile(**data)
+
+
+def _load_all_custom_profiles() -> list[ModelProfile]:
+    """Load all custom profiles from ~/.klippbok/profiles/.
+
+    Returns:
+        List of custom ModelProfile instances. Empty if directory
+        doesn't exist or contains no valid profiles.
+    """
+    if not _USER_PROFILES_DIR.is_dir():
+        return []
+
+    profiles: list[ModelProfile] = []
+    for path in sorted(_USER_PROFILES_DIR.glob("*.json")):
+        try:
+            data = json.loads(path.read_text())
+            data.pop("based_on", None)
+            profiles.append(ModelProfile(**data))
+        except Exception:
+            logger.warning("Failed to load custom profile from %s", path)
+    return profiles
+
+
+# ─── Profile Lookup ───
+
+
+def get_profile(name: str) -> ModelProfile:
+    """Look up a profile by name, checking built-ins first then custom profiles.
+
+    Args:
+        name: Profile name to look up.
+
+    Returns:
+        The matching ModelProfile.
+
+    Raises:
+        KeyError: If no built-in or custom profile with that name exists.
+    """
+    if name in BUILTIN_PROFILES:
+        return BUILTIN_PROFILES[name]
+
+    try:
+        return _load_custom_profile(name)
+    except FileNotFoundError:
+        available = sorted(
+            list(BUILTIN_PROFILES.keys())
+            + [p.name for p in _load_all_custom_profiles()]
+        )
+        raise KeyError(
+            f"Profile '{name}' not found. Available: {available}"
+        )
+
+
+def list_profiles() -> list[ModelProfile]:
+    """List all available profiles (built-in + custom).
+
+    Built-in profiles are listed first, followed by custom profiles.
+    Custom profiles that shadow built-in names are excluded.
+
+    Returns:
+        List of all available ModelProfile instances.
+    """
+    builtin_names = set(BUILTIN_PROFILES.keys())
+    profiles = list(BUILTIN_PROFILES.values())
+
+    for custom in _load_all_custom_profiles():
+        if custom.name not in builtin_names:
+            profiles.append(custom)
+
+    return profiles
