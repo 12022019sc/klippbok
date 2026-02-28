@@ -54,3 +54,89 @@
   width: 100%;
   flex: 1;
 }
+
+/* Gallery */
+.gallery-container {
+  width: 100%;
+}
+
+.thumbnail-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: filter 0.2s;
+}
+
+.thumbnail-card:hover {
+  filter: brightness(1.1);
+}
+
+.thumbnail-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Status strip */
+.status-strip {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: #e0e0e0;
+}
+
+.status-strip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-caption {
+  font-size: 10px;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.status-dot.ok {
+  background: #22c55e;
+}
+
+.status-dot.fail {
+  background: #ef4444;
+}
+
+/* Duplicate border */
+.duplicate-border {
+  border-left-width: 3px;
+  border-left-style: solid;
+}
+
+/* Lightbox footer */
+.lightbox-footer {
+  background: rgba(0, 0, 0, 0.8);
+  padding: 12px 16px;
+  color: #e0e0e0;
+  font-size: 13px;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
