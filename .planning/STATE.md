@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 ## Current Position
 
 Phase: 3 of 8 (Image Import and Quality)
-Plan: 0 of 3 in current phase
-Status: Ready to plan
-Last activity: 2026-02-28 -- Phase 2 complete (2/2 plans, verified)
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-02-28 -- Completed 03-01-PLAN.md (TIFF support, IssueCodes, import models)
 
-Progress: [█████░░░░░] ~33% (5 of ~15 estimated plans)
+Progress: [██████░░░░] ~40% (6 of ~15 estimated plans)
 
 ## Performance Metrics
 
@@ -61,6 +61,9 @@ Recent decisions affecting current work:
 - [02-02]: Override fields flattened (bucket_step_size) instead of nested dicts for simpler JSON
 - [02-02]: Built-in profiles cannot be deleted or overwritten by custom profiles
 - [02-02]: Custom profiles stored as individual JSON files in ~/.klippbok/profiles/
+- [03-01]: CMYK warning reuses IMAGE_RGBA_CONVERSION code (color conversion semantics are the same)
+- [03-01]: n_frames on ImageMetadata (not validate_image param) -- keeps validation interface clean, pure-logic
+- [03-01]: imagehash and scipy declared in pyproject.toml [image] extras but not yet installed (needed by 03-03)
 
 ### Pending Todos
 
@@ -74,6 +77,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-28
-Stopped at: Phase 2 complete, verified, ready for Phase 3
+Last session: 2026-02-28T05:12:44Z
+Stopped at: Completed 03-01-PLAN.md (1/3 in Phase 3)
 Resume file: None
