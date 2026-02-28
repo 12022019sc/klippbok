@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** Take raw images/video of any size and produce correctly bucketed, captioned, training-ready datasets for any supported diffusion model through an intuitive web interface.
-**Current focus:** Phase 4 - GUI (Phase 3 complete)
+**Current focus:** Phase 4 - GUI (In progress)
 
 ## Current Position
 
 Phase: 4 of 8 (Web GUI Foundation) -- In progress
-Plan: 1 of ~3 in phase 4 -- in progress
+Plan: 2 of 5 in phase 4
 Status: In progress
-Last activity: 2026-02-28 -- Completed 04-01-PLAN.md (FastAPI backend shell)
+Last activity: 2026-02-28 -- Completed 04-02-PLAN.md (React SPA scaffold with routing, NavBar, Zustand, TanStack Query)
 
-Progress: [█████████░] ~60% (9 of ~15 estimated plans)
+Progress: [█████████░] ~63% (10 of ~16 estimated plans)
 
 ## Performance Metrics
 
@@ -30,10 +30,11 @@ Progress: [█████████░] ~60% (9 of ~15 estimated plans)
 | 01-architecture-foundation | 3 | ~12min | ~4min |
 | 02-model-configuration | 2 | ~7min | ~3.5min |
 | 03-image-import-quality | 3 | ~5min | ~5min |
+| 04-web-gui-foundation | 2 | ~4min | ~2min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (4min), 02-02 (3min), 03-01 (5min), 03-02 (5min), 03-03 (5min)
-- Trend: Stable
+- Last 5 plans: 03-01 (5min), 03-02 (5min), 03-03 (5min), 04-01 (~2min), 04-02 (~2min)
+- Trend: Fast -- frontend scaffold tasks execute quickly
 
 *Updated after each plan completion*
 
@@ -77,11 +78,16 @@ Recent decisions affecting current work:
 - [04-01 API-03]: Routers registered before StaticFiles mount (SPA catch-all safety)
 - [04-01 API-04]: project_dir on app.state (no global state -- testable factory pattern)
 - [04-01 API-05]: Top-level klippbok/__main__.py as thin dispatcher; submodule CLIs remain independent
+- [04-02]: react-router v7 exports from react-router (not react-router-dom) -- merged package
+- [04-02]: NavLink className receives { isActive } function -- no activeClassName prop in v7
+- [04-02]: Zustand store is flat (not nested) for importOperationId and importProgress
+- [04-02]: Plain CSS (App.css + index.css) for styling -- no Tailwind or CSS modules in scaffold
 
 03-01 SUMMARY: TIFF format support, 5 new IssueCodes, ImageImportEntry/ImageImportReport models, n_frames field
 03-02 SUMMARY: assign_to_bucket (argmin AR), needs_upscale, compute_blur_score (scipy Laplacian), is_blurry (threshold 100.0)
 03-03 SUMMARY: compute_phash (imagehash pHash hex), are_near_duplicates (Hamming <= 10), select_keeper (resolution + format), batch_import_images (full pipeline), save_image_entries (manifest persistence)
 04-01 SUMMARY: FastAPI app factory (create_app), SHA256[:16] image ID, gallery+thumbnail endpoints, klippbok serve CLI, uvicorn/fastapi/sse-starlette installed
+04-02 SUMMARY: Vite+React+TS SPA at frontend/, React Router v7 layout routing, dark NavBar, GalleryPage/ImportPage/SettingsPage stubs, useAppStore (Zustand), QueryClientProvider (TanStack Query), /api proxy
 
 ### Pending Todos
 
@@ -95,6 +101,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-28T17:10:00Z
-Stopped at: Completed 04-01-PLAN.md (1/3 in Phase 4 -- In progress)
+Last session: 2026-02-28T17:09:57Z
+Stopped at: Completed 04-02-PLAN.md (2/5 in Phase 4 -- In progress)
 Resume file: None
