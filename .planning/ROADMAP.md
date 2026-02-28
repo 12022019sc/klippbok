@@ -82,12 +82,14 @@ Plans:
   3. Each thumbnail shows resolution, quality status (pass/fail), and a caption preview
   4. Long-running operations (import, batch processing) display progress indicators
   5. Server generates thumbnails for gallery display (not relying on browser canvas for full-resolution images)
-**Plans**: TBD
+**Plans**: 5 plans
 
 Plans:
-- [ ] 04-01: FastAPI application shell and React SPA scaffold
-- [ ] 04-02: Image gallery with thumbnails and status display
-- [ ] 04-03: Progress indicator system (SSE streaming)
+- [ ] 04-01-PLAN.md -- FastAPI backend shell, API models, images router, thumbnail service, CLI serve command
+- [ ] 04-02-PLAN.md -- React SPA scaffold with Vite, app shell, routing, zustand, TanStack Query
+- [ ] 04-03-PLAN.md -- Gallery page with masonry grid, status overlays, duplicate borders, lightbox
+- [ ] 04-04-PLAN.md -- Import router with SSE progress, settings router, import/settings pages, toast system
+- [ ] 04-05-PLAN.md -- Build pipeline, SPA deployment to static dir, end-to-end verification
 
 ### Phase 5: Interactive Crop Editor
 **Goal**: Users can precisely crop any image to a valid training bucket ratio using an interactive editor -- the signature feature that no existing tool does well
@@ -165,7 +167,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 1. Architecture Foundation | 3/3 | Complete | 2026-02-27 |
 | 2. Model Configuration | 2/2 | Complete | 2026-02-28 |
 | 3. Image Import and Quality | 3/3 | Complete | 2026-02-28 |
-| 4. Web GUI Foundation | 0/3 | Not started | - |
+| 4. Web GUI Foundation | 0/5 | Not started | - |
 | 5. Interactive Crop Editor | 0/4 | Not started | - |
 | 6. Captioning System | 0/4 | Not started | - |
 | 7. Video and CLIP Integration | 0/2 | Not started | - |
