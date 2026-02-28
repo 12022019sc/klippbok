@@ -11,6 +11,8 @@ import pytest
 from klippbok.image.models import (
     SUPPORTED_IMAGE_EXTENSIONS,
     SUPPORTED_IMAGE_FORMATS,
+    ImageImportEntry,
+    ImageImportReport,
     ImageMetadata,
     ImageValidation,
 )
@@ -207,3 +209,225 @@ class TestImageIssueCodes:
         assert hasattr(IssueCode, code_name)
         code = getattr(IssueCode, code_name)
         assert code.value == code_name
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: TIFF format constant extensions
+# ---------------------------------------------------------------------------
+
+class TestTiffFormatConstants:
+    """Tests for TIFF format support in constants."""
+
+    def test_supported_formats_includes_tiff(self) -> None:
+        """'tiff' is in SUPPORTED_IMAGE_FORMATS."""
+        assert "tiff" in SUPPORTED_IMAGE_FORMATS
+
+    def test_supported_extensions_includes_tif_and_tiff(self) -> None:
+        """'.tif' and '.tiff' are in SUPPORTED_IMAGE_EXTENSIONS."""
+        assert ".tif" in SUPPORTED_IMAGE_EXTENSIONS
+        assert ".tiff" in SUPPORTED_IMAGE_EXTENSIONS
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: New IssueCode values
+# ---------------------------------------------------------------------------
+
+class TestPhase3IssueCodes:
+    """Tests for the five new Phase 3 IssueCode values."""
+
+    def test_issue_code_image_upscale_required(self) -> None:
+        """IssueCode.IMAGE_UPSCALE_REQUIRED exists with correct value."""
+        assert hasattr(IssueCode, "IMAGE_UPSCALE_REQUIRED")
+        assert IssueCode.IMAGE_UPSCALE_REQUIRED.value == "IMAGE_UPSCALE_REQUIRED"
+
+    def test_issue_code_image_blur_detected(self) -> None:
+        """IssueCode.IMAGE_BLUR_DETECTED exists with correct value."""
+        assert hasattr(IssueCode, "IMAGE_BLUR_DETECTED")
+        assert IssueCode.IMAGE_BLUR_DETECTED.value == "IMAGE_BLUR_DETECTED"
+
+    def test_issue_code_image_near_duplicate(self) -> None:
+        """IssueCode.IMAGE_NEAR_DUPLICATE exists with correct value."""
+        assert hasattr(IssueCode, "IMAGE_NEAR_DUPLICATE")
+        assert IssueCode.IMAGE_NEAR_DUPLICATE.value == "IMAGE_NEAR_DUPLICATE"
+
+    def test_issue_code_image_extreme_aspect(self) -> None:
+        """IssueCode.IMAGE_EXTREME_ASPECT exists with correct value."""
+        assert hasattr(IssueCode, "IMAGE_EXTREME_ASPECT")
+        assert IssueCode.IMAGE_EXTREME_ASPECT.value == "IMAGE_EXTREME_ASPECT"
+
+    def test_issue_code_image_tiff_multipage(self) -> None:
+        """IssueCode.IMAGE_TIFF_MULTIPAGE exists with correct value."""
+        assert hasattr(IssueCode, "IMAGE_TIFF_MULTIPAGE")
+        assert IssueCode.IMAGE_TIFF_MULTIPAGE.value == "IMAGE_TIFF_MULTIPAGE"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: ImageImportEntry model
+# ---------------------------------------------------------------------------
+
+def _make_image_metadata(**kwargs) -> ImageMetadata:
+    """Helper: create ImageMetadata with sensible defaults."""
+    defaults = dict(
+        path=Path("/test/photo.png"),
+        width=1024,
+        height=768,
+        format="png",
+        color_mode="RGB",
+    )
+    defaults.update(kwargs)
+    return ImageMetadata(**defaults)
+
+
+class TestImageImportEntry:
+    """Tests for the ImageImportEntry model."""
+
+    def test_import_entry_is_frozen(self) -> None:
+        """ImageImportEntry is immutable -- assigning to a field raises."""
+        entry = ImageImportEntry(path=Path("x.png"))
+        with pytest.raises(Exception):
+            entry.path = Path("y.png")  # type: ignore[misc]
+
+    def test_import_entry_minimal(self) -> None:
+        """ImageImportEntry with only path has correct defaults."""
+        entry = ImageImportEntry(path=Path("x.png"))
+        assert entry.path == Path("x.png")
+        assert entry.metadata is None
+        assert entry.validation is None
+        assert entry.bucket is None
+        assert entry.blur_score is None
+        assert entry.phash is None
+        assert entry.is_near_duplicate is False
+        assert entry.duplicate_of is None
+        assert entry.skipped is False
+
+    def test_import_entry_full(self) -> None:
+        """ImageImportEntry with all fields round-trips correctly."""
+        meta = _make_image_metadata()
+        validation = ImageValidation(metadata=meta)
+        entry = ImageImportEntry(
+            path=Path("/test/photo.png"),
+            metadata=meta,
+            validation=validation,
+            bucket=(512, 512),
+            blur_score=150.5,
+            phash="abcdef1234567890",
+            is_near_duplicate=False,
+            duplicate_of=None,
+            skipped=False,
+        )
+        assert entry.path == Path("/test/photo.png")
+        assert entry.metadata == meta
+        assert entry.validation == validation
+        assert entry.bucket == (512, 512)
+        assert entry.blur_score == 150.5
+        assert entry.phash == "abcdef1234567890"
+        assert entry.is_near_duplicate is False
+        assert entry.duplicate_of is None
+        assert entry.skipped is False
+
+    def test_import_entry_skipped(self) -> None:
+        """ImageImportEntry with skipped=True for already-imported files."""
+        entry = ImageImportEntry(path=Path("/test/already.png"), skipped=True)
+        assert entry.skipped is True
+        assert entry.path == Path("/test/already.png")
+
+    def test_import_entry_near_duplicate(self) -> None:
+        """ImageImportEntry captures near-duplicate information."""
+        entry = ImageImportEntry(
+            path=Path("/test/dup.png"),
+            is_near_duplicate=True,
+            duplicate_of=Path("/test/original.png"),
+        )
+        assert entry.is_near_duplicate is True
+        assert entry.duplicate_of == Path("/test/original.png")
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: ImageImportReport model
+# ---------------------------------------------------------------------------
+
+class TestImageImportReport:
+    """Tests for the ImageImportReport model."""
+
+    def test_import_report_is_frozen(self) -> None:
+        """ImageImportReport is immutable -- assigning raises."""
+        report = ImageImportReport(
+            total_discovered=0,
+            imported=0,
+            skipped_existing=0,
+            rejected=0,
+            warned=0,
+            near_duplicates_flagged=0,
+        )
+        with pytest.raises(Exception):
+            report.imported = 5  # type: ignore[misc]
+
+    def test_import_report_counts(self) -> None:
+        """ImageImportReport stores counts correctly."""
+        report = ImageImportReport(
+            total_discovered=10,
+            imported=7,
+            skipped_existing=2,
+            rejected=1,
+            warned=3,
+            near_duplicates_flagged=1,
+        )
+        assert report.total_discovered == 10
+        assert report.imported == 7
+        assert report.skipped_existing == 2
+        assert report.rejected == 1
+        assert report.warned == 3
+        assert report.near_duplicates_flagged == 1
+
+    def test_import_report_bucket_distribution(self) -> None:
+        """bucket_distribution returns correct counts per bucket key."""
+        entries = [
+            ImageImportEntry(path=Path(f"/test/{i}.png"), bucket=(512, 512))
+            for i in range(3)
+        ] + [
+            ImageImportEntry(path=Path(f"/test/wide{i}.png"), bucket=(768, 512))
+            for i in range(2)
+        ]
+        report = ImageImportReport(
+            total_discovered=5,
+            imported=5,
+            skipped_existing=0,
+            rejected=0,
+            warned=0,
+            near_duplicates_flagged=0,
+            entries=entries,
+        )
+        dist = report.bucket_distribution
+        assert dist["512x512"] == 3
+        assert dist["768x512"] == 2
+
+    def test_import_report_bucket_distribution_excludes_skipped(self) -> None:
+        """bucket_distribution skips entries with skipped=True."""
+        entries = [
+            ImageImportEntry(path=Path("/test/a.png"), bucket=(512, 512)),
+            ImageImportEntry(path=Path("/test/b.png"), bucket=(512, 512), skipped=True),
+        ]
+        report = ImageImportReport(
+            total_discovered=2,
+            imported=1,
+            skipped_existing=1,
+            rejected=0,
+            warned=0,
+            near_duplicates_flagged=0,
+            entries=entries,
+        )
+        dist = report.bucket_distribution
+        assert dist["512x512"] == 1
+
+    def test_import_report_empty(self) -> None:
+        """ImageImportReport with zero counts and empty entries works."""
+        report = ImageImportReport(
+            total_discovered=0,
+            imported=0,
+            skipped_existing=0,
+            rejected=0,
+            warned=0,
+            near_duplicates_flagged=0,
+        )
+        assert report.entries == []
+        assert report.bucket_distribution == {}

@@ -89,6 +89,13 @@ class IssueCode(str, Enum):
     IMAGE_NO_VALID_BUCKET = "IMAGE_NO_VALID_BUCKET"
     IMAGE_BELOW_MIN_RESOLUTION = "IMAGE_BELOW_MIN_RESOLUTION"
 
+    # Phase 3: Image import and quality
+    IMAGE_UPSCALE_REQUIRED = "IMAGE_UPSCALE_REQUIRED"
+    IMAGE_BLUR_DETECTED = "IMAGE_BLUR_DETECTED"
+    IMAGE_NEAR_DUPLICATE = "IMAGE_NEAR_DUPLICATE"
+    IMAGE_EXTREME_ASPECT = "IMAGE_EXTREME_ASPECT"
+    IMAGE_TIFF_MULTIPAGE = "IMAGE_TIFF_MULTIPAGE"
+
 
 # ---------------------------------------------------------------------------
 # Video metadata from ffprobe

@@ -23,6 +23,8 @@ from klippbok.image.errors import (
 from klippbok.image.models import (
     SUPPORTED_IMAGE_EXTENSIONS,
     SUPPORTED_IMAGE_FORMATS,
+    ImageImportEntry,
+    ImageImportReport,
     ImageMetadata,
     ImageValidation,
 )
@@ -33,6 +35,8 @@ __all__ = [
     # Models
     "ImageMetadata",
     "ImageValidation",
+    "ImageImportEntry",
+    "ImageImportReport",
     "SUPPORTED_IMAGE_FORMATS",
     "SUPPORTED_IMAGE_EXTENSIONS",
     # Probe

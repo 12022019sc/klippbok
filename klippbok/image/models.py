@@ -22,14 +22,14 @@ from klippbok.video.models import Severity, ValidationIssue
 # Constants
 # ---------------------------------------------------------------------------
 
-SUPPORTED_IMAGE_FORMATS: set[str] = {"png", "jpeg", "webp"}
+SUPPORTED_IMAGE_FORMATS: set[str] = {"png", "jpeg", "webp", "tiff"}
 """Lowercase Pillow format names that klippbok can process.
 
 Note: PIL reports 'jpeg' (not 'jpg') for JPEG files. Both .jpg and .jpeg
-extensions map to format 'jpeg'.
+extensions map to format 'jpeg'. PIL reports 'tiff' for all TIFF files.
 """
 
-SUPPORTED_IMAGE_EXTENSIONS: set[str] = {".png", ".jpg", ".jpeg", ".webp"}
+SUPPORTED_IMAGE_EXTENSIONS: set[str] = {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff"}
 """File extensions recognized as supported images during discovery."""
 
 
@@ -70,6 +70,9 @@ class ImageMetadata(BaseModel):
 
     is_corrupt: bool = False
     """True if Pillow's verify() detected corruption."""
+
+    n_frames: int = 1
+    """Number of frames/pages in the image (>1 for animated GIFs, multi-page TIFFs)."""
 
     @property
     def display_resolution(self) -> str:
@@ -125,3 +128,89 @@ class ImageValidation(BaseModel):
     def warnings(self) -> list[ValidationIssue]:
         """Only the warning-severity issues."""
         return [i for i in self.issues if i.severity == Severity.WARNING]
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: Import result models
+# ---------------------------------------------------------------------------
+
+class ImageImportEntry(BaseModel):
+    """Per-image result of the import pipeline.
+
+    Carries all information gathered during a single image's journey through
+    the import pipeline: probed metadata, validation result, assigned bucket,
+    quality scores, and duplicate status.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    path: Path
+    """Path to the image file."""
+
+    metadata: ImageMetadata | None = None
+    """Probed image metadata, or None if probing failed."""
+
+    validation: ImageValidation | None = None
+    """Validation result, or None if validation was skipped."""
+
+    bucket: tuple[int, int] | None = None
+    """Assigned training bucket (width, height), or None if not bucketed."""
+
+    blur_score: float | None = None
+    """Laplacian variance blur score. Higher = sharper. None if not computed."""
+
+    phash: str | None = None
+    """Perceptual hash string for near-duplicate detection. None if not computed."""
+
+    is_near_duplicate: bool = False
+    """True if this image was flagged as a near-duplicate of another."""
+
+    duplicate_of: Path | None = None
+    """Path to the original image if this is a near-duplicate."""
+
+    skipped: bool = False
+    """True if this image was skipped (e.g. already imported in a prior run)."""
+
+
+class ImageImportReport(BaseModel):
+    """Summary of a batch image import operation.
+
+    Aggregates per-image entries into summary counts and statistics for
+    reporting at the end of an import run.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    total_discovered: int
+    """Total number of image files found on disk."""
+
+    imported: int
+    """Number of images successfully imported."""
+
+    skipped_existing: int
+    """Number of images skipped because they were already in the dataset."""
+
+    rejected: int
+    """Number of images rejected due to validation errors."""
+
+    warned: int
+    """Number of images imported with warnings."""
+
+    near_duplicates_flagged: int
+    """Number of images flagged as near-duplicates."""
+
+    entries: list[ImageImportEntry] = Field(default_factory=list)
+    """Per-image import results."""
+
+    @property
+    def bucket_distribution(self) -> dict[str, int]:
+        """Count of non-skipped entries per bucket key, e.g. {'512x512': 47}.
+
+        Only includes entries that have a bucket assigned and were not skipped.
+        """
+        dist: dict[str, int] = {}
+        for e in self.entries:
+            if e.bucket and not e.skipped:
+                key = f"{e.bucket[0]}x{e.bucket[1]}"
+                dist[key] = dist.get(key, 0) + 1
+        return dist
