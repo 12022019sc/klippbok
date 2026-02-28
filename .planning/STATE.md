@@ -5,33 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** Take raw images/video of any size and produce correctly bucketed, captioned, training-ready datasets for any supported diffusion model through an intuitive web interface.
-**Current focus:** Phase 2 - Model Configuration
+**Current focus:** Phase 2 - Model Configuration (complete)
 
 ## Current Position
 
 Phase: 2 of 8 (Model Configuration)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-02-27 -- Completed 02-01-PLAN.md (model profile schema)
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-02-28 -- Completed 02-02-PLAN.md (model config overrides)
 
-Progress: [████░░░░░░] ~27% (4 of ~15 estimated plans)
+Progress: [█████░░░░░] ~33% (5 of ~15 estimated plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
+- Total plans completed: 5
 - Average duration: ~4min
-- Total execution time: ~16min
+- Total execution time: ~19min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-architecture-foundation | 3 | ~12min | ~4min |
-| 02-model-configuration | 1 | ~4min | ~4min |
+| 02-model-configuration | 2 | ~7min | ~3.5min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (~5min), 01-02 (4min), 01-03 (4min), 02-01 (4min)
+- Last 5 plans: 01-02 (4min), 01-03 (4min), 02-01 (4min), 02-02 (3min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -58,6 +58,9 @@ Recent decisions affecting current work:
 - [02-01]: max_aspect_ratio defaults to 2.0 for bucket generation
 - [02-01]: step_size validated as power of 2 (VAE compression alignment)
 - [02-01]: base_resolution validated as multiple of step_size via model_validator
+- [02-02]: Override fields flattened (bucket_step_size) instead of nested dicts for simpler JSON
+- [02-02]: Built-in profiles cannot be deleted or overwritten by custom profiles
+- [02-02]: Custom profiles stored as individual JSON files in ~/.klippbok/profiles/
 
 ### Pending Todos
 
@@ -71,6 +74,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-27
-Stopped at: Completed 02-01-PLAN.md (model profile schema + bucket generation)
+Last session: 2026-02-28
+Stopped at: Completed 02-02-PLAN.md (model config overrides -- Phase 2 complete)
 Resume file: None
