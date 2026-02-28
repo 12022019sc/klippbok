@@ -13,7 +13,7 @@ Klippbok v2 extends the existing video-only LoRA dataset tool into a unified ima
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Architecture Foundation** - Service layer, image domain module, unified models, and dependency structure
-- [ ] **Phase 2: Model Configuration** - Model profiles with resolution presets, bucket sizes, and caption style defaults
+- [x] **Phase 2: Model Configuration** - Model profiles with resolution presets, bucket sizes, and caption style defaults
 - [ ] **Phase 3: Image Import and Quality** - Batch image import with validation, bucketing, quality filtering, and duplicate detection
 - [ ] **Phase 4: Web GUI Foundation** - FastAPI+React shell, image gallery, thumbnails, and progress indicators
 - [ ] **Phase 5: Interactive Crop Editor** - Canvas-based crop tool with snap-to-bucket, zoom, rotation, and auto-crop
@@ -49,11 +49,11 @@ Plans:
   2. Selecting SDXL or Flux sets base resolution to 1024px with appropriate buckets and natural language caption default
   3. User can override any model default (resolution, bucket sizes, caption style) and the override persists
   4. User can create a custom model profile with arbitrary resolution and caption settings
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: Model profile schema and built-in presets
-- [ ] 02-02: Override system and custom profile creation
+- [x] 02-01-PLAN.md -- Model profile schema and built-in presets
+- [x] 02-02-PLAN.md -- Override system and custom profile creation
 
 ### Phase 3: Image Import and Quality
 **Goal**: Users can batch-import images and immediately see which ones are training-ready, which need attention, and how they distribute across resolution buckets
@@ -163,7 +163,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Architecture Foundation | 3/3 | Complete | 2026-02-27 |
-| 2. Model Configuration | 0/2 | Not started | - |
+| 2. Model Configuration | 2/2 | Complete | 2026-02-28 |
 | 3. Image Import and Quality | 0/3 | Not started | - |
 | 4. Web GUI Foundation | 0/3 | Not started | - |
 | 5. Interactive Crop Editor | 0/4 | Not started | - |
