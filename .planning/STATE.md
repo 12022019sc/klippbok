@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 ## Current Position
 
 Phase: 3 of 8 (Image Import and Quality)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-02-28 -- Completed 03-01-PLAN.md (TIFF support, IssueCodes, import models)
+Last activity: 2026-02-28 -- Completed 03-02-PLAN.md (bucket assignment, blur detection)
 
-Progress: [██████░░░░] ~40% (6 of ~15 estimated plans)
+Progress: [███████░░░] ~47% (7 of ~15 estimated plans)
 
 ## Performance Metrics
 
@@ -64,6 +64,10 @@ Recent decisions affecting current work:
 - [03-01]: CMYK warning reuses IMAGE_RGBA_CONVERSION code (color conversion semantics are the same)
 - [03-01]: n_frames on ImageMetadata (not validate_image param) -- keeps validation interface clean, pure-logic
 - [03-01]: imagehash and scipy declared in pyproject.toml [image] extras but not yet installed (needed by 03-03)
+- [03-02]: assign_to_bucket takes bucket list (not model profile) -- pure function, caller provides context
+- [03-02]: scipy installed (1.17.1) from pyproject.toml [image] extras; imagehash still needed for 03-03
+- [03-02]: BLUR_THRESHOLD = 100.0 as module constant, not parameter -- fixed threshold semantics
+- [03-02]: test_image_blur.py (not test_image_quality.py) to avoid collision with video domain test file
 
 ### Pending Todos
 
@@ -77,6 +81,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-28T05:12:44Z
-Stopped at: Completed 03-01-PLAN.md (1/3 in Phase 3)
+Last session: 2026-02-28T05:25:57Z
+Stopped at: Completed 03-02-PLAN.md (2/3 in Phase 3)
 Resume file: None
