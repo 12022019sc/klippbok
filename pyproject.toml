@@ -45,6 +45,7 @@ dataset = [
 image = [
     "Pillow>=9.0",
     "imagehash>=4.3",
+    "numpy>=1.21",
     "scipy>=1.9",
 ]
 triage = [
@@ -53,7 +54,10 @@ triage = [
     "transformers>=4.30",
 ]
 gui = [
-    # Placeholder for Phase 4 GUI dependencies
+    "klippbok[image]",
+    "fastapi[standard]>=0.100",
+    "uvicorn[standard]>=0.20",
+    "sse-starlette>=3.2.0",
 ]
 all = [
     "klippbok[video]",
@@ -61,12 +65,16 @@ all = [
     "klippbok[dataset]",
     "klippbok[image]",
     "klippbok[triage]",
+    "klippbok[gui]",
 ]
 dev = [
     "pytest>=7.0",
     "pytest-tmp-files>=0.0.2",
     "Pillow>=9.0",
 ]
+
+[project.scripts]
+klippbok = "klippbok.__main__:main"
 
 [project.urls]
 Homepage = "https://github.com/alvdansen/klippbok"
