@@ -5,10 +5,18 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from klippbok.config.model_defaults import (
+    BUILTIN_PROFILES,
+    FLUX_PROFILE,
+    PONY_PROFILE,
+    SD15_PROFILE,
+    SDXL_PROFILE,
+)
 from klippbok.config.model_profiles import (
     BucketConfig,
     ModelProfile,
     TrainingHints,
+    generate_buckets,
 )
 
 
@@ -129,3 +137,65 @@ class TestBaseResolutionValidation:
             bucket_config=BucketConfig(step_size=64),
         )
         assert p.base_resolution == 512
+
+
+class TestBuiltinProfiles:
+    """Tests for built-in model profile constants."""
+
+    def test_builtin_profiles_count(self) -> None:
+        """BUILTIN_PROFILES has exactly 4 entries."""
+        assert len(BUILTIN_PROFILES) == 4
+
+    def test_sd15_profile_values(self) -> None:
+        """SD15_PROFILE has correct resolution and caption style."""
+        assert SD15_PROFILE.base_resolution == 512
+        assert SD15_PROFILE.caption_style == "booru"
+        assert SD15_PROFILE.name == "sd15"
+
+    def test_sdxl_profile_values(self) -> None:
+        """SDXL_PROFILE has correct resolution and caption style."""
+        assert SDXL_PROFILE.base_resolution == 1024
+        assert SDXL_PROFILE.caption_style == "natural_language"
+        assert SDXL_PROFILE.name == "sdxl"
+
+    def test_flux_alpha_ratio(self) -> None:
+        """FLUX_PROFILE has network_alpha_ratio == 1.0."""
+        assert FLUX_PROFILE.training_hints.network_alpha_ratio == 1.0
+
+    def test_pony_caption_style(self) -> None:
+        """PONY_PROFILE has caption_style == 'booru'."""
+        assert PONY_PROFILE.caption_style == "booru"
+
+    def test_all_builtin_buckets_generate_successfully(self) -> None:
+        """Each built-in profile generates a non-empty bucket list."""
+        for name, profile in BUILTIN_PROFILES.items():
+            buckets = generate_buckets(
+                profile.base_resolution,
+                step_size=profile.bucket_config.step_size,
+                min_dimension=profile.bucket_config.min_dimension,
+                max_dimension=profile.bucket_config.max_dimension,
+            )
+            assert len(buckets) > 0, f"Profile '{name}' generated no buckets"
+
+    def test_sd15_buckets_within_budget(self) -> None:
+        """All SD1.5 buckets have w*h <= 512*512."""
+        buckets = generate_buckets(
+            SD15_PROFILE.base_resolution,
+            step_size=SD15_PROFILE.bucket_config.step_size,
+            min_dimension=SD15_PROFILE.bucket_config.min_dimension,
+            max_dimension=SD15_PROFILE.bucket_config.max_dimension,
+        )
+        budget = 512 * 512
+        for w, h in buckets:
+            assert w * h <= budget, f"SD1.5 bucket ({w}, {h}) exceeds budget"
+
+    def test_public_api_importable(self) -> None:
+        """Public API is importable from klippbok.config."""
+        from klippbok.config import (  # noqa: F401
+            BUILTIN_PROFILES as bp,
+            BucketConfig as bc,
+            ModelProfile as mp,
+            TrainingHints as th,
+            generate_buckets as gb,
+        )
+        assert len(bp) == 4
