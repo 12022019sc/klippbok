@@ -58,3 +58,56 @@ class GalleryResponse(BaseModel):
 
     images: list[ImageStatusResponse]
     """List of image status objects."""
+
+
+class ImportRequest(BaseModel):
+    """Request body for starting a batch import."""
+
+    directory: str
+    """Absolute or relative path to the directory to import from."""
+
+    recursive: bool = False
+    """If True, scan subdirectories for images."""
+
+
+class ImportStarted(BaseModel):
+    """Response returned when a batch import is started."""
+
+    operation_id: str
+    """UUID identifying this import operation. Use for SSE progress stream."""
+
+
+class ImportProgress(BaseModel):
+    """SSE event payload for import progress updates."""
+
+    operation_id: str
+    """UUID of the import operation."""
+
+    current: int
+    """Number of images processed so far."""
+
+    total: int
+    """Total number of images to process."""
+
+    message: str
+    """Human-readable status message."""
+
+    status: str
+    """Operation status: 'running' | 'complete' | 'error'."""
+
+
+class SettingsResponse(BaseModel):
+    """Response model for reading current project settings."""
+
+    project_dir: str
+    """Absolute path to the project directory."""
+
+    active_profile: str | None
+    """Currently active model profile name, or None if not set."""
+
+
+class SettingsUpdate(BaseModel):
+    """Request body for updating project settings."""
+
+    active_profile: str | None = None
+    """New active model profile name, or None to clear."""

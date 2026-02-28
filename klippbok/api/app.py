@@ -15,6 +15,7 @@ API requests.
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -32,20 +33,40 @@ def create_app(project_dir: Path | None = None) -> FastAPI:
     Returns:
         Configured FastAPI application instance.
     """
+    from klippbok.api.routers import import_ as import_router_module
     from klippbok.api.routers.images import router as images_router
+    from klippbok.api.routers.settings import router as settings_router
+
+    resolved_project_dir = project_dir if project_dir is not None else Path.cwd()
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        """Lifespan context manager: cancel active import tasks on shutdown."""
+        yield
+        # Shutdown: cancel all in-flight import tasks to avoid resource leaks
+        from klippbok.api.routers.import_ import _tasks
+        if _tasks:
+            logger.info("Cancelling %d active import task(s) on shutdown", len(_tasks))
+            for op_id, task in list(_tasks.items()):
+                if not task.done():
+                    task.cancel()
+                    logger.debug("Cancelled import task for operation %s", op_id)
 
     app = FastAPI(
         title="klippbok",
         description="Dataset curation and preparation for LoRA training.",
         version="0.1.0",
+        lifespan=lifespan,
     )
 
     # Store project_dir on app state for route handlers to access via request.app.state
-    app.state.project_dir = project_dir if project_dir is not None else Path.cwd()
+    app.state.project_dir = resolved_project_dir
 
     # Register API routers BEFORE static files mount
     # (StaticFiles catch-all would intercept /api/ routes if mounted first)
     app.include_router(images_router, prefix="/api/v1")
+    app.include_router(import_router_module.router, prefix="/api/v1")
+    app.include_router(settings_router, prefix="/api/v1")
 
     # Mount SPA static files (only if the static directory exists)
     # This is a catch-all that serves the React build; it must come last.
