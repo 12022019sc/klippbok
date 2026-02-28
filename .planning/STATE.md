@@ -10,27 +10,28 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 ## Current Position
 
 Phase: 2 of 8 (Model Configuration)
-Plan: 0 of 2 in current phase
-Status: Ready to plan
-Last activity: 2026-02-27 -- Phase 1 complete (3/3 plans, verified)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-02-27 -- Completed 02-01-PLAN.md (model profile schema)
 
-Progress: [███░░░░░░░] ~20% (3 of ~15 estimated plans)
+Progress: [████░░░░░░] ~27% (4 of ~15 estimated plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
+- Total plans completed: 4
 - Average duration: ~4min
-- Total execution time: ~12min
+- Total execution time: ~16min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-architecture-foundation | 3 | ~12min | ~4min |
+| 02-model-configuration | 1 | ~4min | ~4min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (~5min), 01-02 (4min), 01-03 (4min)
+- Last 5 plans: 01-01 (~5min), 01-02 (4min), 01-03 (4min), 02-01 (4min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -54,6 +55,9 @@ Recent decisions affecting current work:
 - [01-03 UNI-01]: Type discriminator defaults to "video" for zero breakage
 - [01-03 UNI-02]: target_type parameter with video/image/mixed values for discovery
 - [01-03 UNI-03]: SUPPORTED_IMAGE_EXTENSIONS imported from image module with fallback
+- [02-01]: max_aspect_ratio defaults to 2.0 for bucket generation
+- [02-01]: step_size validated as power of 2 (VAE compression alignment)
+- [02-01]: base_resolution validated as multiple of step_size via model_validator
 
 ### Pending Todos
 
@@ -68,5 +72,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Phase 1 complete, verified, ready for Phase 2
+Stopped at: Completed 02-01-PLAN.md (model profile schema + bucket generation)
 Resume file: None
