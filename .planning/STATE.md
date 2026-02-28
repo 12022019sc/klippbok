@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 ## Current Position
 
 Phase: 4 of 8 (Web GUI Foundation) -- In progress
-Plan: 3 of 5 in phase 4
+Plan: 4 of 5 in phase 4
 Status: In progress
-Last activity: 2026-02-28 -- Completed 04-03-PLAN.md (Image gallery page with masonry grid, status strip, duplicate borders, lightbox)
+Last activity: 2026-02-28 -- Completed 04-04-PLAN.md (Import API SSE streaming, import page, settings page, sonner toast notifications)
 
-Progress: [██████████░] ~69% (11 of ~16 estimated plans)
+Progress: [███████████░] ~75% (12 of ~16 estimated plans)
 
 ## Performance Metrics
 
@@ -30,11 +30,11 @@ Progress: [██████████░] ~69% (11 of ~16 estimated plans)
 | 01-architecture-foundation | 3 | ~12min | ~4min |
 | 02-model-configuration | 2 | ~7min | ~3.5min |
 | 03-image-import-quality | 3 | ~5min | ~5min |
-| 04-web-gui-foundation | 3 | ~6min | ~2min |
+| 04-web-gui-foundation | 4 | ~9min | ~2.25min |
 
 **Recent Trend:**
-- Last 5 plans: 03-02 (5min), 03-03 (5min), 04-01 (~2min), 04-02 (~2min), 04-03 (~2min)
-- Trend: Fast -- frontend gallery build tasks execute quickly
+- Last 5 plans: 03-03 (5min), 04-01 (~2min), 04-02 (~2min), 04-03 (~2min), 04-04 (~3min)
+- Trend: Fast -- backend + frontend API integration tasks execute quickly
 
 *Updated after each plan completion*
 
@@ -87,6 +87,12 @@ Recent decisions affecting current work:
 - [04-03 GAL-03]: Duplicate border applied as inline style (borderLeft) not CSS class -- enables dynamic color
 - [04-03 GAL-04]: Caption truncation at 40 chars done in StatusStrip, not in hook/types -- keeps data layer clean
 - [04-03 GAL-05]: GalleryPage uses selectedIndex: number | null (not separate open boolean) -- single state source
+- [04-04 IMP-01]: import_error SSE event name (not "error") -- avoids collision with EventSource built-in error event
+- [04-04 IMP-02]: asyncio.Queue per operation_id as SSE event bus; None sentinel signals end of stream
+- [04-04 IMP-03]: batch_import_images runs in run_in_executor (synchronous/CPU-bound) to keep event loop responsive
+- [04-04 IMP-04]: lifespan context manager cancels all _tasks dict entries on app shutdown
+- [04-04 IMP-05]: Stable toast ID "import-progress" for AppLayout persistent toast (in-place updates across navigation)
+- [04-04 SET-01]: Settings PUT is Phase 4 stub -- returns updated settings without persisting
 
 03-01 SUMMARY: TIFF format support, 5 new IssueCodes, ImageImportEntry/ImageImportReport models, n_frames field
 03-02 SUMMARY: assign_to_bucket (argmin AR), needs_upscale, compute_blur_score (scipy Laplacian), is_blurry (threshold 100.0)
@@ -94,6 +100,7 @@ Recent decisions affecting current work:
 04-01 SUMMARY: FastAPI app factory (create_app), SHA256[:16] image ID, gallery+thumbnail endpoints, klippbok serve CLI, uvicorn/fastapi/sse-starlette installed
 04-02 SUMMARY: Vite+React+TS SPA at frontend/, React Router v7 layout routing, dark NavBar, GalleryPage/ImportPage/SettingsPage stubs, useAppStore (Zustand), QueryClientProvider (TanStack Query), /api proxy
 04-03 SUMMARY: Virtualized masonry gallery (masonic), ThumbnailCard with aspect-ratio heights and colored duplicate borders, StatusStrip (resolution/quality/bucket/caption preview), ImageLightbox (yet-another-react-lightbox with metadata footer), useImages TanStack Query hook, GalleryItem/GalleryResponse types
+04-04 SUMMARY: POST /api/v1/import (asyncio background task + SSE named events), GET/PUT /api/v1/settings, useImportEvents SSE hook, ImportPage with progress bar, SettingsPage (TanStack Query), ToastProvider, persistent AppLayout import toast
 
 ### Pending Todos
 
@@ -107,6 +114,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-28T17:15:52Z
-Stopped at: Completed 04-03-PLAN.md (3/5 in Phase 4 -- In progress)
+Last session: 2026-02-28T17:18:14Z
+Stopped at: Completed 04-04-PLAN.md (4/5 in Phase 4 -- In progress)
 Resume file: None
