@@ -7,14 +7,14 @@
 
 ### Image Pipeline
 
-- [ ] **IMG-01**: User can batch import images (PNG, JPG, WEBP, TIFF) via drag-and-drop or file picker
-- [ ] **IMG-02**: Corrupt/invalid files are rejected with clear error messages on import
-- [ ] **IMG-03**: Each image displays resolution (WxH) with green/red indicator vs target training resolution
-- [ ] **IMG-04**: Images are automatically grouped into aspect ratio buckets based on target model
-- [ ] **IMG-05**: Bucket distribution is visible (how many images per bucket, flagging imbalanced buckets)
-- [ ] **IMG-06**: Near-duplicate images detected via perceptual hashing with visual indicator
-- [ ] **IMG-07**: Basic quality filtering: blur detection, exposure assessment with pass/fail per image
-- [ ] **IMG-08**: Upscale warning: clear red indicator when source resolution is below target bucket size
+- [x] **IMG-01**: User can batch import images (PNG, JPG, WEBP, TIFF) via drag-and-drop or file picker
+- [x] **IMG-02**: Corrupt/invalid files are rejected with clear error messages on import
+- [x] **IMG-03**: Each image displays resolution (WxH) with green/red indicator vs target training resolution
+- [x] **IMG-04**: Images are automatically grouped into aspect ratio buckets based on target model
+- [x] **IMG-05**: Bucket distribution is visible (how many images per bucket, flagging imbalanced buckets)
+- [x] **IMG-06**: Near-duplicate images detected via perceptual hashing with visual indicator
+- [x] **IMG-07**: Basic quality filtering: blur detection, exposure assessment with pass/fail per image
+- [x] **IMG-08**: Upscale warning: clear red indicator when source resolution is below target bucket size
 
 ### Cropping
 

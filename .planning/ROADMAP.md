@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Architecture Foundation** - Service layer, image domain module, unified models, and dependency structure
 - [x] **Phase 2: Model Configuration** - Model profiles with resolution presets, bucket sizes, and caption style defaults
-- [ ] **Phase 3: Image Import and Quality** - Batch image import with validation, bucketing, quality filtering, and duplicate detection
+- [x] **Phase 3: Image Import and Quality** - Batch image import with validation, bucketing, quality filtering, and duplicate detection
 - [ ] **Phase 4: Web GUI Foundation** - FastAPI+React shell, image gallery, thumbnails, and progress indicators
 - [ ] **Phase 5: Interactive Crop Editor** - Canvas-based crop tool with snap-to-bucket, zoom, rotation, and auto-crop
 - [ ] **Phase 6: Captioning System** - Booru tag generation, NL captioning, model-aware defaults, manual editing, and batch operations
@@ -68,9 +68,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md -- TIFF format support, new IssueCode values, and import result models
-- [ ] 03-02-PLAN.md -- Bucket assignment and blur detection modules
-- [ ] 03-03-PLAN.md -- Perceptual hash dedup and full batch import pipeline
+- [x] 03-01-PLAN.md -- TIFF format support, new IssueCode values, and import result models
+- [x] 03-02-PLAN.md -- Bucket assignment and blur detection modules
+- [x] 03-03-PLAN.md -- Perceptual hash dedup and full batch import pipeline
 
 ### Phase 4: Web GUI Foundation
 **Goal**: Users can launch the web interface with a single command and browse their imported images in a responsive gallery with per-image status at a glance
@@ -164,7 +164,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 |-------|----------------|--------|-----------|
 | 1. Architecture Foundation | 3/3 | Complete | 2026-02-27 |
 | 2. Model Configuration | 2/2 | Complete | 2026-02-28 |
-| 3. Image Import and Quality | 0/3 | Not started | - |
+| 3. Image Import and Quality | 3/3 | Complete | 2026-02-28 |
 | 4. Web GUI Foundation | 0/3 | Not started | - |
 | 5. Interactive Crop Editor | 0/4 | Not started | - |
 | 6. Captioning System | 0/4 | Not started | - |
