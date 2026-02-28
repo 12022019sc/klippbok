@@ -48,15 +48,20 @@ class TestDiscoverImages:
         assert "video.mp4" not in names
 
     def test_returns_only_images(self, tmp_path: Path) -> None:
-        """Only returns files with supported image extensions."""
+        """Only returns files with supported image extensions (png, jpg, jpeg, webp, tif, tiff)."""
         _touch(tmp_path / "a.png")
         _touch(tmp_path / "b.bmp")
         _touch(tmp_path / "c.tiff")
         _touch(tmp_path / "d.gif")
 
         result = discover_images(tmp_path)
-        assert len(result) == 1
-        assert result[0].name == "a.png"
+        # .png and .tiff are both supported; .bmp and .gif are not
+        assert len(result) == 2
+        names = [p.name for p in result]
+        assert "a.png" in names
+        assert "c.tiff" in names
+        assert "b.bmp" not in names
+        assert "d.gif" not in names
 
     def test_empty_directory(self, tmp_path: Path) -> None:
         """Empty directory returns empty list."""

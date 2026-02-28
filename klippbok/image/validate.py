@@ -109,4 +109,32 @@ def validate_image(
             expected="RGB",
         ))
 
+    # 5. CMYK color mode check (like RGBA, needs conversion to RGB)
+    if metadata.color_mode == "CMYK":
+        issues.append(ValidationIssue(
+            code=IssueCode.IMAGE_RGBA_CONVERSION,
+            severity=Severity.WARNING,
+            message=(
+                "Image is in CMYK color mode. Will be auto-converted "
+                "to RGB during import. Colors may shift slightly."
+            ),
+            field="color_mode",
+            actual=metadata.color_mode,
+            expected="RGB",
+        ))
+
+    # 6. Multi-page TIFF check
+    if metadata.n_frames > 1:
+        issues.append(ValidationIssue(
+            code=IssueCode.IMAGE_TIFF_MULTIPAGE,
+            severity=Severity.WARNING,
+            message=(
+                f"Multi-page TIFF with {metadata.n_frames} frames. "
+                f"Only the first frame will be used for training."
+            ),
+            field="n_frames",
+            actual=str(metadata.n_frames),
+            expected="1",
+        ))
+
     return ImageValidation(metadata=metadata, issues=issues)

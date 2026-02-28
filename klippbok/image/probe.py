@@ -87,6 +87,7 @@ def probe_image(path: Path | str) -> ImageMetadata:
             has_alpha = "A" in color_mode
             width = img.width
             height = img.height
+            n_frames = getattr(img, "n_frames", 1)
     except Exception as exc:
         raise ImageProbeError(
             str(path),
@@ -107,4 +108,5 @@ def probe_image(path: Path | str) -> ImageMetadata:
         file_size=file_size,
         has_alpha=has_alpha,
         is_corrupt=False,
+        n_frames=n_frames,
     )

@@ -143,3 +143,64 @@ class TestProbeImage:
         """Probed metadata has correct pixel_count property."""
         meta = probe_image(rgb_png)
         assert meta.pixel_count == 100 * 80
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: TIFF probing tests
+# ---------------------------------------------------------------------------
+
+class TestProbeImageTiff:
+    """Tests for TIFF-specific probing (multi-page, CMYK)."""
+
+    def test_probe_tiff_image(self, tmp_path: Path) -> None:
+        """Probe returns correct metadata for a single-page RGB TIFF."""
+        path = tmp_path / "test_rgb.tiff"
+        img = Image.new("RGB", (320, 240), color=(100, 150, 200))
+        img.save(path, format="TIFF")
+
+        meta = probe_image(path)
+        assert meta.format == "tiff"
+        assert meta.width == 320
+        assert meta.height == 240
+        assert meta.color_mode == "RGB"
+        assert meta.is_corrupt is False
+        assert meta.n_frames == 1
+
+    def test_probe_tiff_multipage(self, tmp_path: Path) -> None:
+        """Probe returns n_frames>1 for a multi-page TIFF, using first frame dimensions."""
+        path = tmp_path / "multipage.tiff"
+        img1 = Image.new("RGB", (400, 300), color=(255, 0, 0))
+        img2 = Image.new("RGB", (400, 300), color=(0, 255, 0))
+        img3 = Image.new("RGB", (400, 300), color=(0, 0, 255))
+        img1.save(path, format="TIFF", save_all=True, append_images=[img2, img3])
+
+        meta = probe_image(path)
+        assert meta.format == "tiff"
+        assert meta.width == 400
+        assert meta.height == 300
+        assert meta.n_frames == 3
+        assert meta.is_corrupt is False
+
+    def test_probe_cmyk_tiff(self, tmp_path: Path) -> None:
+        """Probe returns color_mode='CMYK' for a CMYK TIFF."""
+        path = tmp_path / "cmyk.tiff"
+        img = Image.new("RGB", (200, 200), color=(200, 100, 50))
+        cmyk_img = img.convert("CMYK")
+        cmyk_img.save(path, format="TIFF")
+
+        meta = probe_image(path)
+        assert meta.format == "tiff"
+        assert meta.color_mode == "CMYK"
+        assert meta.width == 200
+        assert meta.height == 200
+        assert meta.is_corrupt is False
+
+    def test_probe_tif_extension(self, tmp_path: Path) -> None:
+        """Probe works with .tif extension as well as .tiff."""
+        path = tmp_path / "test.tif"
+        img = Image.new("RGB", (100, 100), color=(128, 128, 128))
+        img.save(path, format="TIFF")
+
+        meta = probe_image(path)
+        assert meta.format == "tiff"
+        assert meta.width == 100

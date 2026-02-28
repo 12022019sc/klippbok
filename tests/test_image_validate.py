@@ -146,3 +146,61 @@ class TestValidateImage:
         # With min=64, should pass
         result_low = validate_image(meta, min_resolution=64)
         assert result_low.is_valid
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: TIFF-specific validation tests
+# ---------------------------------------------------------------------------
+
+class TestValidateImageTiff:
+    """Tests for TIFF format validation (CMYK, multi-page)."""
+
+    def test_validate_tiff_format_accepted(self) -> None:
+        """ImageMetadata with format='tiff' does NOT produce IMAGE_FORMAT_UNSUPPORTED."""
+        meta = _make_meta(format="tiff")
+        result = validate_image(meta)
+        codes = _issue_codes(result)
+        assert IssueCode.IMAGE_FORMAT_UNSUPPORTED not in codes
+        assert result.is_valid is True
+
+    def test_validate_cmyk_image_warning(self) -> None:
+        """ImageMetadata with color_mode='CMYK' produces a WARNING."""
+        meta = _make_meta(color_mode="CMYK", format="tiff")
+        result = validate_image(meta)
+        # Should produce a warning, not an error -- still valid
+        assert result.is_valid is True
+        assert len(result.warnings) >= 1
+        # The warning should mention CMYK or conversion
+        warning_messages = [w.message.lower() for w in result.warnings]
+        assert any("cmyk" in msg for msg in warning_messages)
+
+    def test_validate_tiff_multipage_warning(self) -> None:
+        """ImageMetadata with n_frames>1 produces IMAGE_TIFF_MULTIPAGE warning."""
+        meta = _make_meta(format="tiff", n_frames=5)
+        result = validate_image(meta)
+        # Should produce a warning, not an error -- still valid
+        assert result.is_valid is True
+        codes = _issue_codes(result)
+        assert IssueCode.IMAGE_TIFF_MULTIPAGE in codes
+        # Warning should mention frame count
+        tiff_warning = next(
+            w for w in result.warnings if w.code == IssueCode.IMAGE_TIFF_MULTIPAGE
+        )
+        assert "5" in tiff_warning.message
+
+    def test_validate_single_page_tiff_no_multipage_warning(self) -> None:
+        """Single-page TIFF (n_frames=1) does not produce multipage warning."""
+        meta = _make_meta(format="tiff", n_frames=1)
+        result = validate_image(meta)
+        codes = _issue_codes(result)
+        assert IssueCode.IMAGE_TIFF_MULTIPAGE not in codes
+
+    def test_validate_tiff_cmyk_multipage_both_warn(self) -> None:
+        """CMYK multi-page TIFF produces both CMYK conversion and multipage warnings."""
+        meta = _make_meta(format="tiff", color_mode="CMYK", n_frames=3)
+        result = validate_image(meta)
+        assert result.is_valid is True
+        codes = _issue_codes(result)
+        assert IssueCode.IMAGE_TIFF_MULTIPAGE in codes
+        # At least the multipage warning is present
+        assert len(result.warnings) >= 1
