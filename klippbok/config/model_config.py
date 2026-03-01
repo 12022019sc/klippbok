@@ -218,7 +218,12 @@ def load_model_config(project_dir: Path) -> ModelConfigOverride | None:
     if not config_path.is_file():
         return None
 
-    data = json.loads(config_path.read_text())
+    try:
+        data = json.loads(config_path.read_text())
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"Corrupt or invalid JSON in model config file {config_path}: {exc}"
+        ) from exc
     return ModelConfigOverride(**data)
 
 
@@ -360,8 +365,8 @@ def _load_all_custom_profiles() -> list[ModelProfile]:
             data = json.loads(path.read_text())
             data.pop("based_on", None)
             profiles.append(ModelProfile(**data))
-        except Exception:
-            logger.warning("Failed to load custom profile from %s", path)
+        except Exception as exc:
+            logger.warning("Failed to load custom profile from %s: %s", path, exc)
     return profiles
 
 

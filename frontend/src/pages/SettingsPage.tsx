@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
+import { useAppStore } from '../stores/appStore'
+import { toast } from 'sonner'
 
 interface SettingsResponse {
   project_dir: string
@@ -13,16 +15,42 @@ async function fetchSettings(): Promise<SettingsResponse> {
   return res.json()
 }
 
-/**
- * SettingsPage displays the current project directory and active model profile.
- * Both fields are read-only in Phase 4 -- profile selection will be wired in
- * a future phase.
- */
 export default function SettingsPage() {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['settings'],
     queryFn: fetchSettings,
   })
+
+  const setProjectDir = useAppStore((s) => s.setProjectDir)
+  const clearImport = useAppStore((s) => s.clearImport)
+
+  function handleChangeProject() {
+    clearImport()
+    setProjectDir(null)
+  }
+
+  async function handleDeleteProject() {
+    const confirmed = window.confirm(
+      'Delete project data (.klippbok/)?\n\nThis removes thumbnails, manifest, and cache. Your original files are NOT affected.'
+    )
+    if (!confirmed) return
+
+    try {
+      const res = await fetch('/api/v1/settings/project', { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
+        toast.error('Failed to delete project', { description: err.detail })
+        return
+      }
+      toast.success('Project data deleted')
+      clearImport()
+      setProjectDir(null)
+    } catch (err) {
+      toast.error('Failed to delete project', {
+        description: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
 
   return (
     <div>
@@ -53,6 +81,21 @@ export default function SettingsPage() {
                 )}
               </span>
             </div>
+          </div>
+
+          <div className="settings-actions">
+            <button
+              className="settings-btn settings-btn--secondary"
+              onClick={handleChangeProject}
+            >
+              Change Project
+            </button>
+            <button
+              className="settings-btn settings-btn--danger"
+              onClick={handleDeleteProject}
+            >
+              Delete Project Data
+            </button>
           </div>
         </div>
       )}

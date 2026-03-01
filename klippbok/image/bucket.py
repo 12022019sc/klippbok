@@ -27,7 +27,7 @@ def assign_to_bucket(
         (bucket_width, bucket_height) tuple, or None if the image's
         aspect ratio exceeds max_aspect_ratio or bucket list is empty.
     """
-    if not buckets or height == 0:
+    if not buckets or width == 0 or height == 0:
         return None
 
     # Check if image has extreme aspect ratio

@@ -95,7 +95,25 @@ def validate_image(
             expected=f">={min_resolution}x{min_resolution}",
         ))
 
-    # 4. RGBA / alpha channel check
+    # 4. Dimensions above maximum
+    if (
+        metadata.width > max_resolution
+        or metadata.height > max_resolution
+    ):
+        issues.append(ValidationIssue(
+            code=IssueCode.RESOLUTION_ABOVE_TARGET,
+            severity=Severity.WARNING,
+            message=(
+                f"Image is {metadata.display_resolution} -- "
+                f"exceeds maximum {max_resolution}x{max_resolution}. "
+                f"Will be downscaled during export."
+            ),
+            field="resolution",
+            actual=metadata.display_resolution,
+            expected=f"<={max_resolution}x{max_resolution}",
+        ))
+
+    # 5. RGBA / alpha channel check
     if metadata.color_mode == "RGBA" or metadata.has_alpha:
         issues.append(ValidationIssue(
             code=IssueCode.IMAGE_RGBA_CONVERSION,
@@ -112,7 +130,7 @@ def validate_image(
     # 5. CMYK color mode check (like RGBA, needs conversion to RGB)
     if metadata.color_mode == "CMYK":
         issues.append(ValidationIssue(
-            code=IssueCode.IMAGE_RGBA_CONVERSION,
+            code=IssueCode.IMAGE_CMYK_CONVERSION,
             severity=Severity.WARNING,
             message=(
                 "Image is in CMYK color mode. Will be auto-converted "

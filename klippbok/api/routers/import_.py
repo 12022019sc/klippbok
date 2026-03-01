@@ -54,23 +54,23 @@ async def _run_import(
         op_id: Operation UUID for event payloads.
         project_dir: Project root directory from app state.
     """
-    from klippbok.image.discover import discover_images
+    from klippbok.image.discover import discover_media
     from klippbok.services.image_service import batch_import_images
 
     try:
-        # Step 1: Discover images (fast -- runs in event loop)
+        # Step 1: Discover media files (fast -- runs in event loop)
         await queue.put(ImportProgress(
             operation_id=op_id,
             current=0,
             total=0,
-            message="Discovering images...",
+            message="Discovering media files...",
             status="running",
         ))
 
         import_dir = Path(request.directory)
         discovered = await asyncio.get_event_loop().run_in_executor(
             None,
-            lambda: discover_images(import_dir, recursive=request.recursive),
+            lambda: discover_media(import_dir, recursive=request.recursive),
         )
         total = len(discovered)
 
@@ -78,7 +78,7 @@ async def _run_import(
             operation_id=op_id,
             current=0,
             total=total,
-            message=f"Importing {total} image{'s' if total != 1 else ''}...",
+            message=f"Importing {total} file{'s' if total != 1 else ''}...",
             status="running",
         ))
 
@@ -134,7 +134,10 @@ async def start_import(body: ImportRequest, request: Request) -> ImportStarted:
     Returns:
         ImportStarted with the operation_id for SSE subscription.
     """
-    project_dir: Path = request.app.state.project_dir
+    project_dir: Path | None = request.app.state.project_dir
+    if project_dir is None:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=409, detail="No project directory selected")
     op_id = str(uuid.uuid4())
 
     queue: asyncio.Queue = asyncio.Queue()

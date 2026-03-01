@@ -2,13 +2,17 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { useAppStore } from '../stores/appStore'
 import { useImportEvents } from '../hooks/useImportEvents'
+import DirectoryBrowser from '../components/DirectoryBrowser/DirectoryBrowser'
 
 /**
- * ImportPage lets the user select a directory, optionally enable recursive
+ * ImportPage lets the user browse to a directory, optionally enable recursive
  * scanning, and start a batch import. Progress is streamed via SSE.
  */
 export default function ImportPage() {
-  const [directory, setDirectory] = useState('')
+  const projectDir = useAppStore((s) => s.projectDir)
+  const [selectedDir, setSelectedDir] = useState<string | null>(
+    () => localStorage.getItem('klippbok:lastImportDir') ?? projectDir
+  )
   const [recursive, setRecursive] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -22,8 +26,8 @@ export default function ImportPage() {
   const isImporting = importOperationId !== null
 
   async function handleStartImport() {
-    if (!directory.trim()) {
-      toast.error('Please enter a directory path')
+    if (!selectedDir) {
+      toast.error('Please select a directory first')
       return
     }
 
@@ -32,7 +36,7 @@ export default function ImportPage() {
       const res = await fetch('/api/v1/import/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ directory: directory.trim(), recursive }),
+        body: JSON.stringify({ directory: selectedDir, recursive }),
       })
 
       if (!res.ok) {
@@ -43,7 +47,8 @@ export default function ImportPage() {
 
       const data = await res.json()
       setImportOperationId(data.operation_id)
-      toast.info('Import started', { description: `Scanning: ${directory.trim()}` })
+      localStorage.setItem('klippbok:lastImportDir', selectedDir)
+      toast.info('Import started', { description: `Scanning: ${selectedDir}` })
     } catch (err) {
       toast.error('Failed to start import', {
         description: err instanceof Error ? err.message : String(err),
@@ -55,26 +60,32 @@ export default function ImportPage() {
 
   return (
     <div>
-      <h1 className="page-title">Import Images</h1>
+      <h1 className="page-title">Import Media</h1>
       <p className="page-subtitle">
-        Scan a directory and import images into the project. Progress streams in real time.
+        Browse to a directory and import images and videos into the project.
       </p>
 
       <div className="import-form">
-        <div className="import-field">
-          <label htmlFor="directory" className="import-label">
-            Directory Path
-          </label>
-          <input
-            id="directory"
-            type="text"
-            className="import-input"
-            placeholder="/path/to/images"
-            value={directory}
-            onChange={(e) => setDirectory(e.target.value)}
+        {selectedDir ? (
+          <div className="import-field">
+            <span className="import-label">Selected Directory</span>
+            <div className="import-selected-dir">
+              <code className="import-selected-path">{selectedDir}</code>
+              <button
+                className="import-change-btn"
+                onClick={() => { setSelectedDir(null); localStorage.removeItem('klippbok:lastImportDir') }}
+                disabled={isImporting}
+              >
+                Change
+              </button>
+            </div>
+          </div>
+        ) : (
+          <DirectoryBrowser
+            onSelect={(path) => setSelectedDir(path)}
             disabled={isImporting}
           />
-        </div>
+        )}
 
         <div className="import-checkbox-row">
           <label className="import-checkbox-label">
@@ -88,13 +99,15 @@ export default function ImportPage() {
           </label>
         </div>
 
-        <button
-          className="import-button"
-          onClick={handleStartImport}
-          disabled={isImporting || loading}
-        >
-          {loading ? 'Starting...' : isImporting ? 'Importing...' : 'Start Import'}
-        </button>
+        {selectedDir && (
+          <button
+            className="import-button"
+            onClick={handleStartImport}
+            disabled={isImporting || loading}
+          >
+            {loading ? 'Starting...' : isImporting ? 'Importing...' : 'Start Import'}
+          </button>
+        )}
       </div>
 
       {isImporting && importProgress && (

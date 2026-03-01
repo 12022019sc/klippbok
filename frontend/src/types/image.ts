@@ -10,6 +10,9 @@ export interface GalleryItem {
   is_near_duplicate: boolean;
   duplicate_group_id: string | null;
   caption: string | null;
+  media_type: 'image' | 'video';
+  full_url: string;
+  video_url: string | null;
 }
 
 export interface GalleryResponse {

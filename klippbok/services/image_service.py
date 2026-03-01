@@ -10,11 +10,16 @@ All functions are pure -- no side effects, no state.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 
 from klippbok.image.bucket import assign_to_bucket, needs_upscale
 from klippbok.image.dedup import are_near_duplicates, compute_phash
-from klippbok.image.discover import discover_images
+from klippbok.image.discover import (
+    SUPPORTED_VIDEO_EXTENSIONS,
+    discover_images,
+    discover_media,
+)
 from klippbok.image.models import (
     ImageImportEntry,
     ImageImportReport,
@@ -22,7 +27,7 @@ from klippbok.image.models import (
     ImageValidation,
 )
 from klippbok.image.probe import probe_image
-from klippbok.image.quality import compute_blur_score, is_blurry
+from klippbok.image.quality import BLUR_THRESHOLD, compute_blur_score
 from klippbok.image.validate import validate_image
 from klippbok.video.models import IssueCode, Severity, ValidationIssue
 
@@ -165,8 +170,8 @@ def batch_import_images(
             if "phash" in entry and "path" in entry:
                 hash_map[entry["phash"]] = project_dir / entry["path"]
 
-    # Step 2: Discover images
-    discovered_paths = discover_images(directory, recursive=recursive)
+    # Step 2: Discover media (images + videos)
+    discovered_paths = discover_media(directory, recursive=recursive)
     total_discovered = len(discovered_paths)
 
     # Step 3: Separate new vs already-imported (canonical relative path comparison)
@@ -174,27 +179,35 @@ def batch_import_images(
     entries: list[ImageImportEntry] = []
     skipped_existing = 0
 
-    for img_path in discovered_paths:
+    for media_path in discovered_paths:
         try:
-            rel_str = str(img_path.resolve().relative_to(project_dir_resolved))
+            rel_str = str(media_path.resolve().relative_to(project_dir_resolved))
         except ValueError:
-            rel_str = str(img_path)
+            rel_str = str(media_path)
 
         if rel_str in known_paths:
             # Already imported -- skip silently
             entries.append(ImageImportEntry(
-                path=img_path,
+                path=media_path,
                 skipped=True,
             ))
             skipped_existing += 1
             continue
 
+        is_video = media_path.suffix.lower() in SUPPORTED_VIDEO_EXTENSIONS
+
+        if is_video:
+            # Video path: probe via ffprobe, skip image-specific processing
+            entries.append(_import_video(media_path))
+            continue
+
+        # Image path: full pipeline (probe, validate, bucket, blur, phash, dedup)
         # Step 3a: Probe
         try:
-            metadata = probe_image(img_path)
+            metadata = probe_image(media_path)
         except Exception as exc:
-            logger.error("Failed to probe image '%s': %s", img_path, exc)
-            entries.append(ImageImportEntry(path=img_path))
+            logger.error("Failed to probe image '%s': %s", media_path, exc)
+            entries.append(ImageImportEntry(path=media_path))
             continue
 
         # Step 3b: Validate
@@ -239,9 +252,9 @@ def batch_import_images(
         if not metadata.is_corrupt:
             try:
                 from PIL import Image
-                with Image.open(img_path) as pil_img:
+                with Image.open(media_path) as pil_img:
                     blur_score = compute_blur_score(pil_img)
-                    blurry = is_blurry(pil_img)
+                    blurry = blur_score < BLUR_THRESHOLD
                 if blurry:
                     extra_issues.append(ValidationIssue(
                         code=IssueCode.IMAGE_BLUR_DETECTED,
@@ -255,15 +268,15 @@ def batch_import_images(
                         expected=">=100.0",
                     ))
             except Exception as exc:
-                logger.warning("Failed to compute blur score for '%s': %s", img_path, exc)
+                logger.warning("Failed to compute blur score for '%s': %s", media_path, exc)
 
         # Step 3e: pHash computation (skip corrupt images)
         phash_hex: str | None = None
         if not metadata.is_corrupt:
             try:
-                phash_hex = compute_phash(img_path)
+                phash_hex = compute_phash(media_path)
             except Exception as exc:
-                logger.warning("Failed to compute pHash for '%s': %s", img_path, exc)
+                logger.warning("Failed to compute pHash for '%s': %s", media_path, exc)
 
         # Step 3f: Near-duplicate check against accumulated hash map
         is_near_dup = False
@@ -288,7 +301,7 @@ def batch_import_images(
             # Add this image's hash to the map regardless (so subsequent images
             # in same batch can detect duplicates of this one)
             if not is_near_dup:
-                hash_map[phash_hex] = img_path
+                hash_map[phash_hex] = media_path
 
         # Merge extra issues into validation (ImageValidation is frozen, create new)
         if extra_issues:
@@ -298,7 +311,7 @@ def batch_import_images(
             )
 
         entries.append(ImageImportEntry(
-            path=img_path,
+            path=media_path,
             metadata=metadata,
             validation=validation,
             bucket=assigned_bucket,
@@ -335,8 +348,6 @@ def batch_import_images(
     )
 
     # Step 5: Persist results to manifest
-    project_dir_resolved_str = str(project_dir_resolved)
-
     def _to_rel(p: Path) -> str:
         try:
             return str(p.resolve().relative_to(project_dir_resolved))
@@ -352,7 +363,86 @@ def batch_import_images(
     return report
 
 
-def _entry_to_dict(entry: ImageImportEntry, to_rel: object) -> dict:
+def _probe_video(video_path: Path) -> dict:
+    """Probe a video file using ffprobe and return metadata.
+
+    Args:
+        video_path: Absolute path to the video file.
+
+    Returns:
+        Dict with width, height, duration, fps, and codec fields.
+    """
+    import json
+    import subprocess
+
+    cmd = [
+        "ffprobe", "-v", "quiet",
+        "-print_format", "json",
+        "-show_streams", "-show_format",
+        str(video_path),
+    ]
+    result = subprocess.run(cmd, capture_output=True, timeout=30)
+    if result.returncode != 0:
+        logger.warning("ffprobe failed for '%s': %s", video_path, result.stderr.decode(errors="replace")[:200])
+        return {"width": 0, "height": 0}
+
+    data = json.loads(result.stdout)
+    video_stream = next(
+        (s for s in data.get("streams", []) if s.get("codec_type") == "video"),
+        None,
+    )
+    if video_stream is None:
+        return {"width": 0, "height": 0}
+
+    # Parse frame rate from r_frame_rate (e.g. "30/1" or "24000/1001")
+    fps = 0.0
+    r_frame_rate = video_stream.get("r_frame_rate", "0/1")
+    try:
+        num, den = r_frame_rate.split("/")
+        if int(den) > 0:
+            fps = round(int(num) / int(den), 2)
+    except (ValueError, ZeroDivisionError):
+        pass
+
+    return {
+        "width": int(video_stream.get("width", 0)),
+        "height": int(video_stream.get("height", 0)),
+        "duration": float(data.get("format", {}).get("duration", 0)),
+        "fps": fps,
+        "codec": video_stream.get("codec_name", "unknown"),
+    }
+
+
+def _import_video(video_path: Path) -> ImageImportEntry:
+    """Import a single video file — probe metadata, skip image-specific steps.
+
+    Args:
+        video_path: Path to the video file.
+
+    Returns:
+        ImageImportEntry with video metadata (no validation/bucket/blur/phash).
+    """
+    try:
+        video_meta = _probe_video(video_path)
+        # Create a minimal ImageMetadata-like structure for consistency
+        metadata = ImageMetadata(
+            path=video_path,
+            width=video_meta.get("width", 0),
+            height=video_meta.get("height", 0),
+            format="video",
+            color_mode="RGB",
+        )
+        return ImageImportEntry(
+            path=video_path,
+            metadata=metadata,
+            skipped=False,
+        )
+    except Exception as exc:
+        logger.error("Failed to probe video '%s': %s", video_path, exc)
+        return ImageImportEntry(path=video_path)
+
+
+def _entry_to_dict(entry: ImageImportEntry, to_rel: Callable[[Path], str]) -> dict:
     """Serialize an ImageImportEntry to a manifest dict.
 
     Args:
@@ -362,10 +452,19 @@ def _entry_to_dict(entry: ImageImportEntry, to_rel: object) -> dict:
     Returns:
         Dict for inclusion in manifest["images"].
     """
+    is_video = entry.path.suffix.lower() in SUPPORTED_VIDEO_EXTENSIONS
+
+    # Videos skip image validation (entry.validation is None), so use
+    # metadata presence as a validity proxy instead.
+    if is_video:
+        status = "valid" if (entry.metadata and entry.metadata.width > 0) else "invalid"
+    else:
+        status = "valid" if (entry.validation and entry.validation.is_valid) else "invalid"
+
     d: dict = {
-        "type": "image",
-        "path": to_rel(entry.path),  # type: ignore[operator]
-        "status": "valid" if (entry.validation and entry.validation.is_valid) else "invalid",
+        "type": "video" if is_video else "image",
+        "path": to_rel(entry.path),
+        "status": status,
     }
 
     if entry.metadata:
@@ -383,7 +482,7 @@ def _entry_to_dict(entry: ImageImportEntry, to_rel: object) -> dict:
         d["blur_score"] = entry.blur_score
 
     if entry.is_near_duplicate and entry.duplicate_of is not None:
-        d["near_duplicate_of"] = to_rel(entry.duplicate_of)  # type: ignore[operator]
+        d["near_duplicate_of"] = to_rel(entry.duplicate_of)
 
     if entry.validation and entry.validation.issues:
         d["issues"] = [

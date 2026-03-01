@@ -16,7 +16,7 @@ export default function ImageLightbox({
   onClose,
 }: ImageLightboxProps) {
   const slides = items.map((item) => ({
-    src: item.thumbnail_url,
+    src: item.full_url,
     alt: item.relative_path,
     width: item.width,
     height: item.height,
@@ -29,6 +29,27 @@ export default function ImageLightbox({
       slides={slides}
       index={currentIndex}
       render={{
+        slide: ({ slide }) => {
+          const idx = slides.findIndex((s) => s.src === slide.src)
+          const item = idx >= 0 ? items[idx] : null
+          if (item?.media_type === 'video' && item.video_url) {
+            return (
+              <video
+                src={item.video_url}
+                controls
+                autoPlay
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '80vh',
+                  objectFit: 'contain',
+                  display: 'block',
+                  margin: '0 auto',
+                }}
+              />
+            )
+          }
+          return undefined
+        },
         slideFooter: ({ slide }) => {
           const idx = slides.findIndex((s) => s.src === slide.src)
           const item = idx >= 0 ? items[idx] : null
@@ -47,12 +68,17 @@ export default function ImageLightbox({
                   Bucket: {item.bucket}
                 </span>
               )}
-              <span
-                title="Quality"
-                style={{ color: item.quality_pass ? '#22c55e' : '#ef4444' }}
-              >
-                {item.quality_pass ? 'Sharp' : 'Blurry'}
-              </span>
+              {item.media_type === 'image' && (
+                <span
+                  title="Quality"
+                  style={{ color: item.quality_pass ? '#22c55e' : '#ef4444' }}
+                >
+                  {item.quality_pass ? 'Sharp' : 'Blurry'}
+                </span>
+              )}
+              {item.media_type === 'video' && (
+                <span style={{ color: '#818cf8' }}>Video</span>
+              )}
               {item.is_near_duplicate && (
                 <span style={{ color: '#f97316' }}>Near-duplicate</span>
               )}

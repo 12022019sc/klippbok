@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/block-secrets.py"
+            "command": "python C:/Dev/Projects/klippbok-main/.claude/hooks/block-secrets.py"
           }
         ]
       },
@@ -39,19 +39,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/check-rybbit.sh"
+            "command": "bash C:/Dev/Projects/klippbok-main/.claude/hooks/check-rybbit.sh"
           },
           {
             "type": "command",
-            "command": "bash .claude/hooks/check-branch.sh"
+            "command": "bash C:/Dev/Projects/klippbok-main/.claude/hooks/check-branch.sh"
           },
           {
             "type": "command",
-            "command": "bash .claude/hooks/check-ports.sh"
+            "command": "bash C:/Dev/Projects/klippbok-main/.claude/hooks/check-ports.sh"
           },
           {
             "type": "command",
-            "command": "bash .claude/hooks/check-e2e.sh"
+            "command": "bash C:/Dev/Projects/klippbok-main/.claude/hooks/check-e2e.sh"
           }
         ]
       }
@@ -62,7 +62,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/lint-on-save.sh"
+            "command": "bash C:/Dev/Projects/klippbok-main/.claude/hooks/lint-on-save.sh"
           }
         ]
       }
@@ -72,15 +72,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/verify-no-secrets.sh"
+            "command": "bash C:/Dev/Projects/klippbok-main/.claude/hooks/verify-no-secrets.sh"
           },
           {
             "type": "command",
-            "command": "bash .claude/hooks/check-rulecatch.sh"
+            "command": "bash C:/Dev/Projects/klippbok-main/.claude/hooks/check-rulecatch.sh"
           },
           {
             "type": "command",
-            "command": "bash .claude/hooks/check-env-sync.sh"
+            "command": "bash C:/Dev/Projects/klippbok-main/.claude/hooks/check-env-sync.sh"
           }
         ]
       }

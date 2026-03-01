@@ -27,7 +27,7 @@ from klippbok.video.models import IssueCode, Severity, ValidationIssue
 try:
     from klippbok.image.models import SUPPORTED_IMAGE_EXTENSIONS
 except ImportError:
-    SUPPORTED_IMAGE_EXTENSIONS: set[str] = {".png", ".jpg", ".jpeg", ".webp"}
+    SUPPORTED_IMAGE_EXTENSIONS: set[str] = {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff"}
 
 
 # ---------------------------------------------------------------------------

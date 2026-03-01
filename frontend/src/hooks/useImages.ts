@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { GalleryResponse } from '../types/image'
 
 async function fetchImages(): Promise<GalleryResponse> {
-  const response = await fetch('/api/v1/images')
+  const response = await fetch('/api/v1/images/')
   if (!response.ok) {
     throw new Error(`Failed to fetch images: ${response.status} ${response.statusText}`)
   }

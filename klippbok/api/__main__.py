@@ -32,7 +32,7 @@ def build_parser(prog: str = "python -m klippbok.api") -> argparse.ArgumentParse
         "--project-dir",
         default=None,
         metavar="DIR",
-        help="Path to the klippbok project directory (default: current working directory).",
+        help="Path to the klippbok project directory (default: select from web UI).",
     )
     parser.add_argument(
         "--host",
@@ -42,8 +42,8 @@ def build_parser(prog: str = "python -m klippbok.api") -> argparse.ArgumentParse
     parser.add_argument(
         "--port",
         type=int,
-        default=8000,
-        help="Port to run the server on (default: 8000).",
+        default=9000,
+        help="Port to run the server on (default: 9000).",
     )
     return parser
 
@@ -61,11 +61,11 @@ def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    project_dir = Path(args.project_dir).resolve() if args.project_dir else Path.cwd()
+    project_dir = Path(args.project_dir).resolve() if args.project_dir else None
     app = create_app(project_dir=project_dir)
 
     print(f"Starting klippbok server")
-    print(f"  Project: {project_dir}")
+    print(f"  Project: {project_dir or '(none — select from web UI)'}")
     print(f"  URL:     http://{args.host}:{args.port}")
     print()
 

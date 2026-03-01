@@ -34,10 +34,13 @@ def create_app(project_dir: Path | None = None) -> FastAPI:
         Configured FastAPI application instance.
     """
     from klippbok.api.routers import import_ as import_router_module
+    from klippbok.api.routers.browse import router as browse_router
     from klippbok.api.routers.images import router as images_router
     from klippbok.api.routers.settings import router as settings_router
 
-    resolved_project_dir = project_dir if project_dir is not None else Path.cwd()
+    # project_dir starts as None when no --project-dir is passed.
+    # The user selects a project directory from the web UI.
+    resolved_project_dir = project_dir
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -64,16 +67,53 @@ def create_app(project_dir: Path | None = None) -> FastAPI:
 
     # Register API routers BEFORE static files mount
     # (StaticFiles catch-all would intercept /api/ routes if mounted first)
+    app.include_router(browse_router, prefix="/api/v1")
     app.include_router(images_router, prefix="/api/v1")
     app.include_router(import_router_module.router, prefix="/api/v1")
     app.include_router(settings_router, prefix="/api/v1")
 
-    # Mount SPA static files (only if the static directory exists)
-    # This is a catch-all that serves the React build; it must come last.
+    # SPA static files + fallback to index.html for client-side routes.
+    # StaticFiles(html=True) alone only serves index.html at "/" — it 404s
+    # on sub-paths like "/import" or "/settings" that the React router handles.
+    # Instead, mount StaticFiles for real assets, then add a catch-all GET
+    # that returns index.html for any non-API path (SPA fallback).
     static_dir = Path(__file__).parent / "static"
     if static_dir.exists():
+        from fastapi.responses import FileResponse
         from fastapi.staticfiles import StaticFiles
-        app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="spa")
+
+        # Serve real static assets (JS, CSS, images) at /assets/
+        assets_dir = static_dir / "assets"
+        if assets_dir.exists():
+            app.mount(
+                "/assets",
+                StaticFiles(directory=str(assets_dir)),
+                name="assets",
+            )
+
+        # SPA fallback: serve static files by exact match, or index.html
+        # for client-side routes. Excludes /api/ paths so mismatched API
+        # requests get a proper 404 instead of the SPA shell.
+        @app.get("/{file_path:path}")
+        async def spa_fallback(file_path: str):
+            """Serve static files if they exist, otherwise return index.html.
+
+            This enables client-side routing: /import, /settings, etc. all
+            get the SPA shell, and React Router handles the actual routing.
+            API paths are excluded to avoid masking real 404s.
+            """
+            from fastapi import HTTPException
+
+            # Never serve SPA shell for API paths — let them 404 properly
+            if file_path.startswith("api/"):
+                raise HTTPException(status_code=404, detail="Not found")
+            # Try to serve a real file first (e.g. vite.svg, favicon.ico)
+            candidate = static_dir / file_path
+            if file_path and candidate.is_file():
+                return FileResponse(str(candidate))
+            # Fallback: serve index.html for all non-file routes (SPA)
+            return FileResponse(str(static_dir / "index.html"))
+
         logger.info("SPA static files mounted from: %s", static_dir)
     else:
         logger.debug("No static directory found at %s; SPA not mounted", static_dir)

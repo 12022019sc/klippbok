@@ -1,5 +1,4 @@
 import type { GalleryItem } from '../../types/image'
-import { getDuplicateGroupColor } from '../../utils/duplicateColors'
 import StatusStrip from './StatusStrip'
 
 interface ThumbnailCardProps {
@@ -11,17 +10,10 @@ interface ThumbnailCardProps {
 export default function ThumbnailCard({ item, width, onClick }: ThumbnailCardProps) {
   const height = Math.round(width * (item.height / item.width))
 
-  const duplicateBorderStyle =
-    item.is_near_duplicate && item.duplicate_group_id
-      ? {
-          borderLeft: `3px solid ${getDuplicateGroupColor(item.duplicate_group_id)}`,
-        }
-      : {}
-
   return (
     <div
       className="thumbnail-card"
-      style={{ width, height, ...duplicateBorderStyle }}
+      style={{ width, height }}
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -39,6 +31,7 @@ export default function ThumbnailCard({ item, width, onClick }: ThumbnailCardPro
         height={height}
         loading="lazy"
       />
+      {item.media_type === 'video' && <div className="video-indicator" />}
       <StatusStrip
         resolution_ok={item.resolution_ok}
         quality_pass={item.quality_pass}
@@ -46,6 +39,8 @@ export default function ThumbnailCard({ item, width, onClick }: ThumbnailCardPro
         width={item.width}
         height={item.height}
         caption={item.caption}
+        is_near_duplicate={item.is_near_duplicate}
+        duplicate_group_id={item.duplicate_group_id}
       />
     </div>
   )

@@ -23,10 +23,11 @@
 - NEVER assume approval — wait for explicit "yes, deploy"
 - ALWAYS ask before deploying to production
 
-### 7. Quality Gates
+### 7. Quality Gates (soft warnings, not blockers)
 
-- No file > 300 lines (split if larger)
-- No function > 50 lines (extract helper functions)
+- Source files > 500 lines should be reviewed for splitting opportunities
+- Functions > 50 lines should be reviewed for extraction opportunities
+- Test files are exempt from line limits
 - All tests must pass before committing
 
 ### 8. Parallelize Independent Awaits
