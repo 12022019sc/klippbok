@@ -156,7 +156,7 @@ def test_auto_crop_center_fallback(tmp_path: Path) -> None:
     source = make_solid_image(tmp_path / "solid.jpg", 800, 600)
     buckets = generate_buckets(base_resolution=512)
 
-    left, top, width, height = auto_crop_image(source, buckets)
+    left, top, width, height, detection_type = auto_crop_image(source, buckets)
 
     # Should produce a valid crop within image bounds
     assert left >= 0
@@ -165,6 +165,7 @@ def test_auto_crop_center_fallback(tmp_path: Path) -> None:
     assert height > 0
     assert left + width <= 800
     assert top + height <= 600
+    assert detection_type in ("pose", "center")
 
 
 def test_auto_crop_coords_in_bounds(tmp_path: Path) -> None:
@@ -193,7 +194,7 @@ def test_auto_crop_coords_in_bounds(tmp_path: Path) -> None:
             img_width, img_height,
         )
 
-        left, top, width, height = auto_crop_image(source, buckets)
+        left, top, width, height, detection_type = auto_crop_image(source, buckets)
 
         assert left >= 0, f"left={left} < 0 for {img_width}x{img_height}"
         assert top >= 0, f"top={top} < 0 for {img_width}x{img_height}"
