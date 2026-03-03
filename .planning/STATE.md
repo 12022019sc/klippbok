@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-03-03T19:07:47.688Z"
+stopped_at: "Checkpoint: 05-04 Task 3 human-verify (complete pipeline verification)"
+last_updated: "2026-03-03T22:52:55.769Z"
 last_activity: 2026-03-03 -- Completed 05-03-PLAN.md (react-advanced-cropper CropPage, CropCard, CropReadout, BucketSelector, CTRL bucket-snap, auto-crop All)
 progress:
   total_phases: 8
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 17
-  completed_plans: 15
+  completed_plans: 16
   percent: 85
 ---
 
@@ -55,6 +55,7 @@ Progress: [████████████░] ~85% (15 of ~20 estimated pl
 
 *Updated after each plan completion*
 | Phase 05 P03 | 8 | 2 tasks | 6 files |
+| Phase 05-04 P04 | 8 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -136,6 +137,9 @@ Recent decisions affecting current work:
 05-01 SUMMARY: CropState/CropCoordinates/BucketOption types, generateBuckets+snapToNearestBucket+needsUpscale utilities (mirrors Python bucket.py), extended appStore with selectionMode+selectedImageIds+cropStates, SelectionToolbar with smart filters, gallery selection mode, /crop+/process routes, Crop nav item
 05-02 SUMMARY: apply_crop() Pillow crop+rotate+flip+resize, auto_crop_image() MediaPipe PoseLandmarker+center-crop fallback, detect_seedvr2()/detect_nmkd_siax(), start_upscale() subprocess+SSE, POST /crop/, POST /crop/auto, POST /upscale/start, GET /upscale/{op_id}/events, GET /upscale/status
 05-03 SUMMARY: react-advanced-cropper CropCard+CropReadout+BucketSelector+CropPage, CTRL bucket-snap, dynamic aspectRatio stencil prop, per-card rotate/flip/zoom, green/red resolution readout, auto-crop All button
+- [Phase 05-04]: 05-04 PROC-01: ProcessPage is upscale entry only -- navigate('/crop') on complete/skip, no inline crop embedding
+- [Phase 05-04]: 05-04 PROC-02: useUpscaleEvents resets state on operationId change -- prevents stale progress across retries
+- [Phase 05-04]: 05-04 UPS-03: Cancel upscale button calls /api/v1/upscale/{op_id}/cancel -- graceful subprocess termination
 
 ### Pending Todos
 
@@ -149,6 +153,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-03
-Stopped at: Completed 05-03-PLAN.md
-Resume file: .planning/phases/05-interactive-crop-editor/05-03-SUMMARY.md
+Last session: 2026-03-03T22:52:55.768Z
+Stopped at: Checkpoint: 05-04 Task 3 human-verify (complete pipeline verification)
+Resume file: None
