@@ -183,8 +183,8 @@ class CropApplyItem(BaseModel):
     image_id: str
     """SHA256[:16] image ID."""
 
-    source_path: str
-    """Absolute path to the source image file."""
+    source_path: str | None = None
+    """Absolute path to the source image file (optional — resolved from image_id)."""
 
     left: int
     """Left edge of crop region in post-rotation image coordinates."""
