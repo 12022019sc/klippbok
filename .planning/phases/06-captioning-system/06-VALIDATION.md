@@ -45,9 +45,9 @@ created: 2026-03-03
 | 06-02-03 | 02 | 1 | CAPT-04 | unit | `pytest tests/test_caption_service.py::test_style_override -x` | ❌ W0 | ⬜ pending |
 | 06-03-01 | 03 | 2 | CAPT-05 | integration | `pytest tests/test_caption_api.py::test_update_caption -x` | ❌ W0 | ⬜ pending |
 | 06-03-02 | 03 | 2 | GUI-04 | manual | N/A | N/A | ⬜ pending |
-| 06-04-01 | 04 | 2 | CAPT-06 | unit | `pytest tests/test_caption_service.py::test_trigger_prepend -x` | ❌ W0 | ⬜ pending |
-| 06-04-02 | 04 | 2 | CAPT-07 | unit | `pytest tests/test_caption_service.py::test_batch_operations -x` | ❌ W0 | ⬜ pending |
-| 06-04-03 | 04 | 2 | CAPT-08 | unit | `pytest tests/test_caption_scoring.py::test_image_scoring_config -x` | ❌ W0 | ⬜ pending |
+| 06-04-01 | 04 | 3 | CAPT-06 | unit | `pytest tests/test_caption_service.py::test_trigger_prepend -x` | ❌ W0 | ⬜ pending |
+| 06-04-02 | 04 | 3 | CAPT-07 | unit | `pytest tests/test_caption_service.py::test_batch_operations -x` | ❌ W0 | ⬜ pending |
+| 06-04-03 | 04 | 3 | CAPT-08 | unit | `pytest tests/test_caption_scoring.py::test_image_scoring_config -x` | ❌ W0 | ⬜ pending |
 | 06-04-04 | 04 | 2 | GUI-06 | manual | N/A | N/A | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
