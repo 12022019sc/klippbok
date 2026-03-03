@@ -18,15 +18,15 @@
 
 ### Cropping
 
-- [ ] **CROP-01**: Interactive crop editor with draggable/resizable rectangle overlay on image
-- [ ] **CROP-02**: Crop rectangle snaps to nearest valid training aspect ratio on resize release
-- [ ] **CROP-03**: CTRL+resize allows freeform resize, snaps to nearest valid bucket ratio on key release
-- [ ] **CROP-04**: Real-time resolution display during crop (green=downscale ok, red=upscale quality loss)
-- [ ] **CROP-05**: Zoom slider for navigating high-resolution source images
-- [ ] **CROP-06**: Rotation controls (90-degree increments) and horizontal/vertical flip
+- [x] **CROP-01**: Interactive crop editor with draggable/resizable rectangle overlay on image
+- [x] **CROP-02**: Crop rectangle snaps to nearest valid training aspect ratio on resize release
+- [x] **CROP-03**: CTRL+resize allows freeform resize, snaps to nearest valid bucket ratio on key release
+- [x] **CROP-04**: Real-time resolution display during crop (green=downscale ok, red=upscale quality loss)
+- [x] **CROP-05**: Zoom slider for navigating high-resolution source images
+- [x] **CROP-06**: Rotation controls (90-degree increments) and horizontal/vertical flip
 - [x] **CROP-07**: Auto-crop with subject detection places crop rectangle on detected subject
 - [x] **CROP-08**: Auto-crop falls back to center crop when no subject detected
-- [ ] **CROP-09**: User can adjust auto-crop result via interactive crop editor
+- [x] **CROP-09**: User can adjust auto-crop result via interactive crop editor
 
 ### Model Configuration
 
@@ -127,15 +127,15 @@
 | IMG-06 | Phase 3 | Pending |
 | IMG-07 | Phase 3 | Pending |
 | IMG-08 | Phase 3 | Pending |
-| CROP-01 | Phase 5 | Pending |
-| CROP-02 | Phase 5 | Pending |
-| CROP-03 | Phase 5 | Pending |
-| CROP-04 | Phase 5 | Pending |
-| CROP-05 | Phase 5 | Pending |
-| CROP-06 | Phase 5 | Pending |
+| CROP-01 | Phase 5 | Complete |
+| CROP-02 | Phase 5 | Complete |
+| CROP-03 | Phase 5 | Complete |
+| CROP-04 | Phase 5 | Complete |
+| CROP-05 | Phase 5 | Complete |
+| CROP-06 | Phase 5 | Complete |
 | CROP-07 | Phase 5 | Complete |
 | CROP-08 | Phase 5 | Complete |
-| CROP-09 | Phase 5 | Pending |
+| CROP-09 | Phase 5 | Complete |
 | MODL-01 | Phase 2 | Complete |
 | MODL-02 | Phase 2 | Complete |
 | MODL-03 | Phase 2 | Complete |

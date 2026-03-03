@@ -1,3 +1,19 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: executing
+stopped_at: Completed 05-03-PLAN.md
+last_updated: "2026-03-03T19:07:47.688Z"
+last_activity: 2026-03-03 -- Completed 05-03-PLAN.md (react-advanced-cropper CropPage, CropCard, CropReadout, BucketSelector, CTRL bucket-snap, auto-crop All)
+progress:
+  total_phases: 8
+  completed_phases: 3
+  total_plans: 17
+  completed_plans: 15
+  percent: 85
+---
+
 # Project State
 
 ## Project Reference
@@ -10,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 ## Current Position
 
 Phase: 5 of 8 (Interactive Crop Editor) -- In progress
-Plan: 2 of 4 in phase 5
+Plan: 3 of 4 in phase 5
 Status: In progress
-Last activity: 2026-03-03 -- Completed 05-02-PLAN.md (Pillow crop service, MediaPipe autocrop, SeedVR2/NMKD-Siax upscaler, crop+upscale API endpoints)
+Last activity: 2026-03-03 -- Completed 05-03-PLAN.md (react-advanced-cropper CropPage, CropCard, CropReadout, BucketSelector, CTRL bucket-snap, auto-crop All)
 
-Progress: [████████████░] ~82% (14 of ~20 estimated plans)
+Progress: [████████████░] ~85% (15 of ~20 estimated plans)
 
 ## Performance Metrics
 
@@ -38,6 +54,7 @@ Progress: [████████████░] ~82% (14 of ~20 estimated pl
 - Trend: Fast -- frontend React/TypeScript tasks execute quickly
 
 *Updated after each plan completion*
+| Phase 05 P03 | 8 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -104,6 +121,10 @@ Recent decisions affecting current work:
 - [05-02 UPS-01]: upscale_error SSE event name (not "error") -- matches import_error pattern, avoids EventSource collision
 - [05-02 UPS-02]: Lifespan cancels both import _tasks and upscale _tasks on app shutdown
 - [05-02 DET-01]: _SEEDVR2_COMMON_PATHS and _NMKD_SIAX_COMMON_PATHS are patchable module-level lists for testing
+- [05-03 CTRL-01]: isCtrlHeld lifted to CropPage level -- passed as prop to all CropCards -- all cards snap simultaneously on CTRL release (desired batch behavior)
+- [05-03 AR-01]: Bucket AR snap triggered in useEffect watching isCtrlHeld transition to false -- avoids per-pixel-move thrashing (only snaps on CTRL release, not during drag)
+- [05-03 INIT-01]: Default center crop initialized at first bucket AR in CropPage useEffect for images without existing CropState -- non-destructive on re-render
+- [05-03 PKG-01]: react-advanced-cropper installed with --legacy-peer-deps for React 19 compatibility; pinned ~0.20.1
 
 03-01 SUMMARY: TIFF format support, 5 new IssueCodes, ImageImportEntry/ImageImportReport models, n_frames field
 03-02 SUMMARY: assign_to_bucket (argmin AR), needs_upscale, compute_blur_score (scipy Laplacian), is_blurry (threshold 100.0)
@@ -114,6 +135,7 @@ Recent decisions affecting current work:
 04-04 SUMMARY: POST /api/v1/import (asyncio background task + SSE named events), GET/PUT /api/v1/settings, useImportEvents SSE hook, ImportPage with progress bar, SettingsPage (TanStack Query), ToastProvider, persistent AppLayout import toast
 05-01 SUMMARY: CropState/CropCoordinates/BucketOption types, generateBuckets+snapToNearestBucket+needsUpscale utilities (mirrors Python bucket.py), extended appStore with selectionMode+selectedImageIds+cropStates, SelectionToolbar with smart filters, gallery selection mode, /crop+/process routes, Crop nav item
 05-02 SUMMARY: apply_crop() Pillow crop+rotate+flip+resize, auto_crop_image() MediaPipe PoseLandmarker+center-crop fallback, detect_seedvr2()/detect_nmkd_siax(), start_upscale() subprocess+SSE, POST /crop/, POST /crop/auto, POST /upscale/start, GET /upscale/{op_id}/events, GET /upscale/status
+05-03 SUMMARY: react-advanced-cropper CropCard+CropReadout+BucketSelector+CropPage, CTRL bucket-snap, dynamic aspectRatio stencil prop, per-card rotate/flip/zoom, green/red resolution readout, auto-crop All button
 
 ### Pending Todos
 
@@ -121,12 +143,12 @@ None.
 
 ### Blockers/Concerns
 
-- [Research]: react-advanced-cropper custom stencil for bucket-ratio snapping needs a spike before Phase 5 commitment
 - [Research]: WD Tagger v3 ONNX preprocessing (448x448, normalization) must be verified against reference implementation before Phase 6
 - [Research]: Auto-crop subject detection for anime content needs evaluation before Phase 5 plan 4
+- [Resolved]: react-advanced-cropper custom stencil for bucket-ratio snapping -- implemented in 05-03 using dynamic aspectRatio prop on RectangleStencil
 
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 05-02-PLAN.md
-Resume file: .planning/phases/05-interactive-crop-editor/05-02-SUMMARY.md
+Stopped at: Completed 05-03-PLAN.md
+Resume file: .planning/phases/05-interactive-crop-editor/05-03-SUMMARY.md
