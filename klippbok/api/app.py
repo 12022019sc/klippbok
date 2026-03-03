@@ -35,8 +35,10 @@ def create_app(project_dir: Path | None = None) -> FastAPI:
     """
     from klippbok.api.routers import import_ as import_router_module
     from klippbok.api.routers.browse import router as browse_router
+    from klippbok.api.routers.crop import router as crop_router
     from klippbok.api.routers.images import router as images_router
     from klippbok.api.routers.settings import router as settings_router
+    from klippbok.api.routers.upscale import router as upscale_router
 
     # project_dir starts as None when no --project-dir is passed.
     # The user selects a project directory from the web UI.
@@ -46,14 +48,20 @@ def create_app(project_dir: Path | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         """Lifespan context manager: cancel active import tasks on shutdown."""
         yield
-        # Shutdown: cancel all in-flight import tasks to avoid resource leaks
-        from klippbok.api.routers.import_ import _tasks
-        if _tasks:
-            logger.info("Cancelling %d active import task(s) on shutdown", len(_tasks))
-            for op_id, task in list(_tasks.items()):
-                if not task.done():
-                    task.cancel()
-                    logger.debug("Cancelled import task for operation %s", op_id)
+        # Shutdown: cancel all in-flight import and upscale tasks to avoid resource leaks
+        from klippbok.api.routers.import_ import _tasks as import_tasks
+        from klippbok.api.routers.upscale import _tasks as upscale_tasks
+
+        for task_dict, label in [(import_tasks, "import"), (upscale_tasks, "upscale")]:
+            if task_dict:
+                logger.info(
+                    "Cancelling %d active %s task(s) on shutdown",
+                    len(task_dict), label,
+                )
+                for op_id, task in list(task_dict.items()):
+                    if not task.done():
+                        task.cancel()
+                        logger.debug("Cancelled %s task for operation %s", label, op_id)
 
     app = FastAPI(
         title="klippbok",
@@ -71,6 +79,8 @@ def create_app(project_dir: Path | None = None) -> FastAPI:
     app.include_router(images_router, prefix="/api/v1")
     app.include_router(import_router_module.router, prefix="/api/v1")
     app.include_router(settings_router, prefix="/api/v1")
+    app.include_router(crop_router, prefix="/api/v1")
+    app.include_router(upscale_router, prefix="/api/v1")
 
     # SPA static files + fallback to index.html for client-side routes.
     # StaticFiles(html=True) alone only serves index.html at "/" — it 404s
