@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Checkpoint: 05-04 Task 3 human-verify (complete pipeline verification)"
-last_updated: "2026-03-03T22:52:55.769Z"
-last_activity: 2026-03-03 -- Completed 05-03-PLAN.md (react-advanced-cropper CropPage, CropCard, CropReadout, BucketSelector, CTRL bucket-snap, auto-crop All)
+stopped_at: "Phase 05 complete — all 4 plans executed, pipeline verified via Playwright"
+last_updated: "2026-03-03T23:05:00.000Z"
+last_activity: 2026-03-03 -- Completed 05-04-PLAN.md (ProcessPage wizard, UpscaleStep, useUpscaleEvents, Proceed to Captioning save, source_path fix)
 progress:
   total_phases: 8
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 17
-  completed_plans: 16
-  percent: 85
+  completed_plans: 17
+  percent: 100
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** Take raw images/video of any size and produce correctly bucketed, captioned, training-ready datasets for any supported diffusion model through an intuitive web interface.
-**Current focus:** Phase 5 - Interactive Crop Editor (In progress)
+**Current focus:** Phase 5 - Interactive Crop Editor (Complete)
 
 ## Current Position
 
-Phase: 5 of 8 (Interactive Crop Editor) -- In progress
-Plan: 3 of 4 in phase 5
-Status: In progress
-Last activity: 2026-03-03 -- Completed 05-03-PLAN.md (react-advanced-cropper CropPage, CropCard, CropReadout, BucketSelector, CTRL bucket-snap, auto-crop All)
+Phase: 5 of 8 (Interactive Crop Editor) -- Complete
+Plan: 4 of 4 in phase 5
+Status: Complete — awaiting phase verification
+Last activity: 2026-03-03 -- Completed 05-04-PLAN.md (ProcessPage wizard, UpscaleStep, useUpscaleEvents, Proceed to Captioning save, source_path fix)
 
 Progress: [████████████░] ~85% (15 of ~20 estimated plans)
 
@@ -137,9 +137,11 @@ Recent decisions affecting current work:
 05-01 SUMMARY: CropState/CropCoordinates/BucketOption types, generateBuckets+snapToNearestBucket+needsUpscale utilities (mirrors Python bucket.py), extended appStore with selectionMode+selectedImageIds+cropStates, SelectionToolbar with smart filters, gallery selection mode, /crop+/process routes, Crop nav item
 05-02 SUMMARY: apply_crop() Pillow crop+rotate+flip+resize, auto_crop_image() MediaPipe PoseLandmarker+center-crop fallback, detect_seedvr2()/detect_nmkd_siax(), start_upscale() subprocess+SSE, POST /crop/, POST /crop/auto, POST /upscale/start, GET /upscale/{op_id}/events, GET /upscale/status
 05-03 SUMMARY: react-advanced-cropper CropCard+CropReadout+BucketSelector+CropPage, CTRL bucket-snap, dynamic aspectRatio stencil prop, per-card rotate/flip/zoom, green/red resolution readout, auto-crop All button
+05-04 SUMMARY: ProcessPage upscale wizard (SeedVR2/NMKD-Siax detection, SSE progress), UpscaleStep, useUpscaleEvents hook, CropPage "Proceed to Captioning" save action, source_path optional fix
 - [Phase 05-04]: 05-04 PROC-01: ProcessPage is upscale entry only -- navigate('/crop') on complete/skip, no inline crop embedding
 - [Phase 05-04]: 05-04 PROC-02: useUpscaleEvents resets state on operationId change -- prevents stale progress across retries
 - [Phase 05-04]: 05-04 UPS-03: Cancel upscale button calls /api/v1/upscale/{op_id}/cancel -- graceful subprocess termination
+- [Phase 05-04 FIX]: CropApplyItem.source_path made optional -- already resolved from image_id by _resolve_image_path()
 
 ### Pending Todos
 
@@ -153,6 +155,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-03T22:52:55.768Z
-Stopped at: Checkpoint: 05-04 Task 3 human-verify (complete pipeline verification)
+Last session: 2026-03-03T23:05:00.000Z
+Stopped at: Phase 05 complete — all 4 plans executed, pipeline verified via Playwright
 Resume file: None
