@@ -404,3 +404,356 @@ h1 {
   width: 14px;
   height: 14px;
 }
+
+/* ============================
+   UpscaleStep
+   ============================ */
+
+.upscale-step {
+  padding: 2rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.upscale-step-title {
+  font-size: 1.375rem;
+  color: #e0e0e0;
+  margin-bottom: 0.5rem;
+}
+
+.upscale-step-subtitle {
+  font-size: 0.9375rem;
+  color: #9ca3af;
+  margin-bottom: 1.5rem;
+}
+
+.upscaler-status-loading {
+  color: #9ca3af;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.upscaler-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.upscaler-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.upscaler-status-badge.available {
+  background: #052e16;
+  border: 1px solid #166534;
+  color: #4ade80;
+}
+
+.upscaler-status-badge.unavailable {
+  background: #2c1810;
+  border: 1px solid #78350f;
+  color: #fbbf24;
+}
+
+.upscaler-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.upscaler-status-badge.available .upscaler-status-dot {
+  background: #22c55e;
+}
+
+.upscaler-status-badge.unavailable .upscaler-status-dot {
+  background: #f59e0b;
+}
+
+.upscale-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.upscale-control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.upscale-control-label {
+  font-size: 0.8125rem;
+  color: #9ca3af;
+}
+
+.upscale-select {
+  background: #374151;
+  border: 1px solid #4b5563;
+  border-radius: 5px;
+  color: #d1d5db;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.upscale-start-btn {
+  background: #1d4ed8;
+  border: 1px solid #3b82f6;
+  border-radius: 6px;
+  color: #fff;
+  padding: 0.4rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.upscale-start-btn:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.upscale-start-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Progress */
+.upscale-progress {
+  margin-bottom: 1.5rem;
+}
+
+.upscale-progress-text {
+  font-size: 0.9375rem;
+  color: #d1d5db;
+  margin-bottom: 0.5rem;
+}
+
+.upscale-progress-percent {
+  font-size: 0.8125rem;
+  color: #9ca3af;
+  margin-top: 0.25rem;
+}
+
+.upscale-progress-message {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+/* Complete state */
+.upscale-complete {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.upscale-complete-msg {
+  color: #4ade80;
+  font-size: 0.9375rem;
+  margin: 0;
+}
+
+.upscale-continue-btn {
+  background: #166534;
+  border: 1px solid #22c55e;
+  border-radius: 6px;
+  color: #22c55e;
+  padding: 0.4rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.upscale-continue-btn:hover {
+  background: #15803d;
+}
+
+/* Error state */
+.upscale-error {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.upscale-error-msg {
+  color: #ef4444;
+  font-size: 0.9375rem;
+  margin: 0;
+}
+
+.upscale-retry-btn {
+  background: #7f1d1d;
+  border: 1px solid #ef4444;
+  border-radius: 6px;
+  color: #ef4444;
+  padding: 0.4rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.upscale-retry-btn:hover {
+  background: #991b1b;
+}
+
+/* Skip row */
+.upscale-skip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid #2d2d3e;
+}
+
+.upscale-skip-btn {
+  background: #2d2d3e;
+  border: 1px solid #4b5563;
+  border-radius: 6px;
+  color: #9ca3af;
+  padding: 0.4rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.upscale-skip-btn:hover {
+  background: #3d3d50;
+  color: #d1d5db;
+}
+
+.upscale-skip-hint {
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+/* ============================
+   ProcessPage
+   ============================ */
+
+.process-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+.process-steps {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #2d2d3e;
+}
+
+.process-step-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.process-step-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  border: 2px solid #4b5563;
+  background: #1f2937;
+  color: #6b7280;
+}
+
+.process-step-circle.active {
+  border-color: #3b82f6;
+  background: #1d3a6e;
+  color: #93c5fd;
+}
+
+.process-step-circle.done {
+  border-color: #22c55e;
+  background: #052e16;
+  color: #4ade80;
+}
+
+.process-step-label {
+  font-size: 0.875rem;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.process-step-label.active {
+  color: #93c5fd;
+  font-weight: 600;
+}
+
+.process-step-label.done {
+  color: #4ade80;
+}
+
+.process-step-connector {
+  flex: 1;
+  height: 2px;
+  background: #2d2d3e;
+  margin: 0 0.25rem;
+  min-width: 20px;
+}
+
+/* Proceed to Captioning button */
+.proceed-button {
+  background: #1d4ed8;
+  border: 1px solid #3b82f6;
+  border-radius: 8px;
+  color: #fff;
+  padding: 0.65rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.proceed-button:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.proceed-button:disabled {
+  background: #374151;
+  border-color: #4b5563;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+.proceed-button-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-top: 1px solid #2d2d3e;
+  background: #111827;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+}
+
+.proceed-button-hint {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
