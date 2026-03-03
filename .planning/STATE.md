@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 ## Current Position
 
 Phase: 5 of 8 (Interactive Crop Editor) -- In progress
-Plan: 1 of 4 in phase 5
+Plan: 2 of 4 in phase 5
 Status: In progress
-Last activity: 2026-03-03 -- Completed 05-01-PLAN.md (Crop types, bucket math, gallery selection mode, /crop+/process routes)
+Last activity: 2026-03-03 -- Completed 05-02-PLAN.md (Pillow crop service, MediaPipe autocrop, SeedVR2/NMKD-Siax upscaler, crop+upscale API endpoints)
 
-Progress: [████████████░] ~80% (13 of ~20 estimated plans)
+Progress: [████████████░] ~82% (14 of ~20 estimated plans)
 
 ## Performance Metrics
 
@@ -99,6 +99,11 @@ Recent decisions affecting current work:
 - [05-01 SEL-01]: selectionMode toggle clears selectedImageIds on exit to avoid stale selections
 - [05-01 SEL-02]: Selection state rendered via CSS outline on thumbnail-card (not separate overlay) -- no DOM nesting issues
 - [05-01 SEL-03]: SelectionToolbar always rendered in GalleryPage; toggle button always visible
+- [05-02 CROP-01]: MediaPipe 0.10.x dropped mp.solutions; uses Tasks API PoseLandmarker with model discovery (env var > vendored > user cache > download)
+- [05-02 CROP-02]: _center_crop and _fit_crop_to_bucket are pure-Python; importable without mediapipe for testing
+- [05-02 UPS-01]: upscale_error SSE event name (not "error") -- matches import_error pattern, avoids EventSource collision
+- [05-02 UPS-02]: Lifespan cancels both import _tasks and upscale _tasks on app shutdown
+- [05-02 DET-01]: _SEEDVR2_COMMON_PATHS and _NMKD_SIAX_COMMON_PATHS are patchable module-level lists for testing
 
 03-01 SUMMARY: TIFF format support, 5 new IssueCodes, ImageImportEntry/ImageImportReport models, n_frames field
 03-02 SUMMARY: assign_to_bucket (argmin AR), needs_upscale, compute_blur_score (scipy Laplacian), is_blurry (threshold 100.0)
@@ -108,6 +113,7 @@ Recent decisions affecting current work:
 04-03 SUMMARY: Virtualized masonry gallery (masonic), ThumbnailCard with aspect-ratio heights and colored duplicate borders, StatusStrip (resolution/quality/bucket/caption preview), ImageLightbox (yet-another-react-lightbox with metadata footer), useImages TanStack Query hook, GalleryItem/GalleryResponse types
 04-04 SUMMARY: POST /api/v1/import (asyncio background task + SSE named events), GET/PUT /api/v1/settings, useImportEvents SSE hook, ImportPage with progress bar, SettingsPage (TanStack Query), ToastProvider, persistent AppLayout import toast
 05-01 SUMMARY: CropState/CropCoordinates/BucketOption types, generateBuckets+snapToNearestBucket+needsUpscale utilities (mirrors Python bucket.py), extended appStore with selectionMode+selectedImageIds+cropStates, SelectionToolbar with smart filters, gallery selection mode, /crop+/process routes, Crop nav item
+05-02 SUMMARY: apply_crop() Pillow crop+rotate+flip+resize, auto_crop_image() MediaPipe PoseLandmarker+center-crop fallback, detect_seedvr2()/detect_nmkd_siax(), start_upscale() subprocess+SSE, POST /crop/, POST /crop/auto, POST /upscale/start, GET /upscale/{op_id}/events, GET /upscale/status
 
 ### Pending Todos
 
@@ -122,5 +128,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 05-01-PLAN.md
-Resume file: .planning/phases/05-interactive-crop-editor/05-01-SUMMARY.md
+Stopped at: Completed 05-02-PLAN.md
+Resume file: .planning/phases/05-interactive-crop-editor/05-02-SUMMARY.md
