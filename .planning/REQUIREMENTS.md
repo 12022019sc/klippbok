@@ -54,7 +54,7 @@
 - [ ] **GUI-02**: Image gallery view with thumbnail grid, click to expand/edit
 - [ ] **GUI-03**: Gallery shows per-image: thumbnail, resolution, quality status, caption preview
 - [ ] **GUI-04**: Inline caption editor alongside image preview in expanded view
-- [ ] **GUI-05**: Crop editor accessible from gallery (click image → crop tool)
+- [x] **GUI-05**: Crop editor accessible from gallery (click image → crop tool)
 - [ ] **GUI-06**: Model configuration selector (dropdown/panel) affecting resolution + caption defaults
 - [ ] **GUI-07**: Dataset export interface: select trainer format, configure options, download/export
 - [ ] **GUI-08**: Video pipeline accessible from GUI (existing ingest, scan, triage workflows)
@@ -154,7 +154,7 @@
 | GUI-02 | Phase 4 | Pending |
 | GUI-03 | Phase 4 | Pending |
 | GUI-04 | Phase 6 | Pending |
-| GUI-05 | Phase 5 | Pending |
+| GUI-05 | Phase 5 | Complete |
 | GUI-06 | Phase 6 | Pending |
 | GUI-07 | Phase 8 | Pending |
 | GUI-08 | Phase 7 | Pending |

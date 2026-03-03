@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** Take raw images/video of any size and produce correctly bucketed, captioned, training-ready datasets for any supported diffusion model through an intuitive web interface.
-**Current focus:** Phase 4 - GUI (In progress)
+**Current focus:** Phase 5 - Interactive Crop Editor (In progress)
 
 ## Current Position
 
-Phase: 4 of 8 (Web GUI Foundation) -- In progress
-Plan: 4 of 5 in phase 4
+Phase: 5 of 8 (Interactive Crop Editor) -- In progress
+Plan: 1 of 4 in phase 5
 Status: In progress
-Last activity: 2026-02-28 -- Completed 04-04-PLAN.md (Import API SSE streaming, import page, settings page, sonner toast notifications)
+Last activity: 2026-03-03 -- Completed 05-01-PLAN.md (Crop types, bucket math, gallery selection mode, /crop+/process routes)
 
-Progress: [███████████░] ~75% (12 of ~16 estimated plans)
+Progress: [████████████░] ~80% (13 of ~20 estimated plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
+- Total plans completed: 9
 - Average duration: ~4min
-- Total execution time: ~24min
+- Total execution time: ~27min
 
 **By Phase:**
 
@@ -31,10 +31,11 @@ Progress: [███████████░] ~75% (12 of ~16 estimated plans
 | 02-model-configuration | 2 | ~7min | ~3.5min |
 | 03-image-import-quality | 3 | ~5min | ~5min |
 | 04-web-gui-foundation | 4 | ~9min | ~2.25min |
+| 05-interactive-crop-editor | 1 | ~3min | ~3min |
 
 **Recent Trend:**
-- Last 5 plans: 03-03 (5min), 04-01 (~2min), 04-02 (~2min), 04-03 (~2min), 04-04 (~3min)
-- Trend: Fast -- backend + frontend API integration tasks execute quickly
+- Last 5 plans: 04-02 (~2min), 04-03 (~2min), 04-04 (~3min), 05-01 (~3min)
+- Trend: Fast -- frontend React/TypeScript tasks execute quickly
 
 *Updated after each plan completion*
 
@@ -93,6 +94,11 @@ Recent decisions affecting current work:
 - [04-04 IMP-04]: lifespan context manager cancels all _tasks dict entries on app shutdown
 - [04-04 IMP-05]: Stable toast ID "import-progress" for AppLayout persistent toast (in-place updates across navigation)
 - [04-04 SET-01]: Settings PUT is Phase 4 stub -- returns updated settings without persisting
+- [05-01 TYPES-01]: generateBuckets pixel-budget algorithm mirrors Python generate_buckets with step=64, min=256, max=2x, maxAR=2.0
+- [05-01 TYPES-02]: snapToNearestBucket reduces by minimum absolute AR difference, mirrors Python assign_to_bucket
+- [05-01 SEL-01]: selectionMode toggle clears selectedImageIds on exit to avoid stale selections
+- [05-01 SEL-02]: Selection state rendered via CSS outline on thumbnail-card (not separate overlay) -- no DOM nesting issues
+- [05-01 SEL-03]: SelectionToolbar always rendered in GalleryPage; toggle button always visible
 
 03-01 SUMMARY: TIFF format support, 5 new IssueCodes, ImageImportEntry/ImageImportReport models, n_frames field
 03-02 SUMMARY: assign_to_bucket (argmin AR), needs_upscale, compute_blur_score (scipy Laplacian), is_blurry (threshold 100.0)
@@ -101,6 +107,7 @@ Recent decisions affecting current work:
 04-02 SUMMARY: Vite+React+TS SPA at frontend/, React Router v7 layout routing, dark NavBar, GalleryPage/ImportPage/SettingsPage stubs, useAppStore (Zustand), QueryClientProvider (TanStack Query), /api proxy
 04-03 SUMMARY: Virtualized masonry gallery (masonic), ThumbnailCard with aspect-ratio heights and colored duplicate borders, StatusStrip (resolution/quality/bucket/caption preview), ImageLightbox (yet-another-react-lightbox with metadata footer), useImages TanStack Query hook, GalleryItem/GalleryResponse types
 04-04 SUMMARY: POST /api/v1/import (asyncio background task + SSE named events), GET/PUT /api/v1/settings, useImportEvents SSE hook, ImportPage with progress bar, SettingsPage (TanStack Query), ToastProvider, persistent AppLayout import toast
+05-01 SUMMARY: CropState/CropCoordinates/BucketOption types, generateBuckets+snapToNearestBucket+needsUpscale utilities (mirrors Python bucket.py), extended appStore with selectionMode+selectedImageIds+cropStates, SelectionToolbar with smart filters, gallery selection mode, /crop+/process routes, Crop nav item
 
 ### Pending Todos
 
@@ -115,5 +122,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-interactive-crop-editor/05-CONTEXT.md
+Stopped at: Completed 05-01-PLAN.md
+Resume file: .planning/phases/05-interactive-crop-editor/05-01-SUMMARY.md
