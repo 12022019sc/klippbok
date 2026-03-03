@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
+import { toast } from 'sonner'
 
 import { useAppStore } from '../stores/appStore'
 import { useImages } from '../hooks/useImages'
@@ -20,7 +21,22 @@ interface AutoCropResult {
   detection_type: string
 }
 
+interface CropApplyItem {
+  image_id: string
+  left: number
+  top: number
+  width: number
+  height: number
+  rotation: number
+  flip_h: boolean
+  flip_v: boolean
+  target_width: number
+  target_height: number
+}
+
 export default function CropPage() {
+  const navigate = useNavigate()
+
   // Global state
   const selectedImageIds = useAppStore((s) => s.selectedImageIds)
   const cropStates = useAppStore((s) => s.cropStates)
@@ -32,6 +48,7 @@ export default function CropPage() {
   const [allowNonSquare, setAllowNonSquare] = useState<boolean>(true)
   const [isCtrlHeld, setIsCtrlHeld] = useState<boolean>(false)
   const [isAutoCropping, setIsAutoCropping] = useState<boolean>(false)
+  const [isSaving, setIsSaving] = useState<boolean>(false)
   const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set())
 
   // Fetch all images; filter to selected ones
@@ -163,6 +180,76 @@ export default function CropPage() {
     }
   }
 
+  async function handleProceedToCaptioning() {
+    if (isSaving) return
+
+    // Collect all included crop states
+    const includedCrops: CropApplyItem[] = []
+    for (const [imageId, cropState] of cropStates.entries()) {
+      if (cropState.included) {
+        includedCrops.push({
+          image_id: imageId,
+          left: cropState.coordinates.left,
+          top: cropState.coordinates.top,
+          width: cropState.coordinates.width,
+          height: cropState.coordinates.height,
+          rotation: cropState.rotation,
+          flip_h: cropState.flipH,
+          flip_v: cropState.flipV,
+          target_width: cropState.targetBucket[0],
+          target_height: cropState.targetBucket[1],
+        })
+      }
+    }
+
+    if (includedCrops.length === 0) {
+      toast.warning('No crops to save', { description: 'Include at least one image to proceed.' })
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const response = await fetch('/api/v1/crop/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ crops: includedCrops }),
+      })
+
+      if (!response.ok) {
+        const text = await response.text()
+        toast.error('Failed to save crops', { description: text })
+        return
+      }
+
+      const results: { image_id: string; success: boolean; output_path: string | null; error: string | null }[] =
+        await response.json()
+
+      const savedCount = results.filter((r) => r.success).length
+      const failedCount = results.length - savedCount
+
+      if (failedCount > 0) {
+        toast.warning(`Saved ${savedCount} crops`, {
+          description: `${failedCount} image(s) failed to save.`,
+        })
+      } else {
+        toast.success(`Saved ${savedCount} cropped image${savedCount !== 1 ? 's' : ''}`, {
+          description: 'Cropped images saved to .klippbok/crops/',
+        })
+      }
+
+      // Navigate to gallery (captioning page in Phase 6)
+      void navigate('/')
+    } catch (err) {
+      console.error('Error saving crops:', err)
+      toast.error('Save failed', { description: String(err) })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Count included crops
+  const includedCount = Array.from(cropStates.values()).filter((s) => s.included).length
+
   // Empty state
   if (!isLoading && selectedImageIds.size === 0) {
     return (
@@ -217,6 +304,24 @@ export default function CropPage() {
           ))}
         </div>
       )}
+
+      {/* Proceed to Captioning -- sticky bottom bar */}
+      <div className="proceed-button-row">
+        <button
+          className="proceed-button"
+          onClick={() => void handleProceedToCaptioning()}
+          disabled={isSaving || includedCount === 0}
+        >
+          {isSaving ? 'Saving cropped images...' : 'Proceed to Captioning'}
+        </button>
+        {includedCount > 0 ? (
+          <span className="proceed-button-hint">
+            {includedCount} image{includedCount !== 1 ? 's' : ''} will be saved
+          </span>
+        ) : (
+          <span className="proceed-button-hint">No images included — use the Include button on each card</span>
+        )}
+      </div>
     </div>
   )
 }
