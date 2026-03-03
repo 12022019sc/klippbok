@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Model Configuration** - Model profiles with resolution presets, bucket sizes, and caption style defaults
 - [x] **Phase 3: Image Import and Quality** - Batch image import with validation, bucketing, quality filtering, and duplicate detection
 - [x] **Phase 4: Web GUI Foundation** - FastAPI+React shell, image gallery, thumbnails, and progress indicators
-- [x] **Phase 5: Interactive Crop Editor** - Canvas-based crop tool with snap-to-bucket, zoom, rotation, and auto-crop (completed 2026-03-03)
+- [x] **Phase 5: Interactive Crop Editor** - Canvas-based crop tool with snap-to-bucket, zoom, rotation, and auto-crop (completed 2026-03-03)
 - [ ] **Phase 6: Captioning System** - Booru tag generation, NL captioning, model-aware defaults, manual editing, and batch operations
 - [ ] **Phase 7: Video and CLIP Integration** - Existing video pipeline accessible from GUI, CLIP triage extended to standalone images
 - [ ] **Phase 8: Export Pipeline** - Multi-trainer export with format-specific config generation and dataset download
@@ -119,13 +119,13 @@ Plans:
   3. User can view and edit captions inline alongside the image preview in the gallery
   4. A configurable trigger word is auto-prepended to all captions, and batch tag operations (add/remove/replace) work across the entire dataset
   5. Caption quality scoring (length, specificity, issues) runs on all captions with results visible per image
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 06-01: WD Tagger v3 ONNX integration for booru tags
-- [ ] 06-02: NL captioning via existing backends with model-aware selection
-- [ ] 06-03: Caption editor UI with inline editing
-- [ ] 06-04: Trigger words, batch tag operations, and quality scoring
+- [ ] 06-01-PLAN.md -- WD Tagger v3 ONNX backend and [tagger] dependency group
+- [ ] 06-02-PLAN.md -- Caption service with model-aware routing, NL captioning, API router
+- [ ] 06-03-PLAN.md -- Caption editor UI, PATCH endpoint, settings profile dropdown, generate button
+- [ ] 06-04-PLAN.md -- Trigger words, batch tag operations, and caption quality scoring
 
 ### Phase 7: Video and CLIP Integration
 **Goal**: Users can access existing video pipeline workflows and CLIP-based triage from the web GUI, unifying image and video dataset preparation in one interface
