@@ -16,6 +16,11 @@ export default function NavBar() {
           </NavLink>
         </li>
         <li>
+          <NavLink to="/crop" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            Crop
+          </NavLink>
+        </li>
+        <li>
           <NavLink to="/settings" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
             Settings
           </NavLink>

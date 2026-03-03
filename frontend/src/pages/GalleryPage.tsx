@@ -4,6 +4,7 @@ import { useImportEvents } from '../hooks/useImportEvents'
 import { useAppStore } from '../stores/appStore'
 import { toast } from 'sonner'
 import MasonryGrid from '../components/Gallery/MasonryGrid'
+import SelectionToolbar from '../components/Gallery/SelectionToolbar'
 import ImageLightbox from '../components/Lightbox/ImageLightbox'
 import type { GalleryItem } from '../types/image'
 
@@ -17,6 +18,10 @@ export default function GalleryPage() {
   const setImportOperationId = useAppStore((s) => s.setImportOperationId)
   const [importStarting, setImportStarting] = useState(false)
   const hasAutoImported = useRef(false)
+
+  const selectionMode = useAppStore((s) => s.selectionMode)
+  const selectedImageIds = useAppStore((s) => s.selectedImageIds)
+  const toggleImageSelection = useAppStore((s) => s.toggleImageSelection)
 
   // Subscribe to SSE events for active import
   useImportEvents(importOperationId)
@@ -60,8 +65,12 @@ export default function GalleryPage() {
     }
   }, [isLoading, images.length, projectDir, isImporting, importStarting])
 
-  function handleItemClick(_item: GalleryItem, index: number) {
-    setSelectedIndex(index)
+  function handleItemClick(item: GalleryItem, index: number) {
+    if (selectionMode) {
+      toggleImageSelection(item.id)
+    } else {
+      setSelectedIndex(index)
+    }
   }
 
   function handleLightboxClose() {
@@ -130,8 +139,14 @@ export default function GalleryPage() {
 
   return (
     <>
-      <MasonryGrid items={images} onItemClick={handleItemClick} />
-      {selectedIndex !== null && (
+      <SelectionToolbar items={images} />
+      <MasonryGrid
+        items={images}
+        onItemClick={handleItemClick}
+        selectionMode={selectionMode}
+        selectedIds={selectedImageIds}
+      />
+      {!selectionMode && selectedIndex !== null && (
         <ImageLightbox
           items={images}
           currentIndex={selectedIndex}

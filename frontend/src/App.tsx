@@ -5,6 +5,8 @@ import AppLayout from './components/Layout/AppLayout'
 import GalleryPage from './pages/GalleryPage'
 import ImportPage from './pages/ImportPage'
 import SettingsPage from './pages/SettingsPage'
+import CropPage from './pages/CropPage'
+import ProcessPage from './pages/ProcessPage'
 import ProjectPickerPage from './pages/ProjectPickerPage'
 
 export default function App() {
@@ -36,6 +38,8 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route index element={<GalleryPage />} />
           <Route path="/import" element={<ImportPage />} />
+          <Route path="/crop" element={<CropPage />} />
+          <Route path="/process" element={<ProcessPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>

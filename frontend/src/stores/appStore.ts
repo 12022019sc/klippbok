@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { CropState } from '../types/crop'
 
 interface ImportProgress {
   current: number
@@ -7,6 +8,7 @@ interface ImportProgress {
 }
 
 interface AppState {
+  // --- existing fields ---
   projectDir: string | null
   importOperationId: string | null
   importProgress: ImportProgress | null
@@ -14,9 +16,25 @@ interface AppState {
   setImportOperationId: (id: string | null) => void
   setImportProgress: (progress: ImportProgress | null) => void
   clearImport: () => void
+
+  // --- selection mode ---
+  selectionMode: boolean
+  selectedImageIds: Set<string>
+  toggleSelectionMode: () => void
+  toggleImageSelection: (id: string) => void
+  selectAll: (ids: string[]) => void
+  deselectAll: () => void
+  selectByFilter: (ids: string[]) => void
+
+  // --- crop state ---
+  cropStates: Map<string, CropState>
+  setCropState: (id: string, state: CropState) => void
+  removeCropState: (id: string) => void
+  clearCropStates: () => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
+  // --- existing state ---
   projectDir: null,
   importOperationId: null,
   importProgress: null,
@@ -24,4 +42,53 @@ export const useAppStore = create<AppState>((set) => ({
   setImportOperationId: (id) => set({ importOperationId: id }),
   setImportProgress: (progress) => set({ importProgress: progress }),
   clearImport: () => set({ importOperationId: null, importProgress: null }),
+
+  // --- selection mode state ---
+  selectionMode: false,
+  selectedImageIds: new Set<string>(),
+
+  toggleSelectionMode: () =>
+    set((state) => ({
+      selectionMode: !state.selectionMode,
+      // clear selection when exiting selection mode
+      selectedImageIds: state.selectionMode ? new Set<string>() : state.selectedImageIds,
+    })),
+
+  toggleImageSelection: (id) =>
+    set((state) => {
+      const next = new Set(state.selectedImageIds)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return { selectedImageIds: next }
+    }),
+
+  selectAll: (ids) =>
+    set({ selectedImageIds: new Set(ids) }),
+
+  deselectAll: () =>
+    set({ selectedImageIds: new Set<string>() }),
+
+  selectByFilter: (ids) =>
+    set({ selectedImageIds: new Set(ids) }),
+
+  // --- crop state ---
+  cropStates: new Map<string, CropState>(),
+
+  setCropState: (id, state) =>
+    set((prev) => ({
+      cropStates: new Map([...prev.cropStates, [id, state]]),
+    })),
+
+  removeCropState: (id) =>
+    set((prev) => {
+      const next = new Map(prev.cropStates)
+      next.delete(id)
+      return { cropStates: next }
+    }),
+
+  clearCropStates: () =>
+    set({ cropStates: new Map<string, CropState>() }),
 }))
