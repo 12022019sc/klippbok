@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Architecture Foundation** - Service layer, image domain module, unified models, and dependency structure
 - [x] **Phase 2: Model Configuration** - Model profiles with resolution presets, bucket sizes, and caption style defaults
 - [x] **Phase 3: Image Import and Quality** - Batch image import with validation, bucketing, quality filtering, and duplicate detection
-- [ ] **Phase 4: Web GUI Foundation** - FastAPI+React shell, image gallery, thumbnails, and progress indicators
+- [x] **Phase 4: Web GUI Foundation** - FastAPI+React shell, image gallery, thumbnails, and progress indicators
 - [ ] **Phase 5: Interactive Crop Editor** - Canvas-based crop tool with snap-to-bucket, zoom, rotation, and auto-crop
 - [ ] **Phase 6: Captioning System** - Booru tag generation, NL captioning, model-aware defaults, manual editing, and batch operations
 - [ ] **Phase 7: Video and CLIP Integration** - Existing video pipeline accessible from GUI, CLIP triage extended to standalone images
@@ -85,14 +85,14 @@ Plans:
 **Plans**: 5 plans
 
 Plans:
-- [ ] 04-01-PLAN.md -- FastAPI backend shell, API models, images router, thumbnail service, CLI serve command
-- [ ] 04-02-PLAN.md -- React SPA scaffold with Vite, app shell, routing, zustand, TanStack Query
-- [ ] 04-03-PLAN.md -- Gallery page with masonry grid, status overlays, duplicate borders, lightbox
-- [ ] 04-04-PLAN.md -- Import router with SSE progress, settings router, import/settings pages, toast system
-- [ ] 04-05-PLAN.md -- Build pipeline, SPA deployment to static dir, end-to-end verification
+- [x] 04-01-PLAN.md -- FastAPI backend shell, API models, images router, thumbnail service, CLI serve command
+- [x] 04-02-PLAN.md -- React SPA scaffold with Vite, app shell, routing, zustand, TanStack Query
+- [x] 04-03-PLAN.md -- Gallery page with masonry grid, status overlays, duplicate borders, lightbox
+- [x] 04-04-PLAN.md -- Import router with SSE progress, settings router, import/settings pages, toast system
+- [x] 04-05-PLAN.md -- Build pipeline, SPA deployment to static dir, end-to-end verification
 
 ### Phase 5: Interactive Crop Editor
-**Goal**: Users can precisely crop any image to a valid training bucket ratio using an interactive editor -- the signature feature that no existing tool does well
+**Goal**: Users can precisely crop any image to a valid training bucket ratio using an interactive editor with gallery selection, optional AI upscaling, and batch crop editing with snap-to-bucket behavior -- the signature feature that no existing tool does well
 **Depends on**: Phase 4
 **Requirements**: CROP-01, CROP-02, CROP-03, CROP-04, CROP-05, CROP-06, CROP-07, CROP-08, CROP-09, GUI-05
 **Success Criteria** (what must be TRUE):
@@ -101,13 +101,13 @@ Plans:
   3. Real-time resolution display during crop shows green (downscale OK) or red (upscale quality loss)
   4. Zoom slider and rotation/flip controls (90-degree increments, H/V flip) work on high-resolution source images
   5. Auto-crop places the crop rectangle on the detected subject (falling back to center crop), and the user can adjust the result interactively
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 05-01: Canvas-based crop editor with drag/resize
-- [ ] 05-02: Bucket-ratio snapping and resolution indicators
-- [ ] 05-03: Zoom, rotation, and flip controls
-- [ ] 05-04: Auto-crop with subject detection and center-crop fallback
+- [ ] 05-01-PLAN.md -- Types, Zustand store extension, gallery selection mode, route wiring
+- [ ] 05-02-PLAN.md -- Backend crop service, auto-crop (MediaPipe), upscale service, API routers
+- [ ] 05-03-PLAN.md -- Batch crop editor UI with react-advanced-cropper, bucket snapping, zoom/rotate/flip
+- [ ] 05-04-PLAN.md -- Process wizard (upscale step), crop save action, end-to-end verification
 
 ### Phase 6: Captioning System
 **Goal**: Users can generate, edit, and manage captions for every image in their dataset -- with the correct format automatically selected based on target model
@@ -167,7 +167,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 1. Architecture Foundation | 3/3 | Complete | 2026-02-27 |
 | 2. Model Configuration | 2/2 | Complete | 2026-02-28 |
 | 3. Image Import and Quality | 3/3 | Complete | 2026-02-28 |
-| 4. Web GUI Foundation | 0/5 | Not started | - |
+| 4. Web GUI Foundation | 5/5 | Complete | 2026-02-28 |
 | 5. Interactive Crop Editor | 0/4 | Not started | - |
 | 6. Captioning System | 0/4 | Not started | - |
 | 7. Video and CLIP Integration | 0/2 | Not started | - |
