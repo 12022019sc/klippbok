@@ -172,3 +172,139 @@ class MkdirRequest(BaseModel):
 
     name: str
     """Name of the new folder (no path separators or '..' allowed)."""
+
+
+# --- Crop models ---
+
+
+class CropApplyItem(BaseModel):
+    """A single image crop operation specification."""
+
+    image_id: str
+    """SHA256[:16] image ID."""
+
+    source_path: str
+    """Absolute path to the source image file."""
+
+    left: int
+    """Left edge of crop region in post-rotation image coordinates."""
+
+    top: int
+    """Top edge of crop region in post-rotation image coordinates."""
+
+    width: int
+    """Width of crop region in pixels."""
+
+    height: int
+    """Height of crop region in pixels."""
+
+    rotation: int = 0
+    """Rotation in degrees (0, 90, 180, 270)."""
+
+    flip_h: bool = False
+    """If True, apply horizontal flip."""
+
+    flip_v: bool = False
+    """If True, apply vertical flip."""
+
+    target_width: int
+    """Target output width (bucket dimension)."""
+
+    target_height: int
+    """Target output height (bucket dimension)."""
+
+
+class CropApplyRequest(BaseModel):
+    """Request body for applying a batch of crop operations."""
+
+    crops: list[CropApplyItem]
+    """List of individual crop operations to apply."""
+
+
+class CropApplyResult(BaseModel):
+    """Result of a single crop operation."""
+
+    image_id: str
+    """SHA256[:16] image ID."""
+
+    success: bool
+    """True if the crop was applied successfully."""
+
+    output_path: str | None = None
+    """Absolute path to the output file, or None on failure."""
+
+    error: str | None = None
+    """Error message if success is False, or None on success."""
+
+
+class AutoCropRequest(BaseModel):
+    """Request body for running auto-crop on a set of images."""
+
+    image_ids: list[str]
+    """List of SHA256[:16] image IDs to auto-crop."""
+
+    bucket_size: int = 1024
+    """Base resolution for bucket generation (512, 768, or 1024)."""
+
+    allow_non_square: bool = True
+    """If False, restrict buckets to 1:1 square only."""
+
+
+class AutoCropResult(BaseModel):
+    """Auto-crop result for a single image."""
+
+    image_id: str
+    """SHA256[:16] image ID."""
+
+    left: int
+    """Left edge of the suggested crop in image coordinates."""
+
+    top: int
+    """Top edge of the suggested crop in image coordinates."""
+
+    width: int
+    """Width of the suggested crop in pixels."""
+
+    height: int
+    """Height of the suggested crop in pixels."""
+
+    target_bucket: tuple[int, int]
+    """Nearest matching training bucket (width, height)."""
+
+    detection_type: str
+    """How the crop was determined: 'pose' (person detected) or 'center' (fallback)."""
+
+
+# --- Upscale models ---
+
+
+class UpscaleRequest(BaseModel):
+    """Request body for starting a batch upscale operation."""
+
+    image_ids: list[str]
+    """List of SHA256[:16] image IDs to upscale."""
+
+    upscaler: str = "seedvr2"
+    """Upscaler backend: 'seedvr2' or 'nmkd_siax'."""
+
+    scale_factor: int = 2
+    """Upscale factor (e.g. 2 for 2x)."""
+
+
+class UpscaleProgress(BaseModel):
+    """SSE event payload for upscale progress updates."""
+
+    operation_id: str
+    """UUID of the upscale operation."""
+
+    current: int
+    """Number of images upscaled so far."""
+
+    total: int
+    """Total number of images to upscale."""
+
+    message: str
+    """Human-readable status message."""
+
+    status: str
+    """Operation status: 'running' | 'complete' | 'error'."""
