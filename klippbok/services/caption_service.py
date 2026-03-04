@@ -169,3 +169,208 @@ def save_caption(
             "sidecar written but manifest not updated.",
             image_id,
         )
+
+
+# ---------------------------------------------------------------------------
+# Batch tag operations (CAPT-06, CAPT-07)
+# ---------------------------------------------------------------------------
+
+
+def batch_add_tag(
+    tag: str,
+    manifest: dict,
+    project_dir: Path,
+    image_ids: list[str] | None = None,
+) -> int:
+    """Add a tag to all (or selected) image captions if not already present.
+
+    Iterates manifest images, appending ``', {tag}'`` to each caption that
+    does not already contain the tag (case-insensitive). Writes sidecar .txt
+    and updates manifest in place for each modified entry.
+
+    Args:
+        tag: The booru-style tag to append (e.g. ``'blue_eyes'``).
+        manifest: Project manifest dict (mutated in place).
+        project_dir: Absolute path to the project root directory.
+        image_ids: Optional list of SHA256[:16] IDs to restrict the operation.
+            If None, all images with captions are processed.
+
+    Returns:
+        Number of captions that were modified.
+    """
+    modified = 0
+    for entry in manifest.get("images", []):
+        caption: str | None = entry.get("caption")
+        if caption is None:
+            continue
+
+        relative_path: str = entry.get("path", "")
+        img_id = _image_id(relative_path)
+
+        if image_ids is not None and img_id not in image_ids:
+            continue
+
+        # Case-insensitive duplicate check: split into individual tags
+        existing_tags = [t.strip().lower() for t in caption.split(",")]
+        if tag.lower() in existing_tags:
+            continue
+
+        new_caption = f"{caption}, {tag}"
+        abs_path = project_dir / relative_path
+        save_caption(abs_path, new_caption, manifest, img_id)
+        modified += 1
+
+    return modified
+
+
+def batch_remove_tag(
+    tag: str,
+    manifest: dict,
+    project_dir: Path,
+    image_ids: list[str] | None = None,
+) -> int:
+    """Remove a tag from all (or selected) image captions.
+
+    Splits each caption by ``', '``, filters out the tag (case-insensitive),
+    and rejoins. Writes sidecar .txt and updates manifest in place for each
+    modified entry.
+
+    Args:
+        tag: The booru-style tag to remove (e.g. ``'solo'``).
+        manifest: Project manifest dict (mutated in place).
+        project_dir: Absolute path to the project root directory.
+        image_ids: Optional list of SHA256[:16] IDs to restrict the operation.
+            If None, all images with captions are processed.
+
+    Returns:
+        Number of captions that were modified.
+    """
+    modified = 0
+    for entry in manifest.get("images", []):
+        caption: str | None = entry.get("caption")
+        if caption is None:
+            continue
+
+        relative_path: str = entry.get("path", "")
+        img_id = _image_id(relative_path)
+
+        if image_ids is not None and img_id not in image_ids:
+            continue
+
+        tag_lower = tag.lower()
+        parts = [t.strip() for t in caption.split(",")]
+        new_parts = [t for t in parts if t.lower() != tag_lower]
+
+        if len(new_parts) == len(parts):
+            # Tag was not present; no change needed
+            continue
+
+        new_caption = ", ".join(new_parts)
+        abs_path = project_dir / relative_path
+        save_caption(abs_path, new_caption, manifest, img_id)
+        modified += 1
+
+    return modified
+
+
+def batch_replace_tag(
+    old_tag: str,
+    new_tag: str,
+    manifest: dict,
+    project_dir: Path,
+    image_ids: list[str] | None = None,
+) -> int:
+    """Replace one tag with another across all (or selected) image captions.
+
+    Splits each caption by ``', '``, replaces ``old_tag`` with ``new_tag``
+    (case-insensitive match), and rejoins. If ``old_tag`` is not found in a
+    caption, that caption is skipped (no-op, no error). Writes sidecar .txt
+    and updates manifest in place for each modified entry.
+
+    Args:
+        old_tag: The tag to find (case-insensitive).
+        new_tag: The replacement tag.
+        manifest: Project manifest dict (mutated in place).
+        project_dir: Absolute path to the project root directory.
+        image_ids: Optional list of SHA256[:16] IDs to restrict the operation.
+            If None, all images with captions are processed.
+
+    Returns:
+        Number of captions that were modified.
+    """
+    modified = 0
+    old_lower = old_tag.lower()
+
+    for entry in manifest.get("images", []):
+        caption: str | None = entry.get("caption")
+        if caption is None:
+            continue
+
+        relative_path: str = entry.get("path", "")
+        img_id = _image_id(relative_path)
+
+        if image_ids is not None and img_id not in image_ids:
+            continue
+
+        parts = [t.strip() for t in caption.split(",")]
+        new_parts = [new_tag if t.lower() == old_lower else t for t in parts]
+
+        if new_parts == parts:
+            # old_tag not found; no change
+            continue
+
+        new_caption = ", ".join(new_parts)
+        abs_path = project_dir / relative_path
+        save_caption(abs_path, new_caption, manifest, img_id)
+        modified += 1
+
+    return modified
+
+
+def batch_prepend_trigger(
+    trigger: str,
+    manifest: dict,
+    project_dir: Path,
+    image_ids: list[str] | None = None,
+) -> int:
+    """Prepend a trigger word to all (or selected) image captions (CAPT-06).
+
+    Reuses :func:`klippbok.caption.captioner._prepend_anchor` which checks
+    whether the caption already starts with the trigger (case-insensitive)
+    before prepending. Writes sidecar .txt and updates manifest in place for
+    each modified entry.
+
+    Args:
+        trigger: The trigger word to prepend (e.g. ``'ohwx'``).
+        manifest: Project manifest dict (mutated in place).
+        project_dir: Absolute path to the project root directory.
+        image_ids: Optional list of SHA256[:16] IDs to restrict the operation.
+            If None, all images with captions are processed.
+
+    Returns:
+        Number of captions that were modified.
+    """
+    from klippbok.caption.captioner import _prepend_anchor
+
+    modified = 0
+    for entry in manifest.get("images", []):
+        caption: str | None = entry.get("caption")
+        if caption is None:
+            continue
+
+        relative_path: str = entry.get("path", "")
+        img_id = _image_id(relative_path)
+
+        if image_ids is not None and img_id not in image_ids:
+            continue
+
+        new_caption = _prepend_anchor(caption, trigger)
+        if new_caption == caption:
+            # Already starts with trigger; no change needed
+            continue
+
+        abs_path = project_dir / relative_path
+        save_caption(abs_path, new_caption, manifest, img_id)
+        modified += 1
+
+    return modified

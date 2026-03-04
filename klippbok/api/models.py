@@ -399,3 +399,52 @@ class CaptionUpdateResponse(BaseModel):
 
     sidecar_written: bool
     """True if the sidecar .txt file was successfully written."""
+
+
+class CaptionBatchRequest(BaseModel):
+    """Request body for a batch caption tag operation."""
+
+    operation: Literal["add_tag", "remove_tag", "replace_tag", "prepend_trigger"]
+    """The batch operation to perform."""
+
+    value: str
+    """The tag or trigger word to operate on (add, remove, replace old, or prepend)."""
+
+    replace_with: str | None = None
+    """Replacement tag for 'replace_tag' operation. Ignored for other operations."""
+
+    image_ids: list[str] | None = None
+    """Optional list of SHA256[:16] image IDs to restrict the operation.
+    If None, the operation applies to all images with captions."""
+
+
+class CaptionBatchResponse(BaseModel):
+    """Response after a batch caption tag operation."""
+
+    operation: str
+    """The operation that was performed."""
+
+    modified_count: int
+    """Number of captions that were modified."""
+
+
+class CaptionScoreResponse(BaseModel):
+    """Caption quality score for a single image."""
+
+    image_id: str
+    """SHA256[:16] image ID."""
+
+    caption: str
+    """The caption text that was scored."""
+
+    overall: float
+    """Weighted overall quality score (0.0–1.0, higher is better)."""
+
+    length_score: float
+    """How appropriate the caption length is (0.0–1.0)."""
+
+    specificity_score: float
+    """How concrete vs vague the description is (0.0–1.0)."""
+
+    issues: list[str]
+    """Human-readable descriptions of detected problems."""

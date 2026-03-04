@@ -12,6 +12,7 @@ import pytest
 
 from klippbok.caption.scoring import (
     CaptionScore,
+    IMAGE_SCORING_CONFIG,
     ScoringConfig,
     _score_length,
     _score_repetition,
@@ -391,3 +392,56 @@ class TestFormatScoreReport:
         scores = score_directory(tmp_path)
         report = format_score_report(scores)
         assert "!" in report  # Issue marker
+
+
+# ---------------------------------------------------------------------------
+# IMAGE_SCORING_CONFIG tests
+# ---------------------------------------------------------------------------
+
+
+class TestImageScoringConfig:
+    """Tests for IMAGE_SCORING_CONFIG — tuned for booru-style image captions."""
+
+    def test_image_scoring_config_exists(self) -> None:
+        """IMAGE_SCORING_CONFIG is a ScoringConfig instance."""
+        assert isinstance(IMAGE_SCORING_CONFIG, ScoringConfig)
+
+    def test_image_scoring_config_short_lengths(self) -> None:
+        """IMAGE_SCORING_CONFIG has shorter length thresholds than default."""
+        assert IMAGE_SCORING_CONFIG.min_good_length < ScoringConfig().min_good_length
+        assert IMAGE_SCORING_CONFIG.min_acceptable_length < ScoringConfig().min_acceptable_length
+
+    def test_image_scoring_config_zero_temporal_weight(self) -> None:
+        """IMAGE_SCORING_CONFIG sets weight_temporal=0.0 (irrelevant for images)."""
+        assert IMAGE_SCORING_CONFIG.weight_temporal == 0.0
+
+    def test_image_scoring_config_scores_booru_reasonably(self) -> None:
+        """Booru caption '1girl, solo, blue_hair' scores > 0.3 with IMAGE_SCORING_CONFIG."""
+        booru_caption = "1girl, solo, blue_hair"
+        result = score_caption(booru_caption, IMAGE_SCORING_CONFIG)
+        assert result.overall > 0.3, (
+            f"Booru caption should score > 0.3 with IMAGE_SCORING_CONFIG, got {result.overall:.3f}"
+        )
+
+    def test_video_scoring_config_low_for_booru(self) -> None:
+        """Booru caption scores lower with default video ScoringConfig than IMAGE_SCORING_CONFIG.
+
+        The default config penalizes short captions and applies temporal weight;
+        IMAGE_SCORING_CONFIG is calibrated for short booru-style tags. This test
+        confirms that IMAGE_SCORING_CONFIG produces a meaningfully higher score
+        than the default for a typical short booru caption.
+        """
+        booru_caption = "1girl, solo, blue_hair"
+        default_result = score_caption(booru_caption)  # default ScoringConfig
+        image_result = score_caption(booru_caption, IMAGE_SCORING_CONFIG)
+
+        # IMAGE_SCORING_CONFIG should score booru captions meaningfully higher
+        assert image_result.overall > default_result.overall, (
+            f"IMAGE_SCORING_CONFIG ({image_result.overall:.3f}) should score booru captions "
+            f"higher than default video config ({default_result.overall:.3f})."
+        )
+        # The gap should be non-trivial (at least 5 percentage points)
+        assert image_result.overall - default_result.overall > 0.05, (
+            f"IMAGE_SCORING_CONFIG should provide a meaningfully better score for booru captions. "
+            f"Gap was only {image_result.overall - default_result.overall:.3f}"
+        )

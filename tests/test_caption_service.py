@@ -326,3 +326,223 @@ class TestSaveCaption:
         assert manifest["images"][0]["caption"] == "new caption"
         sidecar = tmp_path / "photo.txt"
         assert sidecar.read_text(encoding="utf-8") == "new caption"
+
+
+# ---------------------------------------------------------------------------
+# Batch operations -- helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_manifest_with_images(
+    tmp_path: Path,
+    entries: list[tuple[str, str | None]],
+) -> tuple[dict, Path]:
+    """Build a manifest with multiple image entries and create dummy files.
+
+    Args:
+        tmp_path: Pytest temporary directory.
+        entries: List of (relative_path, caption_or_None) tuples.
+
+    Returns:
+        (manifest_dict, project_dir) where project_dir == tmp_path.
+    """
+    images = []
+    for rel_path, caption in entries:
+        # Create the dummy image file on disk
+        abs_path = tmp_path / rel_path
+        abs_path.parent.mkdir(parents=True, exist_ok=True)
+        abs_path.write_bytes(b"fake-image")
+        images.append({"path": rel_path, "caption": caption})
+
+    manifest: dict = {
+        "version": "1",
+        "active_profile": "sd15",
+        "images": images,
+    }
+    return manifest, tmp_path
+
+
+# ---------------------------------------------------------------------------
+# batch_add_tag tests
+# ---------------------------------------------------------------------------
+
+
+class TestBatchAddTag:
+    """Tests for batch_add_tag() adding a tag to all/selected captions."""
+
+    def test_batch_add_tag(self, tmp_path: Path) -> None:
+        """Adds tag to all captions; each caption ends with ', blue_eyes'."""
+        from klippbok.services.caption_service import batch_add_tag
+
+        manifest, project_dir = _make_manifest_with_images(tmp_path, [
+            ("img/a.jpg", "1girl, solo"),
+            ("img/b.jpg", "1boy, outdoors"),
+        ])
+        count = batch_add_tag("blue_eyes", manifest, project_dir)
+
+        assert count == 2
+        assert manifest["images"][0]["caption"] == "1girl, solo, blue_eyes"
+        assert manifest["images"][1]["caption"] == "1boy, outdoors, blue_eyes"
+
+    def test_batch_add_tag_already_present(self, tmp_path: Path) -> None:
+        """Tag already present in caption is NOT duplicated."""
+        from klippbok.services.caption_service import batch_add_tag
+
+        manifest, project_dir = _make_manifest_with_images(tmp_path, [
+            ("img/a.jpg", "1girl, blue_eyes, solo"),
+            ("img/b.jpg", "1boy, brown_eyes"),
+        ])
+        count = batch_add_tag("blue_eyes", manifest, project_dir)
+
+        # Only b.jpg should be modified
+        assert count == 1
+        assert manifest["images"][0]["caption"] == "1girl, blue_eyes, solo"
+        assert manifest["images"][1]["caption"] == "1boy, brown_eyes, blue_eyes"
+
+    def test_batch_add_tag_writes_sidecar(self, tmp_path: Path) -> None:
+        """batch_add_tag writes sidecar .txt files for each modified image."""
+        from klippbok.services.caption_service import batch_add_tag
+
+        manifest, project_dir = _make_manifest_with_images(tmp_path, [
+            ("img/a.jpg", "1girl, solo"),
+        ])
+        batch_add_tag("blue_eyes", manifest, project_dir)
+
+        sidecar = tmp_path / "img" / "a.txt"
+        assert sidecar.exists(), "Sidecar .txt should be written by batch_add_tag"
+        assert sidecar.read_text(encoding="utf-8") == "1girl, solo, blue_eyes"
+
+
+# ---------------------------------------------------------------------------
+# batch_remove_tag tests
+# ---------------------------------------------------------------------------
+
+
+class TestBatchRemoveTag:
+    """Tests for batch_remove_tag() removing a tag from all/selected captions."""
+
+    def test_batch_remove_tag(self, tmp_path: Path) -> None:
+        """Removes tag from all captions; tag is gone, no trailing commas."""
+        from klippbok.services.caption_service import batch_remove_tag
+
+        manifest, project_dir = _make_manifest_with_images(tmp_path, [
+            ("img/a.jpg", "1girl, solo, blue_eyes"),
+            ("img/b.jpg", "1boy, solo, outdoors"),
+        ])
+        count = batch_remove_tag("solo", manifest, project_dir)
+
+        assert count == 2
+        assert manifest["images"][0]["caption"] == "1girl, blue_eyes"
+        assert manifest["images"][1]["caption"] == "1boy, outdoors"
+
+    def test_batch_remove_tag_writes_sidecar(self, tmp_path: Path) -> None:
+        """batch_remove_tag writes sidecar .txt files for each modified image."""
+        from klippbok.services.caption_service import batch_remove_tag
+
+        manifest, project_dir = _make_manifest_with_images(tmp_path, [
+            ("img/a.jpg", "1girl, solo"),
+        ])
+        batch_remove_tag("solo", manifest, project_dir)
+
+        sidecar = tmp_path / "img" / "a.txt"
+        assert sidecar.exists()
+        assert sidecar.read_text(encoding="utf-8") == "1girl"
+
+
+# ---------------------------------------------------------------------------
+# batch_replace_tag tests
+# ---------------------------------------------------------------------------
+
+
+class TestBatchReplaceTag:
+    """Tests for batch_replace_tag() replacing one tag with another."""
+
+    def test_batch_replace_tag(self, tmp_path: Path) -> None:
+        """Replaces old_tag with new_tag across all captions."""
+        from klippbok.services.caption_service import batch_replace_tag
+
+        manifest, project_dir = _make_manifest_with_images(tmp_path, [
+            ("img/a.jpg", "1girl, solo, blue_hair"),
+            ("img/b.jpg", "1girl, outdoors"),
+        ])
+        count = batch_replace_tag("1girl", "1boy", manifest, project_dir)
+
+        assert count == 2
+        assert manifest["images"][0]["caption"] == "1boy, solo, blue_hair"
+        assert manifest["images"][1]["caption"] == "1boy, outdoors"
+
+    def test_batch_replace_tag_not_found(self, tmp_path: Path) -> None:
+        """Replacing a non-existent tag is a no-op (no error, count=0)."""
+        from klippbok.services.caption_service import batch_replace_tag
+
+        manifest, project_dir = _make_manifest_with_images(tmp_path, [
+            ("img/a.jpg", "1girl, solo"),
+        ])
+        count = batch_replace_tag("nonexistent_tag", "something", manifest, project_dir)
+
+        assert count == 0
+        assert manifest["images"][0]["caption"] == "1girl, solo"
+
+    def test_batch_replace_tag_writes_sidecar(self, tmp_path: Path) -> None:
+        """batch_replace_tag writes sidecar .txt files for modified images."""
+        from klippbok.services.caption_service import batch_replace_tag
+
+        manifest, project_dir = _make_manifest_with_images(tmp_path, [
+            ("img/a.jpg", "1girl, solo"),
+        ])
+        batch_replace_tag("1girl", "1boy", manifest, project_dir)
+
+        sidecar = tmp_path / "img" / "a.txt"
+        assert sidecar.exists()
+        assert sidecar.read_text(encoding="utf-8") == "1boy, solo"
+
+
+# ---------------------------------------------------------------------------
+# batch_prepend_trigger tests
+# ---------------------------------------------------------------------------
+
+
+class TestBatchPrependTrigger:
+    """Tests for batch_prepend_trigger() prepending a trigger word to all captions."""
+
+    def test_batch_prepend_trigger(self, tmp_path: Path) -> None:
+        """Prepends trigger to all captions -> 'ohwx, rest of caption'."""
+        from klippbok.services.caption_service import batch_prepend_trigger
+
+        manifest, project_dir = _make_manifest_with_images(tmp_path, [
+            ("img/a.jpg", "1girl, solo"),
+            ("img/b.jpg", "1boy, outdoors"),
+        ])
+        count = batch_prepend_trigger("ohwx", manifest, project_dir)
+
+        assert count == 2
+        assert manifest["images"][0]["caption"] == "ohwx, 1girl, solo"
+        assert manifest["images"][1]["caption"] == "ohwx, 1boy, outdoors"
+
+    def test_batch_prepend_trigger_already_present(self, tmp_path: Path) -> None:
+        """Captions already starting with trigger are unchanged."""
+        from klippbok.services.caption_service import batch_prepend_trigger
+
+        manifest, project_dir = _make_manifest_with_images(tmp_path, [
+            ("img/a.jpg", "ohwx, 1girl, solo"),
+            ("img/b.jpg", "1boy, outdoors"),
+        ])
+        count = batch_prepend_trigger("ohwx", manifest, project_dir)
+
+        # Only b.jpg modified
+        assert count == 1
+        assert manifest["images"][0]["caption"] == "ohwx, 1girl, solo"
+        assert manifest["images"][1]["caption"] == "ohwx, 1boy, outdoors"
+
+    def test_batch_prepend_trigger_writes_sidecar(self, tmp_path: Path) -> None:
+        """batch_prepend_trigger writes sidecar .txt files for modified images."""
+        from klippbok.services.caption_service import batch_prepend_trigger
+
+        manifest, project_dir = _make_manifest_with_images(tmp_path, [
+            ("img/a.jpg", "1girl, solo"),
+        ])
+        batch_prepend_trigger("ohwx", manifest, project_dir)
+
+        sidecar = tmp_path / "img" / "a.txt"
+        assert sidecar.exists()
+        assert sidecar.read_text(encoding="utf-8") == "ohwx, 1girl, solo"

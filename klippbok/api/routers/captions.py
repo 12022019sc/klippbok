@@ -1,9 +1,11 @@
-"""Captions router -- batch generation with SSE progress and single-image PATCH.
+"""Captions router -- batch generation with SSE progress, single-image PATCH, batch tag ops, and scoring.
 
 Endpoints:
     POST /captions/generate         -- Start batch caption generation, returns op_id.
     GET  /captions/{op_id}/events   -- SSE stream for generation progress.
     PATCH /captions/{image_id}      -- Update a single image caption (inline edit).
+    POST /captions/batch            -- Batch tag add/remove/replace/prepend_trigger.
+    GET  /captions/scores           -- Get quality scores for all captioned images.
 
 Named SSE event types:
     "progress"      -- In-progress update (status="running")
@@ -24,8 +26,11 @@ from fastapi import APIRouter, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
 from klippbok.api.models import (
+    CaptionBatchRequest,
+    CaptionBatchResponse,
     CaptionGenerateRequest,
     CaptionProgress,
+    CaptionScoreResponse,
     CaptionStarted,
     CaptionUpdateRequest,
     CaptionUpdateResponse,
@@ -327,6 +332,161 @@ async def caption_events(op_id: str) -> EventSourceResponse:
                 logger.debug("Cancelled caption task for operation %s", op_id)
 
     return EventSourceResponse(event_generator())
+
+
+@router.post("/batch", response_model=CaptionBatchResponse)
+async def batch_caption_operation(
+    body: CaptionBatchRequest,
+    request: Request,
+) -> CaptionBatchResponse:
+    """Apply a batch tag operation across all (or selected) image captions.
+
+    Supports four operations:
+    - ``add_tag``: Append a tag to every caption that doesn't already have it.
+    - ``remove_tag``: Remove a tag from every caption that contains it.
+    - ``replace_tag``: Replace one tag with another across all captions
+      (requires ``replace_with`` field).
+    - ``prepend_trigger``: Prepend a trigger word using ``_prepend_anchor``
+      logic (skips captions already starting with the trigger).
+
+    All modifications are written to both the manifest and sidecar .txt files.
+
+    Args:
+        body: Batch operation parameters.
+        request: FastAPI request (used to access app.state.project_dir).
+
+    Returns:
+        CaptionBatchResponse with the operation name and count of modified captions.
+
+    Raises:
+        HTTPException 409: If no project directory is selected.
+        HTTPException 400: If ``replace_tag`` is requested without ``replace_with``.
+        HTTPException 500: If the manifest cannot be loaded or saved.
+    """
+    import json
+    from datetime import datetime, timezone
+
+    from klippbok.services.caption_service import (
+        batch_add_tag,
+        batch_prepend_trigger,
+        batch_remove_tag,
+        batch_replace_tag,
+    )
+    from klippbok.services.project_service import MANIFEST_DIR, MANIFEST_FILE, load_manifest
+
+    project_dir: Path | None = request.app.state.project_dir
+    if project_dir is None:
+        raise HTTPException(status_code=409, detail="No project directory selected")
+
+    if body.operation == "replace_tag" and body.replace_with is None:
+        raise HTTPException(
+            status_code=400,
+            detail="'replace_with' is required for 'replace_tag' operation",
+        )
+
+    try:
+        manifest = load_manifest(project_dir)
+    except Exception as exc:
+        logger.error("Failed to load manifest for batch operation: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to load project manifest") from exc
+
+    if not manifest or "images" not in manifest:
+        return CaptionBatchResponse(operation=body.operation, modified_count=0)
+
+    if body.operation == "add_tag":
+        count = batch_add_tag(body.value, manifest, project_dir, body.image_ids)
+    elif body.operation == "remove_tag":
+        count = batch_remove_tag(body.value, manifest, project_dir, body.image_ids)
+    elif body.operation == "replace_tag":
+        count = batch_replace_tag(
+            body.value, body.replace_with or "", manifest, project_dir, body.image_ids
+        )
+    elif body.operation == "prepend_trigger":
+        count = batch_prepend_trigger(body.value, manifest, project_dir, body.image_ids)
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown operation: {body.operation}")
+
+    # Persist updated manifest to disk
+    try:
+        manifest["updated"] = datetime.now(timezone.utc).isoformat()
+        manifest_path = project_dir / MANIFEST_DIR / MANIFEST_FILE
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+    except Exception as exc:
+        logger.error("Failed to persist manifest after batch operation: %s", exc)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Batch operation applied but manifest save failed: {exc}",
+        ) from exc
+
+    logger.info(
+        "Batch operation '%s' on project %s: %d captions modified",
+        body.operation, project_dir, count,
+    )
+    return CaptionBatchResponse(operation=body.operation, modified_count=count)
+
+
+@router.get("/scores", response_model=list[CaptionScoreResponse])
+async def get_caption_scores(request: Request) -> list[CaptionScoreResponse]:
+    """Get caption quality scores for all captioned images in the project.
+
+    Scores each caption using IMAGE_SCORING_CONFIG — tuned for short booru-style
+    tags and brief natural language image captions. Temporal scoring is disabled
+    (not relevant for still images).
+
+    Args:
+        request: FastAPI request (used to access app.state.project_dir).
+
+    Returns:
+        List of CaptionScoreResponse, one per image that has a caption.
+        Sorted by overall score, worst first (most needing attention at top).
+
+    Raises:
+        HTTPException 409: If no project directory is selected.
+        HTTPException 500: If the manifest cannot be loaded.
+    """
+    import hashlib
+
+    from klippbok.caption.scoring import IMAGE_SCORING_CONFIG, score_caption
+    from klippbok.services.project_service import load_manifest
+
+    project_dir: Path | None = request.app.state.project_dir
+    if project_dir is None:
+        raise HTTPException(status_code=409, detail="No project directory selected")
+
+    try:
+        manifest = load_manifest(project_dir)
+    except Exception as exc:
+        logger.error("Failed to load manifest for scoring: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to load project manifest") from exc
+
+    if not manifest or "images" not in manifest:
+        return []
+
+    results: list[CaptionScoreResponse] = []
+    for entry in manifest["images"]:
+        caption: str | None = entry.get("caption")
+        if not caption:
+            continue
+
+        relative_path: str = entry.get("path", "")
+        image_id = hashlib.sha256(relative_path.encode()).hexdigest()[:16]
+
+        score = score_caption(caption, IMAGE_SCORING_CONFIG)
+        results.append(CaptionScoreResponse(
+            image_id=image_id,
+            caption=caption,
+            overall=score.overall,
+            length_score=score.length_score,
+            specificity_score=score.specificity_score,
+            issues=score.issues,
+        ))
+
+    # Sort worst-first for easy review
+    results.sort(key=lambda r: r.overall)
+    return results
 
 
 @router.patch("/{image_id}", response_model=CaptionUpdateResponse)

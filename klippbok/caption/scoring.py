@@ -64,6 +64,26 @@ class ScoringConfig:
 
 
 # ---------------------------------------------------------------------------
+# Preset configs
+# ---------------------------------------------------------------------------
+
+#: Scoring config tuned for image datasets using booru-style tags or short
+#: natural language captions. Key differences from the video default:
+#: - Much shorter length thresholds (booru tags are typically 10-100 chars)
+#: - weight_temporal=0.0 (temporal awareness is irrelevant for still images)
+IMAGE_SCORING_CONFIG = ScoringConfig(
+    min_good_length=20,          # booru tags are short
+    max_good_length=300,         # NL captions for images are shorter than video
+    min_acceptable_length=10,
+    max_acceptable_length=500,
+    weight_length=0.40,
+    weight_temporal=0.0,         # temporal irrelevant for images
+    weight_specificity=0.40,
+    weight_repetition=0.20,
+)
+
+
+# ---------------------------------------------------------------------------
 # Word lists for heuristic scoring
 # ---------------------------------------------------------------------------
 
