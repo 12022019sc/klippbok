@@ -140,7 +140,7 @@ Plans:
   4. Caption generation accepts a provider preset and resolves config server-side
   5. Dedicated CaptionPage with collapsible provider config, thumbnail strip, batch tag ops, and caption editor
   6. Generate Captions moved from GalleryPage to CaptionPage; nav reflects pipeline workflow
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 06.1-01-PLAN.md -- Backend: global config service, JoyCaption detection, provider routing, API endpoints
