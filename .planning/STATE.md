@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06-02-PLAN.md (caption service, API models, captions router, 16 unit tests)
-last_updated: "2026-03-04T00:15:48.888Z"
+stopped_at: Completed 06-03-PLAN.md (CaptionPanel, useCaptionEvents, ProfileInfo, GET /profiles, Generate Captions button, 7 integration tests)
+last_updated: "2026-03-04T00:26:39.258Z"
 last_activity: 2026-03-03 -- Completed 05-04-PLAN.md (ProcessPage wizard, UpscaleStep, useUpscaleEvents, Proceed to Captioning save, source_path fix)
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 21
-  completed_plans: 18
+  completed_plans: 19
 ---
 
 ---
@@ -73,6 +73,7 @@ Progress: [████████████░] ~85% (15 of ~20 estimated pl
 | Phase 05-04 P04 | 8 | 2 tasks | 5 files |
 | Phase 06-captioning-system P01 | 3min | 2 tasks | 3 files |
 | Phase 06-captioning-system P06-02 | 378 | 2 tasks | 5 files |
+| Phase 06-captioning-system P06-03 | 10 | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -164,6 +165,9 @@ Recent decisions affecting current work:
 - [Phase 06-02]: caption_style_override in manifest overrides profile default (CAPT-04)
 - [Phase 06-02]: save_caption mutates manifest in place; caller persists to disk
 - [Phase 06-02]: caption_error SSE event name avoids EventSource collision
+- [Phase 06-03]: 06-03 MANIFEST-01: update_caption writes full manifest dict back to disk (NOT save_image_entries which appends) — prevents duplicate image entries
+- [Phase 06-03]: 06-03 CAPS-01: CaptionPanel default read-only mode, Edit button to enter textarea mode with Save/Cancel
+- [Phase 06-03]: 06-03 GEN-01: Generate Captions button captions selected images if in selection mode, all images otherwise
 
 ### Pending Todos
 
@@ -177,6 +181,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-04T00:15:48.886Z
-Stopped at: Completed 06-02-PLAN.md (caption service, API models, captions router, 16 unit tests)
+Last session: 2026-03-04T00:26:39.255Z
+Stopped at: Completed 06-03-PLAN.md (CaptionPanel, useCaptionEvents, ProfileInfo, GET /profiles, Generate Captions button, 7 integration tests)
 Resume file: None

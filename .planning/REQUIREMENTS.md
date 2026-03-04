@@ -43,7 +43,7 @@
 - [x] **CAPT-02**: Natural language caption generation via existing VLM backends (Gemini, Replicate, OpenAI-compatible)
 - [x] **CAPT-03**: Caption style automatically selected based on target model (booru for SD1.5, NL for SDXL/Flux)
 - [x] **CAPT-04**: User can override caption style per dataset regardless of model default
-- [ ] **CAPT-05**: Manual caption editing: inline text editor per image in gallery view
+- [x] **CAPT-05**: Manual caption editing: inline text editor per image in gallery view
 - [ ] **CAPT-06**: Trigger word injection: auto-prepend configurable trigger token to all captions
 - [ ] **CAPT-07**: Batch tag operations: add, remove, or replace tags across all captions at once
 - [ ] **CAPT-08**: Caption quality scoring via existing klippbok scoring (length, specificity, issues)
@@ -53,9 +53,9 @@
 - [ ] **GUI-01**: FastAPI backend serves React SPA from single `klippbok serve` command
 - [ ] **GUI-02**: Image gallery view with thumbnail grid, click to expand/edit
 - [ ] **GUI-03**: Gallery shows per-image: thumbnail, resolution, quality status, caption preview
-- [ ] **GUI-04**: Inline caption editor alongside image preview in expanded view
+- [x] **GUI-04**: Inline caption editor alongside image preview in expanded view
 - [x] **GUI-05**: Crop editor accessible from gallery (click image → crop tool)
-- [ ] **GUI-06**: Model configuration selector (dropdown/panel) affecting resolution + caption defaults
+- [x] **GUI-06**: Model configuration selector (dropdown/panel) affecting resolution + caption defaults
 - [ ] **GUI-07**: Dataset export interface: select trainer format, configure options, download/export
 - [ ] **GUI-08**: Video pipeline accessible from GUI (existing ingest, scan, triage workflows)
 - [ ] **GUI-09**: Progress indicators for long-running operations (captioning, auto-crop batch, export)
@@ -146,16 +146,16 @@
 | CAPT-02 | Phase 6 | Complete |
 | CAPT-03 | Phase 6 | Complete |
 | CAPT-04 | Phase 6 | Complete |
-| CAPT-05 | Phase 6 | Pending |
+| CAPT-05 | Phase 6 | Complete |
 | CAPT-06 | Phase 6 | Pending |
 | CAPT-07 | Phase 6 | Pending |
 | CAPT-08 | Phase 6 | Pending |
 | GUI-01 | Phase 4 | Pending |
 | GUI-02 | Phase 4 | Pending |
 | GUI-03 | Phase 4 | Pending |
-| GUI-04 | Phase 6 | Pending |
+| GUI-04 | Phase 6 | Complete |
 | GUI-05 | Phase 5 | Complete |
-| GUI-06 | Phase 6 | Pending |
+| GUI-06 | Phase 6 | Complete |
 | GUI-07 | Phase 8 | Pending |
 | GUI-08 | Phase 7 | Pending |
 | GUI-09 | Phase 4 | Pending |
