@@ -8,12 +8,14 @@ Key functions:
   - get_caption_style_for_project: determine style from profile + override
   - caption_image_for_project: generate caption using appropriate backend
   - save_caption: atomically write sidecar + update manifest entry
+  - build_vlm_config_from_global: map named provider preset to CaptionConfig
 """
 
 from __future__ import annotations
 
 import hashlib
 import logging
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -325,6 +327,95 @@ def batch_replace_tag(
         modified += 1
 
     return modified
+
+
+def build_vlm_config_from_global(
+    provider: str,
+    global_config: dict,
+    manifest: dict,
+) -> "CaptionConfig":
+    """Map a named provider preset to a CaptionConfig instance.
+
+    Reads settings from the global config dict (loaded from
+    ~/.klippbok/config.json) and builds the appropriate CaptionConfig.
+
+    Provider priority rules (per user decision):
+    - config.json API key ALWAYS takes priority over environment variable.
+    - Only falls back to env var when the config value is absent or empty.
+
+    Args:
+        provider: Named preset: "lm_studio" | "nanogpt" | "gemini".
+            - "joycaption" raises ValueError (uses subprocess, not CaptionConfig).
+            - Any other value raises ValueError.
+        global_config: Global config dict from load_global_config().
+        manifest: Project manifest dict (used to extract anchor_word).
+
+    Returns:
+        CaptionConfig populated from the global config and manifest.
+
+    Raises:
+        ValueError: For "joycaption" (subprocess-based, not API-based) or
+            any unrecognised provider name.
+    """
+    from klippbok.caption.models import CaptionConfig
+
+    # Common fields from manifest and caption config section
+    anchor_word: str | None = manifest.get("anchor_word") or None
+    custom_prompt: str | None = global_config.get("custom_prompt") or None
+
+    if provider == "lm_studio":
+        base_url = global_config.get("lm_studio_base_url", "http://localhost:1234/v1")
+        model = global_config.get("lm_studio_model", "")
+        return CaptionConfig(
+            provider="openai",
+            openai_base_url=base_url,
+            openai_model=model,
+            api_key="lm-studio",  # LM Studio ignores the key but requires one
+            anchor_word=anchor_word,
+            custom_prompt=custom_prompt,
+        )
+
+    elif provider == "nanogpt":
+        api_key = global_config.get("nanogpt_api_key", "")
+        model = global_config.get("nanogpt_model", "")
+        return CaptionConfig(
+            provider="openai",
+            openai_base_url="https://nano-gpt.com/api/v1",
+            openai_model=model,
+            api_key=api_key or None,
+            anchor_word=anchor_word,
+            custom_prompt=custom_prompt,
+        )
+
+    elif provider == "gemini":
+        # config.json key takes priority over env var (user decision)
+        cfg_key = global_config.get("gemini_api_key", "")
+        if cfg_key:
+            api_key = cfg_key
+        else:
+            api_key = os.environ.get("GEMINI_API_KEY", "")
+        model = global_config.get("gemini_model", "gemini-2.5-flash")
+        return CaptionConfig(
+            provider="gemini",
+            gemini_model=model,
+            api_key=api_key or None,
+            anchor_word=anchor_word,
+            custom_prompt=custom_prompt,
+        )
+
+    elif provider == "joycaption":
+        raise ValueError(
+            "joycaption uses a subprocess backend and cannot be used with "
+            "build_vlm_config_from_global(). Use detect_joycaption() and "
+            "launch a subprocess directly."
+        )
+
+    else:
+        raise ValueError(
+            f"Unknown provider preset: '{provider}'. "
+            "Supported presets: 'lm_studio', 'nanogpt', 'gemini'. "
+            "JoyCaption uses a subprocess and is handled separately."
+        )
 
 
 def batch_prepend_trigger(
