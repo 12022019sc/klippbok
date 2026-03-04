@@ -1,11 +1,15 @@
-"""Captions router -- batch generation with SSE progress, single-image PATCH, batch tag ops, and scoring.
+"""Captions router -- batch generation with SSE progress, single-image PATCH, batch tag ops, scoring, and provider config.
 
 Endpoints:
     POST /captions/generate         -- Start batch caption generation, returns op_id.
     GET  /captions/{op_id}/events   -- SSE stream for generation progress.
-    PATCH /captions/{image_id}      -- Update a single image caption (inline edit).
+    GET  /captions/config           -- Get caption provider configuration (with defaults).
+    PUT  /captions/config           -- Save caption provider configuration to global config.
+    GET  /captions/models           -- Fetch model list from provider.
+    GET  /captions/health           -- Probe provider health.
     POST /captions/batch            -- Batch tag add/remove/replace/prepend_trigger.
     GET  /captions/scores           -- Get quality scores for all captioned images.
+    PATCH /captions/{image_id}      -- Update a single image caption (inline edit).
 
 Named SSE event types:
     "progress"      -- In-progress update (status="running")
@@ -13,6 +17,10 @@ Named SSE event types:
     "caption_error" -- Generation failed (status="error")
       "caption_error" is used instead of "error" to avoid collision with the
       browser EventSource built-in error event.
+
+Route registration note:
+    /config, /models, /health, /batch, /scores MUST be registered BEFORE the
+    /{image_id} PATCH route to prevent path parameter capture (per ROUTE-01).
 """
 
 from __future__ import annotations
@@ -30,6 +38,7 @@ from klippbok.api.models import (
     CaptionBatchResponse,
     CaptionGenerateRequest,
     CaptionProgress,
+    CaptionProviderConfig,
     CaptionScoreResponse,
     CaptionStarted,
     CaptionUpdateRequest,
@@ -128,7 +137,13 @@ async def _run_caption_batch(
 
         # Step 3: Build VLM config if needed for NL captioning
         vlm_config = None
-        if body.provider is not None:
+        if body.provider_preset is not None:
+            # provider_preset takes priority -- resolve from global config
+            from klippbok.services.caption_service import build_vlm_config_from_global
+            from klippbok.services.global_config_service import load_global_config
+            global_cfg = load_global_config()
+            vlm_config = build_vlm_config_from_global(body.provider_preset, global_cfg, manifest)
+        elif body.provider is not None:
             from klippbok.caption.models import CaptionConfig
             vlm_config = CaptionConfig(
                 provider=body.provider,  # type: ignore[arg-type]
@@ -487,6 +502,178 @@ async def get_caption_scores(request: Request) -> list[CaptionScoreResponse]:
     # Sort worst-first for easy review
     results.sort(key=lambda r: r.overall)
     return results
+
+
+@router.get("/config", response_model=CaptionProviderConfig)
+async def get_caption_config() -> CaptionProviderConfig:
+    """Get the current caption provider configuration.
+
+    Reads from ~/.klippbok/config.json and returns a CaptionProviderConfig
+    with defaults for any fields not yet saved.
+
+    Returns:
+        CaptionProviderConfig with current settings (defaults when absent).
+    """
+    from klippbok.services.global_config_service import load_global_config
+
+    cfg = load_global_config()
+
+    return CaptionProviderConfig(
+        provider=cfg.get("provider", "lm_studio"),
+        lm_studio_base_url=cfg.get("lm_studio_base_url", "http://localhost:1234/v1"),
+        lm_studio_model=cfg.get("lm_studio_model", ""),
+        nanogpt_api_key=cfg.get("nanogpt_api_key", ""),
+        nanogpt_model=cfg.get("nanogpt_model", ""),
+        gemini_api_key=cfg.get("gemini_api_key", ""),
+        gemini_model=cfg.get("gemini_model", "gemini-2.5-flash"),
+        joycaption_path=cfg.get("joycaption_path", ""),
+        custom_prompt=cfg.get("custom_prompt"),
+    )
+
+
+@router.put("/config", response_model=CaptionProviderConfig)
+async def save_caption_config(body: CaptionProviderConfig) -> CaptionProviderConfig:
+    """Save caption provider configuration to the global config file.
+
+    Writes the provided settings to ~/.klippbok/config.json using atomic write.
+    Returns the saved configuration.
+
+    Args:
+        body: Caption provider settings to persist.
+
+    Returns:
+        The saved CaptionProviderConfig (mirrors the input after save).
+    """
+    from klippbok.services.global_config_service import load_global_config, save_global_config
+
+    # Load existing config and merge (preserve fields not managed by this endpoint)
+    existing = load_global_config()
+    existing.update({
+        "provider": body.provider,
+        "lm_studio_base_url": body.lm_studio_base_url,
+        "lm_studio_model": body.lm_studio_model,
+        "nanogpt_api_key": body.nanogpt_api_key,
+        "nanogpt_model": body.nanogpt_model,
+        "gemini_api_key": body.gemini_api_key,
+        "gemini_model": body.gemini_model,
+        "joycaption_path": body.joycaption_path,
+        "custom_prompt": body.custom_prompt,
+    })
+
+    save_global_config(existing)
+    logger.info("Saved caption provider config: provider=%s", body.provider)
+    return body
+
+
+@router.get("/models")
+async def get_caption_models(provider: str = "lm_studio") -> dict:
+    """Fetch the available models for a caption provider.
+
+    Returns a list of model IDs for the specified provider. For local providers
+    (LM Studio), makes an HTTP request. For API providers, returns a static list.
+
+    Args:
+        provider: Provider name: 'lm_studio' | 'nanogpt' | 'gemini' | 'joycaption'.
+
+    Returns:
+        Dict with 'models' list and optional 'message' for warnings.
+    """
+    import requests
+    from klippbok.services.global_config_service import load_global_config
+
+    cfg = load_global_config()
+
+    if provider == "lm_studio":
+        base_url = cfg.get("lm_studio_base_url", "http://localhost:1234/v1")
+        try:
+            resp = requests.get(f"{base_url}/models", timeout=5)
+            resp.raise_for_status()
+            data = resp.json()
+            models = [item["id"] for item in data.get("data", [])]
+            return {"models": models}
+        except requests.exceptions.ConnectionError:
+            return {
+                "models": [],
+                "message": f"Could not connect to LM Studio at {base_url}. Is it running?",
+            }
+        except Exception as exc:
+            logger.warning("Failed to fetch LM Studio models: %s", exc)
+            return {"models": [], "message": str(exc)}
+
+    elif provider == "nanogpt":
+        api_key = cfg.get("nanogpt_api_key", "")
+        if not api_key:
+            return {"models": [], "message": "NanoGPT API key not configured."}
+        try:
+            resp = requests.get(
+                "https://nano-gpt.com/api/v1/models",
+                headers={"Authorization": f"Bearer {api_key}"},
+                params={"detailed": "true"},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            # Log response shape on first call for debugging
+            logger.debug("NanoGPT /models response keys: %s", list(data.keys()) if isinstance(data, dict) else type(data).__name__)
+            if isinstance(data, dict) and "data" in data:
+                models = [item["id"] for item in data["data"] if isinstance(item, dict)]
+            elif isinstance(data, list):
+                models = [item["id"] for item in data if isinstance(item, dict)]
+            else:
+                models = []
+            return {"models": models}
+        except Exception as exc:
+            logger.warning("Failed to fetch NanoGPT models: %s", exc)
+            return {"models": [], "message": str(exc)}
+
+    elif provider == "gemini":
+        return {
+            "models": ["gemini-2.5-flash", "gemini-2.0-flash"],
+        }
+
+    elif provider == "joycaption":
+        return {
+            "models": ["fancyfeast/llama-joycaption-beta-one-hf-llava"],
+        }
+
+    else:
+        return {"models": [], "message": f"Unknown provider: {provider}"}
+
+
+@router.get("/health")
+async def get_caption_health(provider: str = "lm_studio") -> dict:
+    """Probe provider health/connectivity.
+
+    For local providers (LM Studio), makes a lightweight HTTP request.
+    For API-based providers, returns healthy immediately (no local check needed).
+
+    Args:
+        provider: Provider name: 'lm_studio' | 'nanogpt' | 'gemini' | 'joycaption'.
+
+    Returns:
+        Dict with 'healthy' bool and 'message' string.
+    """
+    import requests
+    from klippbok.services.global_config_service import load_global_config
+
+    cfg = load_global_config()
+
+    if provider == "lm_studio":
+        base_url = cfg.get("lm_studio_base_url", "http://localhost:1234/v1")
+        try:
+            resp = requests.get(f"{base_url}/models", timeout=3)
+            resp.raise_for_status()
+            return {"healthy": True, "message": f"LM Studio is reachable at {base_url}"}
+        except requests.exceptions.ConnectionError:
+            return {
+                "healthy": False,
+                "message": f"Cannot connect to LM Studio at {base_url}. Is it running?",
+            }
+        except Exception as exc:
+            return {"healthy": False, "message": str(exc)}
+    else:
+        # API-based providers (nanogpt, gemini, joycaption) don't need local health checks
+        return {"healthy": True, "message": "API-based provider — no local health check needed."}
 
 
 @router.patch("/{image_id}", response_model=CaptionUpdateResponse)

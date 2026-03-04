@@ -315,6 +315,41 @@ class UpscaleProgress(BaseModel):
 # --- Caption models ---
 
 
+class CaptionProviderConfig(BaseModel):
+    """Provider configuration stored in ~/.klippbok/config.json.
+
+    Holds all provider-specific settings: API keys, base URLs, model names.
+    Returned by GET /captions/config and accepted by PUT /captions/config.
+    """
+
+    provider: str = "lm_studio"
+    """Active provider preset: 'lm_studio' | 'nanogpt' | 'gemini' | 'joycaption'."""
+
+    lm_studio_base_url: str = "http://localhost:1234/v1"
+    """Base URL for the LM Studio OpenAI-compatible API."""
+
+    lm_studio_model: str = ""
+    """Model name for LM Studio (e.g. 'llava-1.5-13b'). Empty = use whatever is loaded."""
+
+    nanogpt_api_key: str = ""
+    """API key for NanoGPT (https://nano-gpt.com)."""
+
+    nanogpt_model: str = ""
+    """Model name for NanoGPT vision API."""
+
+    gemini_api_key: str = ""
+    """API key for Google Gemini. Overrides GEMINI_API_KEY env var when set."""
+
+    gemini_model: str = "gemini-2.5-flash"
+    """Gemini model to use for captioning."""
+
+    joycaption_path: str = ""
+    """Path to the JoyCaption installation root (auto-detected if empty)."""
+
+    custom_prompt: str | None = None
+    """Custom prompt that overrides the built-in use-case prompt when set."""
+
+
 class CaptionGenerateRequest(BaseModel):
     """Request body for starting a batch caption generation operation."""
 
@@ -337,6 +372,11 @@ class CaptionGenerateRequest(BaseModel):
     general_threshold: float = 0.35
     """Confidence threshold for booru general tags (0.0-1.0).
     Tags below this score are filtered. Default 0.35 is the WD Tagger standard."""
+
+    provider_preset: str | None = None
+    """Named provider preset: 'lm_studio' | 'nanogpt' | 'gemini' | 'joycaption'.
+    When set, overrides provider + api_key from global config. Takes priority over
+    the provider/api_key fields above."""
 
 
 class CaptionStarted(BaseModel):
