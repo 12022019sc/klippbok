@@ -17,7 +17,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Image Import and Quality** - Batch image import with validation, bucketing, quality filtering, and duplicate detection
 - [x] **Phase 4: Web GUI Foundation** - FastAPI+React shell, image gallery, thumbnails, and progress indicators
 - [x] **Phase 5: Interactive Crop Editor** - Canvas-based crop tool with snap-to-bucket, zoom, rotation, and auto-crop (completed 2026-03-03)
-- [x] **Phase 6: Captioning System** - Booru tag generation, NL captioning, model-aware defaults, manual editing, and batch operations (completed 2026-03-04)
+- [x] **Phase 6: Captioning System** - Booru tag generation, NL captioning, model-aware defaults, manual editing, and batch operations (completed 2026-03-04)
+- [ ] **Phase 6.1: Caption Provider Configuration** - Dedicated captioning page with provider config, model picker, API key management, and caption workspace (INSERTED)
 - [ ] **Phase 7: Video and CLIP Integration** - Existing video pipeline accessible from GUI, CLIP triage extended to standalone images
 - [ ] **Phase 8: Export Pipeline** - Multi-trainer export with format-specific config generation and dataset download
 
@@ -127,6 +128,24 @@ Plans:
 - [ ] 06-03-PLAN.md -- Caption editor UI, PATCH endpoint, settings profile dropdown, generate button
 - [ ] 06-04-PLAN.md -- Trigger words, batch tag operations, and caption quality scoring
 
+### Phase 06.1: Caption Provider Configuration (INSERTED)
+
+**Goal:** Users can configure caption providers (LM Studio, NanoGPT, Gemini, JoyCaption), manage API keys, pick models, and generate/edit captions from a dedicated Captioning page with a split-view workspace
+**Requirements**: CPROV-01, CPROV-02, CPROV-03, CPROV-04, CPROV-05, CPROV-06
+**Depends on:** Phase 6
+**Success Criteria** (what must be TRUE):
+  1. Global config (~/.klippbok/config.json) stores provider preferences and API keys across projects
+  2. Four named providers (LM Studio, NanoGPT, Gemini, JoyCaption) resolve to correct backend configs
+  3. Model picker fetches available models from LM Studio and NanoGPT endpoints
+  4. Caption generation accepts a provider preset and resolves config server-side
+  5. Dedicated CaptionPage with collapsible provider config, thumbnail strip, batch tag ops, and caption editor
+  6. Generate Captions moved from GalleryPage to CaptionPage; nav reflects pipeline workflow
+**Plans:** 2 plans
+
+Plans:
+- [ ] 06.1-01-PLAN.md -- Backend: global config service, JoyCaption detection, provider routing, API endpoints
+- [ ] 06.1-02-PLAN.md -- Frontend: CaptionPage UI, provider config panel, NavBar update, GalleryPage cleanup
+
 ### Phase 7: Video and CLIP Integration
 **Goal**: Users can access existing video pipeline workflows and CLIP-based triage from the web GUI, unifying image and video dataset preparation in one interface
 **Depends on**: Phase 4
@@ -160,7 +179,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 7 -> 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -170,5 +189,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 4. Web GUI Foundation | 5/5 | Complete | 2026-02-28 |
 | 5. Interactive Crop Editor | 4/4 | Complete   | 2026-03-03 |
 | 6. Captioning System | 4/4 | Complete   | 2026-03-04 |
+| 6.1 Caption Provider Config | 0/2 | Not started | - |
 | 7. Video and CLIP Integration | 0/2 | Not started | - |
 | 8. Export Pipeline | 0/3 | Not started | - |
