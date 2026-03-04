@@ -61,7 +61,7 @@ async def _run_caption_batch(
     """
     from klippbok.api.routers.images import _image_id
     from klippbok.services.caption_service import caption_image_for_project, save_caption
-    from klippbok.services.project_service import load_manifest, save_image_entries
+    from klippbok.services.project_service import load_manifest
 
     try:
         # Step 1: Load manifest
@@ -181,9 +181,19 @@ async def _run_caption_batch(
                 ))
 
         # Step 5: Persist updated manifest (all captions saved in memory above)
+        # Write the full manifest dict back -- do NOT use save_image_entries which appends
         try:
-            # Re-save all images entries to flush manifest caption updates
-            save_image_entries(project_dir, manifest["images"])
+            import json
+            from datetime import datetime, timezone
+
+            from klippbok.services.project_service import MANIFEST_DIR, MANIFEST_FILE
+
+            manifest["updated"] = datetime.now(timezone.utc).isoformat()
+            manifest_path = project_dir / MANIFEST_DIR / MANIFEST_FILE
+            manifest_path.write_text(
+                json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
         except Exception as exc:
             logger.error("Failed to persist manifest after captioning: %s", exc)
 
@@ -343,9 +353,12 @@ async def update_caption(
         HTTPException 404: If the image is not found in the manifest.
         HTTPException 500: If the manifest cannot be loaded or saved.
     """
+    import json
+    from datetime import datetime, timezone
+
     from klippbok.api.routers.images import _find_entry_by_id
     from klippbok.services.caption_service import save_caption
-    from klippbok.services.project_service import load_manifest, save_image_entries
+    from klippbok.services.project_service import MANIFEST_DIR, MANIFEST_FILE, load_manifest
 
     project_dir: Path | None = request.app.state.project_dir
     if project_dir is None:
@@ -373,9 +386,15 @@ async def update_caption(
         logger.error("Failed to write sidecar for '%s': %s", abs_path, exc)
         # Don't raise -- we can still update the manifest
 
-    # Persist the updated manifest
+    # Persist the updated manifest by writing the full dict back
+    # (do NOT use save_image_entries -- that function appends, designed for import batches)
     try:
-        save_image_entries(project_dir, manifest["images"])
+        manifest["updated"] = datetime.now(timezone.utc).isoformat()
+        manifest_path = project_dir / MANIFEST_DIR / MANIFEST_FILE
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
     except Exception as exc:
         logger.error("Failed to persist manifest after caption update: %s", exc)
         raise HTTPException(

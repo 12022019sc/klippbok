@@ -4,6 +4,7 @@ Endpoints:
     GET /settings/       -- Return current project settings.
     PUT /settings/       -- Update project settings (project_dir, active_profile).
     DELETE /settings/project -- Delete project data (.klippbok/) and clear active project.
+    POST /settings/shutdown  -- Gracefully shut down the server and child processes.
 
 The PUT endpoint sets app.state.project_dir at runtime, enabling the
 project picker flow where users select a project from the web UI.
@@ -12,12 +13,14 @@ project picker flow where users select a project from the web UI.
 from __future__ import annotations
 
 import logging
+import os
+import signal
 import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 
-from klippbok.api.models import SettingsResponse, SettingsUpdate
+from klippbok.api.models import ProfileInfo, SettingsResponse, SettingsUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -145,3 +148,56 @@ def delete_project(request: Request) -> dict:
 
     request.app.state.project_dir = None
     return {"status": "deleted"}
+
+
+@router.get("/profiles", response_model=list[ProfileInfo])
+def list_available_profiles() -> list[ProfileInfo]:
+    """List all available model profiles (built-in + custom).
+
+    Returns a compact summary of each profile for display in the Settings
+    page model profile dropdown.
+
+    Returns:
+        List of ProfileInfo objects ordered built-in first, then custom.
+    """
+    from klippbok.config.model_config import list_profiles
+
+    profiles = list_profiles()
+    return [
+        ProfileInfo(
+            name=p.name,
+            display_name=p.display_name,
+            caption_style=p.caption_style or "booru",
+            base_resolution=p.base_resolution or 512,
+        )
+        for p in profiles
+    ]
+
+
+@router.post("/shutdown")
+async def shutdown_server() -> dict:
+    """Gracefully shut down the server and any child processes.
+
+    Kills all active upscale subprocesses, then sends SIGTERM to the
+    current process to trigger uvicorn's graceful shutdown.
+
+    Returns:
+        {"status": "shutting_down"} (client may not receive this if shutdown is fast).
+    """
+    from klippbok.services.upscale_service import _procs
+
+    # Kill any running upscale subprocesses
+    for op_id, proc in list(_procs.items()):
+        try:
+            proc.kill()
+            logger.info("Killed upscale subprocess %s (pid=%d) during shutdown", op_id, proc.pid)
+        except OSError:
+            pass
+    _procs.clear()
+
+    logger.info("Server shutdown requested via API")
+
+    # Send SIGTERM to ourselves to trigger uvicorn's graceful shutdown
+    os.kill(os.getpid(), signal.SIGTERM)
+
+    return {"status": "shutting_down"}

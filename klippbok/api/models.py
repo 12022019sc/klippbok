@@ -365,6 +365,22 @@ class CaptionProgress(BaseModel):
     """Operation status: 'running' | 'complete' | 'error'."""
 
 
+class ProfileInfo(BaseModel):
+    """Summary of an available model profile for the Settings UI dropdown."""
+
+    name: str
+    """Profile identifier (e.g. 'sd15', 'sdxl', 'flux', 'pony')."""
+
+    display_name: str
+    """Human-readable name (e.g. 'Stable Diffusion 1.5')."""
+
+    caption_style: str
+    """Default captioning style: 'booru' or 'natural_language'."""
+
+    base_resolution: int
+    """Base training resolution in pixels (e.g. 512, 1024)."""
+
+
 class CaptionUpdateRequest(BaseModel):
     """Request body for updating a single image caption (inline edit)."""
 
