@@ -1,5 +1,7 @@
+import { useQueryClient } from '@tanstack/react-query'
 import Lightbox from 'yet-another-react-lightbox'
 import 'yet-another-react-lightbox/styles.css'
+import CaptionPanel from '../Caption/CaptionPanel'
 import type { GalleryItem } from '../../types/image'
 
 interface ImageLightboxProps {
@@ -7,6 +9,7 @@ interface ImageLightboxProps {
   currentIndex: number
   open: boolean
   onClose: () => void
+  onCaptionSaved?: () => void
 }
 
 export default function ImageLightbox({
@@ -14,13 +17,23 @@ export default function ImageLightbox({
   currentIndex,
   open,
   onClose,
+  onCaptionSaved,
 }: ImageLightboxProps) {
+  const queryClient = useQueryClient()
   const slides = items.map((item) => ({
     src: item.full_url,
     alt: item.relative_path,
     width: item.width,
     height: item.height,
   }))
+
+  function handleCaptionSaved(caption: string, item: GalleryItem) {
+    // Update the item's caption locally so re-open shows the new value
+    item.caption = caption
+    // Invalidate gallery query so the caption updates in thumbnails/status strips
+    void queryClient.invalidateQueries({ queryKey: ['images'] })
+    onCaptionSaved?.()
+  }
 
   return (
     <Lightbox
@@ -82,14 +95,13 @@ export default function ImageLightbox({
               {item.is_near_duplicate && (
                 <span style={{ color: '#f97316' }}>Near-duplicate</span>
               )}
-              {item.caption && (
-                <span
-                  title="Caption"
-                  style={{ flexBasis: '100%', color: '#9ca3af', fontStyle: 'italic' }}
-                >
-                  {item.caption}
-                </span>
-              )}
+              <div style={{ flexBasis: '100%', marginTop: '0.5rem' }}>
+                <CaptionPanel
+                  imageId={item.id}
+                  initialCaption={item.caption ?? null}
+                  onSaved={(caption) => handleCaptionSaved(caption, item)}
+                />
+              </div>
             </div>
           )
         },

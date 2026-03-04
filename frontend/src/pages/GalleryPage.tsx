@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useImages } from '../hooks/useImages'
 import { useImportEvents } from '../hooks/useImportEvents'
+import { useCaptionEvents } from '../hooks/useCaptionEvents'
 import { useAppStore } from '../stores/appStore'
 import { toast } from 'sonner'
 import MasonryGrid from '../components/Gallery/MasonryGrid'
@@ -10,6 +12,7 @@ import type { GalleryItem } from '../types/image'
 
 export default function GalleryPage() {
   const { data, isLoading, error } = useImages()
+  const queryClient = useQueryClient()
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
 
   const projectDir = useAppStore((s) => s.projectDir)
@@ -23,10 +26,16 @@ export default function GalleryPage() {
   const selectedImageIds = useAppStore((s) => s.selectedImageIds)
   const toggleImageSelection = useAppStore((s) => s.toggleImageSelection)
 
+  // Caption generation state
+  const [captionOperationId, setCaptionOperationId] = useState<string | null>(null)
+  const [isCaptionStarting, setIsCaptionStarting] = useState(false)
+  const captionProgress = useCaptionEvents(captionOperationId)
+
   // Subscribe to SSE events for active import
   useImportEvents(importOperationId)
 
   const isImporting = importOperationId !== null
+  const isCaptioning = captionOperationId !== null && !captionProgress.isComplete && !captionProgress.error
 
   async function handleAutoImport() {
     if (!projectDir || importStarting || isImporting) return
@@ -53,6 +62,64 @@ export default function GalleryPage() {
       setImportStarting(false)
     }
   }
+
+  async function handleGenerateCaptions() {
+    if (isCaptionStarting || isCaptioning) return
+    setIsCaptionStarting(true)
+    try {
+      const imageIds = selectionMode && selectedImageIds.size > 0
+        ? Array.from(selectedImageIds)
+        : undefined
+
+      const res = await fetch('/api/v1/captions/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ style: 'auto', image_ids: imageIds }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
+        toast.error('Failed to start captioning', { description: err.detail })
+        return
+      }
+      const data = await res.json()
+      setCaptionOperationId(data.operation_id)
+      toast.info('Generating captions...', {
+        id: 'caption-progress',
+        description: imageIds ? `${imageIds.length} selected images` : 'All images',
+      })
+    } catch (err) {
+      toast.error('Failed to start captioning', {
+        description: err instanceof Error ? err.message : String(err),
+      })
+    } finally {
+      setIsCaptionStarting(false)
+    }
+  }
+
+  // Handle caption progress updates via toast
+  useEffect(() => {
+    if (!captionOperationId) return
+
+    if (captionProgress.isComplete) {
+      toast.success('Captioning complete', {
+        id: 'caption-progress',
+        description: captionProgress.message,
+      })
+      setCaptionOperationId(null)
+      void queryClient.invalidateQueries({ queryKey: ['images'] })
+    } else if (captionProgress.error) {
+      toast.error('Captioning failed', {
+        id: 'caption-progress',
+        description: captionProgress.error,
+      })
+      setCaptionOperationId(null)
+    } else if (captionProgress.total > 0) {
+      const pct = Math.round((captionProgress.current / captionProgress.total) * 100)
+      toast.loading(`Captioning... ${captionProgress.current}/${captionProgress.total} (${pct}%)`, {
+        id: 'caption-progress',
+      })
+    }
+  }, [captionProgress, captionOperationId, queryClient])
 
   const images = data?.images ?? []
 
@@ -140,6 +207,24 @@ export default function GalleryPage() {
   return (
     <>
       <SelectionToolbar items={images} />
+      <div className="gallery-toolbar">
+        <button
+          className="gallery-toolbar-btn gallery-toolbar-btn--caption"
+          onClick={() => void handleGenerateCaptions()}
+          disabled={isCaptionStarting || isCaptioning}
+          title={
+            selectionMode && selectedImageIds.size > 0
+              ? `Caption ${selectedImageIds.size} selected image${selectedImageIds.size !== 1 ? 's' : ''}`
+              : 'Generate captions for all images'
+          }
+        >
+          {isCaptioning
+            ? `Captioning... ${captionProgress.current}/${captionProgress.total}`
+            : selectionMode && selectedImageIds.size > 0
+              ? `Caption ${selectedImageIds.size} Selected`
+              : 'Generate Captions'}
+        </button>
+      </div>
       <MasonryGrid
         items={images}
         onItemClick={handleItemClick}
