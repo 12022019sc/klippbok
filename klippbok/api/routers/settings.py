@@ -101,17 +101,28 @@ def update_settings(body: SettingsUpdate, request: Request) -> SettingsResponse:
     if project_dir is None:
         return SettingsResponse(project_dir=None, active_profile=body.active_profile)
 
-    # Read current profile from manifest
     from klippbok.services.project_service import load_manifest
 
+    # Load existing manifest to read/update active_profile
+    manifest = None
+    try:
+        manifest = load_manifest(project_dir)
+    except Exception:
+        pass
+
     active_profile: str | None = body.active_profile
-    if active_profile is None:
-        try:
-            manifest = load_manifest(project_dir)
-            if manifest:
-                active_profile = manifest.get("active_profile")
-        except Exception:
-            pass
+    if active_profile is not None and manifest is not None:
+        # Persist profile to manifest
+        import json
+        manifest["active_profile"] = active_profile
+        manifest_path = project_dir / ".klippbok" / "manifest.json"
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        logger.info("Active profile set to: %s", active_profile)
+    elif active_profile is None and manifest is not None:
+        active_profile = manifest.get("active_profile")
 
     return SettingsResponse(
         project_dir=str(project_dir),

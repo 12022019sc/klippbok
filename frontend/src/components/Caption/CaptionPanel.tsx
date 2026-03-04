@@ -17,15 +17,19 @@ interface CaptionPanelProps {
 export default function CaptionPanel({ imageId, initialCaption, onSaved }: CaptionPanelProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editedCaption, setEditedCaption] = useState(initialCaption ?? '')
+  const [savedCaption, setSavedCaption] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
+  // Use savedCaption if we've saved locally, otherwise fall back to prop
+  const displayCaption = savedCaption ?? initialCaption
+
   function handleEdit() {
-    setEditedCaption(initialCaption ?? '')
+    setEditedCaption(displayCaption ?? '')
     setIsEditing(true)
   }
 
   function handleCancel() {
-    setEditedCaption(initialCaption ?? '')
+    setEditedCaption(displayCaption ?? '')
     setIsEditing(false)
   }
 
@@ -43,6 +47,7 @@ export default function CaptionPanel({ imageId, initialCaption, onSaved }: Capti
         toast.error('Failed to save caption', { description: err.detail })
         return
       }
+      setSavedCaption(editedCaption)
       onSaved(editedCaption)
       setIsEditing(false)
       toast.success('Caption saved')
@@ -89,7 +94,7 @@ export default function CaptionPanel({ imageId, initialCaption, onSaved }: Capti
   return (
     <div className="caption-panel caption-panel--readonly">
       <span className="caption-panel-text">
-        {initialCaption ?? <span className="caption-panel-placeholder">No caption</span>}
+        {displayCaption ?? <span className="caption-panel-placeholder">No caption</span>}
       </span>
       <button className="caption-panel-btn caption-panel-btn--edit" onClick={handleEdit}>
         Edit
