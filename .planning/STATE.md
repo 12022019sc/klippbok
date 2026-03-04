@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06.1-01-PLAN.md (global_config_service, joycaption detection, build_vlm_config_from_global, 4 caption config API endpoints)
-last_updated: "2026-03-04T04:58:17.714Z"
+stopped_at: Completed 06.1-02-PLAN.md (CaptionPage, ProviderConfigSection, ThumbnailStrip, BatchTagBar, NavBar Caption item, GalleryPage cleanup)
+last_updated: "2026-03-04T05:06:23.552Z"
 last_activity: 2026-03-03 -- Completed 05-04-PLAN.md (ProcessPage wizard, UpscaleStep, useUpscaleEvents, Proceed to Captioning save, source_path fix)
 progress:
   total_phases: 9
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 23
-  completed_plans: 21
+  completed_plans: 22
 ---
 
 ---
@@ -91,6 +91,7 @@ Progress: [████████████░] ~85% (15 of ~20 estimated pl
 | Phase 06-captioning-system P06-03 | 10 | 2 tasks | 9 files |
 | Phase 06-captioning-system P06-04 | 9 | 1 tasks | 6 files |
 | Phase 06.1-caption-provider-configuration P01 | 490 | 2 tasks | 8 files |
+| Phase 06.1 P02 | 292 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -191,6 +192,8 @@ Recent decisions affecting current work:
 - [Phase 06.1-01]: Atomic write pattern for global config: temp file in same dir + os.replace (prevents corruption)
 - [Phase 06.1-01]: Config.json API key always takes priority over env var for all providers
 - [Phase 06.1-01]: JoyCaption detection mirrors _SEEDVR2_COMMON_PATHS patchable module-level list pattern
+- [Phase 06.1-02]: ProviderConfigSection saves global config and trigger word (anchor_word) via separate PUT calls
+- [Phase 06.1-02]: GalleryPage caption generation removed entirely - zero dead code; captioning now lives in CaptionPage
 
 ### Roadmap Evolution
 
@@ -208,6 +211,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-04T04:58:17.712Z
-Stopped at: Completed 06.1-01-PLAN.md (global_config_service, joycaption detection, build_vlm_config_from_global, 4 caption config API endpoints)
+Last session: 2026-03-04T05:06:23.550Z
+Stopped at: Completed 06.1-02-PLAN.md (CaptionPage, ProviderConfigSection, ThumbnailStrip, BatchTagBar, NavBar Caption item, GalleryPage cleanup)
 Resume file: None

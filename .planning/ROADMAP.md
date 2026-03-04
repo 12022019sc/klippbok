@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Web GUI Foundation** - FastAPI+React shell, image gallery, thumbnails, and progress indicators
 - [x] **Phase 5: Interactive Crop Editor** - Canvas-based crop tool with snap-to-bucket, zoom, rotation, and auto-crop (completed 2026-03-03)
 - [x] **Phase 6: Captioning System** - Booru tag generation, NL captioning, model-aware defaults, manual editing, and batch operations (completed 2026-03-04)
-- [ ] **Phase 6.1: Caption Provider Configuration** - Dedicated captioning page with provider config, model picker, API key management, and caption workspace (INSERTED)
+- [x] **Phase 6.1: Caption Provider Configuration** - Dedicated captioning page with provider config, model picker, API key management, and caption workspace (INSERTED) (completed 2026-03-04)
 - [ ] **Phase 7: Video and CLIP Integration** - Existing video pipeline accessible from GUI, CLIP triage extended to standalone images
 - [ ] **Phase 8: Export Pipeline** - Multi-trainer export with format-specific config generation and dataset download
 
@@ -189,6 +189,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 7 -> 8
 | 4. Web GUI Foundation | 5/5 | Complete | 2026-02-28 |
 | 5. Interactive Crop Editor | 4/4 | Complete   | 2026-03-03 |
 | 6. Captioning System | 4/4 | Complete   | 2026-03-04 |
-| 6.1 Caption Provider Config | 1/2 | In Progress|  |
+| 6.1 Caption Provider Config | 2/2 | Complete   | 2026-03-04 |
 | 7. Video and CLIP Integration | 0/2 | Not started | - |
 | 8. Export Pipeline | 0/3 | Not started | - |
