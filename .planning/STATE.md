@@ -3,6 +3,21 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
+stopped_at: Phase 06.1 context gathered
+last_updated: "2026-03-04T04:17:49.694Z"
+last_activity: 2026-03-03 -- Completed 05-04-PLAN.md (ProcessPage wizard, UpscaleStep, useUpscaleEvents, Proceed to Captioning save, source_path fix)
+progress:
+  total_phases: 9
+  completed_phases: 5
+  total_plans: 21
+  completed_plans: 20
+---
+
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: executing
 stopped_at: Completed 06-04-PLAN.md (batch_add_tag, batch_remove_tag, batch_replace_tag, batch_prepend_trigger, IMAGE_SCORING_CONFIG, POST /batch, GET /scores, 70 tests)
 last_updated: "2026-03-04T00:40:12.519Z"
 last_activity: 2026-03-03 -- Completed 05-04-PLAN.md (ProcessPage wizard, UpscaleStep, useUpscaleEvents, Proceed to Captioning save, source_path fix)
@@ -173,6 +188,10 @@ Recent decisions affecting current work:
 - [Phase 06-captioning-system]: 06-04 SCORE-01: IMAGE_SCORING_CONFIG has weight_temporal=0.0 (temporal awareness irrelevant for still images)
 - [Phase 06-captioning-system]: 06-04 ROUTE-01: /batch and /scores endpoints registered before /{image_id} PATCH to prevent path parameter capture
 
+### Roadmap Evolution
+
+- Phase 06.1 inserted after Phase 6: Caption Provider Configuration (URGENT)
+
 ### Pending Todos
 
 None.
@@ -185,6 +204,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-04T00:34:59.401Z
-Stopped at: Completed 06-04-PLAN.md (batch_add_tag, batch_remove_tag, batch_replace_tag, batch_prepend_trigger, IMAGE_SCORING_CONFIG, POST /batch, GET /scores, 70 tests)
-Resume file: None
+Last session: 2026-03-04T04:17:49.692Z
+Stopped at: Phase 06.1 context gathered
+Resume file: .planning/phases/06.1-caption-provider-configuration/06.1-CONTEXT.md
