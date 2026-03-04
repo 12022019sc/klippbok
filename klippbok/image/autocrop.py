@@ -113,7 +113,7 @@ def _ensure_model() -> Path:
 def auto_crop_image(
     image_path: Path,
     buckets: list[tuple[int, int]],
-) -> tuple[int, int, int, int]:
+) -> tuple[int, int, int, int, str]:
     """Detect a person in an image and return crop coordinates for the body.
 
     Uses MediaPipe PoseLandmarker to detect body landmarks. Falls back to
@@ -125,8 +125,10 @@ def auto_crop_image(
             generate_buckets(). Must not be empty.
 
     Returns:
-        (left, top, width, height) crop coordinates in image pixel space.
-        These coordinates are always clamped to the image bounds.
+        (left, top, width, height, detection_type) crop coordinates in image
+        pixel space. detection_type is ``"pose"`` when a person was detected,
+        ``"center"`` when falling back to center crop. Coordinates are always
+        clamped to the image bounds.
 
     Raises:
         ImportError: If mediapipe is not installed.
@@ -161,14 +163,14 @@ def auto_crop_image(
             "auto_crop_image: pose detection failed for %s (%s), using center crop",
             image_path.name, exc,
         )
-        return _center_crop(img_width, img_height, buckets)
+        return (*_center_crop(img_width, img_height, buckets), "center")
 
     if not result.pose_landmarks:
         logger.debug(
             "auto_crop_image: no pose detected in %s, using center crop",
             image_path.name,
         )
-        return _center_crop(img_width, img_height, buckets)
+        return (*_center_crop(img_width, img_height, buckets), "center")
 
     # Derive bounding box from all detected landmarks
     landmarks = result.pose_landmarks[0]
@@ -199,12 +201,12 @@ def auto_crop_image(
             "auto_crop_image: bbox AR out of range for any bucket in %s, using center crop",
             image_path.name,
         )
-        return _center_crop(img_width, img_height, buckets)
+        return (*_center_crop(img_width, img_height, buckets), "center")
 
-    return _fit_crop_to_bucket(
+    return (*_fit_crop_to_bucket(
         bbox_left, bbox_top, bbox_w, bbox_h,
         bucket, img_width, img_height,
-    )
+    ), "pose")
 
 
 def _center_crop(
@@ -313,22 +315,19 @@ def _fit_crop_to_bucket(
     new_w = max(new_w, bbox_w)
     new_h = max(new_h, bbox_h)
 
-    # Center on bbox center
-    new_left = cx - new_w // 2
-    new_top = cy - new_h // 2
+    # Shrink to fit image while preserving bucket AR
+    if new_w > img_w or new_h > img_h:
+        if img_w / img_h >= bucket_ar:
+            # Image is wider than bucket AR — height is the constraint
+            new_h = min(new_h, img_h)
+            new_w = int(new_h * bucket_ar)
+        else:
+            # Image is taller than bucket AR — width is the constraint
+            new_w = min(new_w, img_w)
+            new_h = int(new_w / bucket_ar)
 
-    # Clamp to image bounds (slide without shrinking)
-    if new_left < 0:
-        new_left = 0
-    if new_top < 0:
-        new_top = 0
-    if new_left + new_w > img_w:
-        new_left = max(0, img_w - new_w)
-    if new_top + new_h > img_h:
-        new_top = max(0, img_h - new_h)
+    # Center on bbox center, slide to stay within image bounds
+    new_left = max(0, min(cx - new_w // 2, img_w - new_w))
+    new_top = max(0, min(cy - new_h // 2, img_h - new_h))
 
-    # Final clamp: ensure crop doesn't exceed image bounds
-    final_w = min(new_w, img_w - new_left)
-    final_h = min(new_h, img_h - new_top)
-
-    return new_left, new_top, final_w, final_h
+    return new_left, new_top, new_w, new_h

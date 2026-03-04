@@ -204,8 +204,9 @@ async def auto_crop(body: AutoCropRequest, request: Request) -> list[AutoCropRes
             logger.warning("Auto-crop: image %s not found: %s", image_id, exc.detail)
             continue
 
+        detection_type = "center"
         try:
-            left, top, width, height = await asyncio.get_event_loop().run_in_executor(
+            left, top, width, height, detection_type = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda src=source_path: auto_crop_image(src, buckets),
             )
@@ -223,6 +224,7 @@ async def auto_crop(body: AutoCropRequest, request: Request) -> list[AutoCropRes
                     None,
                     lambda w=img_w, h=img_h: _center_crop(w, h, buckets),
                 )
+                detection_type = "center"
             except Exception as fallback_exc:
                 logger.error(
                     "Center crop fallback also failed for %s: %s",
@@ -242,7 +244,7 @@ async def auto_crop(body: AutoCropRequest, request: Request) -> list[AutoCropRes
             width=width,
             height=height,
             target_bucket=bucket,
-            detection_type="center",  # Will be "pose" when actual detection runs
+            detection_type=detection_type,
         ))
 
     return results

@@ -41,8 +41,8 @@ export default function CropCard({
   const [flipH, setFlipH] = useState<boolean>(initialCropState?.flipH ?? false)
   const [flipV, setFlipV] = useState<boolean>(initialCropState?.flipV ?? false)
 
-  // Zoom factor for range input (stored as 0-100 slider value)
-  const [zoomValue, setZoomValue] = useState<number>(50)
+  // Zoom factor for range input (stored as 0-100 slider value; 20 = 1x zoom)
+  const [zoomValue, setZoomValue] = useState<number>(20)
 
   // Truncate filename for display
   const filename = item.relative_path.split('/').pop() ?? item.relative_path
@@ -75,6 +75,10 @@ export default function CropCard({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buckets])
+
+  // No imperative setCoordinates needed — autocrop results are applied via
+  // key-based remount from CropPage (autocropVersion), so the Cropper mounts
+  // fresh with correct defaultCoordinates and aspectRatio in sync.
 
   function handleChange(cropper: CropperRef) {
     const coords = cropper.getCoordinates()
@@ -156,11 +160,17 @@ export default function CropCard({
         </span>
       </div>
 
-      {/* Cropper */}
-      <div className="crop-card-cropper-container">
+      {/* Cropper — onWheelCapture prevents react-advanced-cropper's zoom so the page scrolls normally */}
+      <div className="crop-card-cropper-container" onWheelCapture={(e) => e.stopPropagation()}>
         <Cropper
           ref={cropperRef}
           src={item.full_url}
+          defaultCoordinates={initialCropState?.coordinates ? {
+            left: initialCropState.coordinates.left,
+            top: initialCropState.coordinates.top,
+            width: initialCropState.coordinates.width,
+            height: initialCropState.coordinates.height,
+          } : undefined}
           stencilComponent={RectangleStencil}
           stencilProps={{
             aspectRatio: isCtrlHeld ? undefined : lockedAR,
@@ -220,6 +230,13 @@ export default function CropCard({
             onChange={handleZoomChange}
             className="crop-zoom-slider"
           />
+          <button
+            className="crop-control-btn crop-zoom-reset"
+            onClick={() => { setZoomValue(20); cropperRef.current?.reset() }}
+            title="Reset zoom to 1x"
+          >
+            1x
+          </button>
         </div>
       </div>
 
