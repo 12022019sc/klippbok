@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06-03-PLAN.md (CaptionPanel, useCaptionEvents, ProfileInfo, GET /profiles, Generate Captions button, 7 integration tests)
-last_updated: "2026-03-04T00:26:39.258Z"
+stopped_at: Completed 06-04-PLAN.md (batch_add_tag, batch_remove_tag, batch_replace_tag, batch_prepend_trigger, IMAGE_SCORING_CONFIG, POST /batch, GET /scores, 70 tests)
+last_updated: "2026-03-04T00:34:59.404Z"
 last_activity: 2026-03-03 -- Completed 05-04-PLAN.md (ProcessPage wizard, UpscaleStep, useUpscaleEvents, Proceed to Captioning save, source_path fix)
 progress:
   total_phases: 8
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 21
-  completed_plans: 19
+  completed_plans: 20
 ---
 
 ---
@@ -74,6 +74,7 @@ Progress: [████████████░] ~85% (15 of ~20 estimated pl
 | Phase 06-captioning-system P01 | 3min | 2 tasks | 3 files |
 | Phase 06-captioning-system P06-02 | 378 | 2 tasks | 5 files |
 | Phase 06-captioning-system P06-03 | 10 | 2 tasks | 9 files |
+| Phase 06-captioning-system P06-04 | 9 | 1 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -168,6 +169,9 @@ Recent decisions affecting current work:
 - [Phase 06-03]: 06-03 MANIFEST-01: update_caption writes full manifest dict back to disk (NOT save_image_entries which appends) — prevents duplicate image entries
 - [Phase 06-03]: 06-03 CAPS-01: CaptionPanel default read-only mode, Edit button to enter textarea mode with Save/Cancel
 - [Phase 06-03]: 06-03 GEN-01: Generate Captions button captions selected images if in selection mode, all images otherwise
+- [Phase 06-captioning-system]: 06-04 BATCH-01: batch functions return modified count (not list) for simple success reporting
+- [Phase 06-captioning-system]: 06-04 SCORE-01: IMAGE_SCORING_CONFIG has weight_temporal=0.0 (temporal awareness irrelevant for still images)
+- [Phase 06-captioning-system]: 06-04 ROUTE-01: /batch and /scores endpoints registered before /{image_id} PATCH to prevent path parameter capture
 
 ### Pending Todos
 
@@ -181,6 +185,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-04T00:26:39.255Z
-Stopped at: Completed 06-03-PLAN.md (CaptionPanel, useCaptionEvents, ProfileInfo, GET /profiles, Generate Captions button, 7 integration tests)
+Last session: 2026-03-04T00:34:59.401Z
+Stopped at: Completed 06-04-PLAN.md (batch_add_tag, batch_remove_tag, batch_replace_tag, batch_prepend_trigger, IMAGE_SCORING_CONFIG, POST /batch, GET /scores, 70 tests)
 Resume file: None
