@@ -10,7 +10,14 @@ pytest -x                 # Stop on first failure
 pytest -k "pattern"       # Run matching tests
 pip install -e ".[dev]"   # Install with dev dependencies
 pip install -e ".[all]"   # Install all optional dependencies
+cd frontend && pnpm build # Rebuild frontend (REQUIRED after any TSX/CSS change)
 ```
+
+## IMPORTANT: Frontend Build
+
+The API server serves static files from `frontend/dist/`. There is NO Vite dev server.
+**After ANY change to `frontend/src/` files (TSX, CSS, etc.), you MUST run `cd frontend && pnpm build`.**
+Changes are invisible until rebuilt. After rebuild, restart the server.
 
 ## Prerequisites
 

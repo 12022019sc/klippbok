@@ -26,11 +26,20 @@
   "hooks": {
     "PreToolUse": [
       {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash C:/Dev/Projects/klippbok-main/.claude/hooks/debug-all-hooks.sh"
+          }
+        ]
+      },
+      {
         "matcher": "Read|Edit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "python C:/Dev/Projects/klippbok-main/.claude/hooks/block-secrets.py"
+            "command": "bash C:/Dev/Projects/klippbok-main/.claude/hooks/block-secrets.sh"
           }
         ]
       },
@@ -57,6 +66,15 @@
       }
     ],
     "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash C:/Dev/Projects/klippbok-main/.claude/hooks/debug-all-hooks.sh"
+          }
+        ]
+      },
       {
         "matcher": "Write",
         "hooks": [

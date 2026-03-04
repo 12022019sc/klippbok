@@ -7,7 +7,11 @@
 
 # Read the tool input from stdin
 INPUT=$(cat)
-FILE_PATH=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tool_input',{}).get('file_path',''))" 2>/dev/null)
+# Extract file_path from hook JSON using bash built-in regex (no external processes)
+FILE_PATH=""
+if [[ "$INPUT" =~ \"file_path\":\"([^\"]*) ]]; then
+    FILE_PATH="${BASH_REMATCH[1]}"
+fi
 
 if [ -z "$FILE_PATH" ]; then
     exit 0

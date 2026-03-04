@@ -57,3 +57,16 @@ _ai_temp/
 # Misc
 *.bak
 *.tmp
+
+# Screenshots & misc artifacts (repo root)
+/*.png
+/*.jpg
+/*.jpeg
+Claude Notes.txt
+docs/full v1 requirements & notes.txt
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# Debug session docs
+docs/debug/

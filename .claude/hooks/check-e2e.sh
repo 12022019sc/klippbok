@@ -6,7 +6,11 @@
 # Based on Claude Code Mastery Guides V1-V5 by TheDecipherist
 
 INPUT=$(cat)
-COMMAND=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tool_input',{}).get('command',''))" 2>/dev/null)
+# Extract command from hook JSON using bash built-in regex (no external processes)
+COMMAND=""
+if [[ "$INPUT" =~ \"command\":\"([^\"]*) ]]; then
+    COMMAND="${BASH_REMATCH[1]}"
+fi
 
 if [ -z "$COMMAND" ]; then
     exit 0
