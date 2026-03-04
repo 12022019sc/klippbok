@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 05 complete — all 4 plans executed, pipeline verified via Playwright
-last_updated: "2026-03-03T23:09:00.952Z"
+stopped_at: Completed 06-01-PLAN.md (WD Tagger v3 ONNX module, unit tests)
+last_updated: "2026-03-04T00:14:31.663Z"
 last_activity: 2026-03-03 -- Completed 05-04-PLAN.md (ProcessPage wizard, UpscaleStep, useUpscaleEvents, Proceed to Captioning save, source_path fix)
 progress:
   total_phases: 8
   completed_phases: 4
-  total_plans: 17
-  completed_plans: 16
+  total_plans: 21
+  completed_plans: 17
 ---
 
 ---
@@ -71,6 +71,7 @@ Progress: [████████████░] ~85% (15 of ~20 estimated pl
 *Updated after each plan completion*
 | Phase 05 P03 | 8 | 2 tasks | 6 files |
 | Phase 05-04 P04 | 8 | 2 tasks | 5 files |
+| Phase 06-captioning-system P01 | 3min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -157,6 +158,8 @@ Recent decisions affecting current work:
 - [Phase 05-04]: 05-04 PROC-02: useUpscaleEvents resets state on operationId change -- prevents stale progress across retries
 - [Phase 05-04]: 05-04 UPS-03: Cancel upscale button calls /api/v1/upscale/{op_id}/cancel -- graceful subprocess termination
 - [Phase 05-04 FIX]: CropApplyItem.source_path made optional -- already resolved from image_id by _resolve_image_path()
+- [Phase 06-01]: TAGGER-01: Tests use numpy arrays directly for mock tagger — avoids requiring pandas in CI/test environment
+- [Phase 06-01]: TAGGER-02: Parametrized threshold edge case uses clearly above/below values — float32 precision makes exact boundary testing an implementation detail
 
 ### Pending Todos
 
@@ -170,6 +173,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-03T23:05:00.000Z
-Stopped at: Phase 05 complete — all 4 plans executed, pipeline verified via Playwright
+Last session: 2026-03-04T00:14:31.661Z
+Stopped at: Completed 06-01-PLAN.md (WD Tagger v3 ONNX module, unit tests)
 Resume file: None
