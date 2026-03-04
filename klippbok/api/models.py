@@ -6,6 +6,8 @@ and the React frontend.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -308,3 +310,76 @@ class UpscaleProgress(BaseModel):
 
     status: str
     """Operation status: 'running' | 'complete' | 'error'."""
+
+
+# --- Caption models ---
+
+
+class CaptionGenerateRequest(BaseModel):
+    """Request body for starting a batch caption generation operation."""
+
+    image_ids: list[str] | None = None
+    """SHA256[:16] image IDs to caption. None means caption all images."""
+
+    style: Literal["booru", "natural_language", "auto"] = "auto"
+    """Caption style override. 'auto' uses the active model profile default."""
+
+    overwrite: bool = False
+    """If True, re-caption images that already have a caption."""
+
+    provider: str | None = None
+    """VLM provider for natural language captioning: 'gemini', 'replicate', or 'openai'.
+    Required when style is 'natural_language'; ignored for 'booru'."""
+
+    api_key: str | None = None
+    """API key for the VLM provider. Required for external providers."""
+
+    general_threshold: float = 0.35
+    """Confidence threshold for booru general tags (0.0-1.0).
+    Tags below this score are filtered. Default 0.35 is the WD Tagger standard."""
+
+
+class CaptionStarted(BaseModel):
+    """Response returned when a batch caption generation is started."""
+
+    operation_id: str
+    """UUID identifying this caption operation. Use for SSE progress stream."""
+
+
+class CaptionProgress(BaseModel):
+    """SSE event payload for caption generation progress updates."""
+
+    operation_id: str
+    """UUID of the caption operation."""
+
+    current: int
+    """Number of images captioned so far."""
+
+    total: int
+    """Total number of images to caption."""
+
+    message: str
+    """Human-readable status message."""
+
+    status: str
+    """Operation status: 'running' | 'complete' | 'error'."""
+
+
+class CaptionUpdateRequest(BaseModel):
+    """Request body for updating a single image caption (inline edit)."""
+
+    caption: str
+    """The new caption text. Replaces the existing caption."""
+
+
+class CaptionUpdateResponse(BaseModel):
+    """Response after updating a single image caption."""
+
+    image_id: str
+    """SHA256[:16] image ID of the updated image."""
+
+    caption: str
+    """The saved caption text."""
+
+    sidecar_written: bool
+    """True if the sidecar .txt file was successfully written."""
