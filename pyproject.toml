@@ -53,6 +53,12 @@ triage = [
     "torch>=2.0",
     "transformers>=4.30",
 ]
+tagger = [
+    "klippbok[image]",
+    "onnxruntime>=1.17.0",
+    "huggingface_hub>=0.20",
+    "pandas>=1.0",
+]
 crop = [
     "klippbok[image]",
     "mediapipe>=0.10",
@@ -70,6 +76,7 @@ all = [
     "klippbok[dataset]",
     "klippbok[image]",
     "klippbok[triage]",
+    "klippbok[tagger]",
     "klippbok[crop]",
     "klippbok[gui]",
 ]
