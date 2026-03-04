@@ -446,6 +446,13 @@
   margin-top: 1rem;
 }
 
+.settings-section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin: 1rem 0 0.5rem;
+}
+
 /* Project Picker */
 .picker-container {
   display: flex;

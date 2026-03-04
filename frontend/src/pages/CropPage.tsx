@@ -48,6 +48,7 @@ export default function CropPage() {
   const [allowNonSquare, setAllowNonSquare] = useState<boolean>(true)
   const [isCtrlHeld, setIsCtrlHeld] = useState<boolean>(false)
   const [isAutoCropping, setIsAutoCropping] = useState<boolean>(false)
+  const [autocropVersion, setAutocropVersion] = useState<number>(0)
   const [isSaving, setIsSaving] = useState<boolean>(false)
   const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set())
 
@@ -173,6 +174,8 @@ export default function CropPage() {
           included: true,
         })
       }
+      // Bump version to force CropCard remount with correct AR + coordinates
+      setAutocropVersion((v) => v + 1)
     } catch (err) {
       console.error('Auto-crop error:', err)
     } finally {
@@ -237,8 +240,8 @@ export default function CropPage() {
         })
       }
 
-      // Navigate to gallery (captioning page in Phase 6)
-      void navigate('/')
+      // Navigate to caption workspace
+      void navigate('/caption')
     } catch (err) {
       console.error('Error saving crops:', err)
       toast.error('Save failed', { description: String(err) })
@@ -293,7 +296,7 @@ export default function CropPage() {
         <div className="crop-grid">
           {selectedImages.map((img) => (
             <CropCard
-              key={img.id}
+              key={`${img.id}-${autocropVersion}`}
               item={img}
               buckets={buckets}
               isCtrlHeld={isCtrlHeld}

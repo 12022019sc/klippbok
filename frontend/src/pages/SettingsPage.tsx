@@ -2,10 +2,36 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAppStore } from '../stores/appStore'
 import { toast } from 'sonner'
+import ProviderConfigSection from '../components/Caption/ProviderConfigSection'
+
+interface CaptionProviderConfig {
+  provider: string
+  lm_studio_base_url: string
+  lm_studio_model: string
+  nanogpt_api_key: string
+  nanogpt_model: string
+  gemini_api_key: string
+  gemini_model: string
+  joycaption_path: string
+  custom_prompt: string | null
+}
+
+const DEFAULT_CAPTION_CONFIG: CaptionProviderConfig = {
+  provider: 'lm_studio',
+  lm_studio_base_url: 'http://localhost:1234/v1',
+  lm_studio_model: '',
+  nanogpt_api_key: '',
+  nanogpt_model: '',
+  gemini_api_key: '',
+  gemini_model: 'gemini-2.5-flash',
+  joycaption_path: '',
+  custom_prompt: null,
+}
 
 interface SettingsResponse {
   project_dir: string | null
   active_profile: string | null
+  anchor_word?: string
 }
 
 interface ProfileInfo {
@@ -43,6 +69,17 @@ export default function SettingsPage() {
   })
 
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false)
+
+  const { data: captionConfig = DEFAULT_CAPTION_CONFIG } = useQuery<CaptionProviderConfig>({
+    queryKey: ['caption-config'],
+    queryFn: async () => {
+      const res = await fetch('/api/v1/captions/config')
+      if (!res.ok) throw new Error('Failed to fetch caption config')
+      return res.json() as Promise<CaptionProviderConfig>
+    },
+  })
+
+  const triggerWord = data?.anchor_word ?? ''
 
   const setProjectDir = useAppStore((s) => s.setProjectDir)
   const clearImport = useAppStore((s) => s.clearImport)
@@ -179,6 +216,18 @@ export default function SettingsPage() {
               )}
             </div>
           </div>
+
+          <div className="settings-section-divider" />
+
+          <h2 className="settings-section-title">Caption Provider</h2>
+          <ProviderConfigSection
+            config={captionConfig}
+            onSave={() => void queryClient.invalidateQueries({ queryKey: ['caption-config'] })}
+            triggerWord={triggerWord}
+            onTriggerWordSave={() => void queryClient.invalidateQueries({ queryKey: ['settings'] })}
+          />
+
+          <div className="settings-section-divider" />
 
           <div className="settings-actions">
             <button

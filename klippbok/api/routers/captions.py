@@ -518,6 +518,18 @@ async def get_caption_config() -> CaptionProviderConfig:
 
     cfg = load_global_config()
 
+    # Auto-detect JoyCaption path if not explicitly configured
+    joycaption_path = cfg.get("joycaption_path", "")
+    if not joycaption_path:
+        try:
+            from klippbok.caption.joycaption import detect_joycaption
+
+            detected = detect_joycaption()
+            if detected is not None:
+                joycaption_path = str(detected)
+        except Exception:
+            pass
+
     return CaptionProviderConfig(
         provider=cfg.get("provider", "lm_studio"),
         lm_studio_base_url=cfg.get("lm_studio_base_url", "http://localhost:1234/v1"),
@@ -526,7 +538,7 @@ async def get_caption_config() -> CaptionProviderConfig:
         nanogpt_model=cfg.get("nanogpt_model", ""),
         gemini_api_key=cfg.get("gemini_api_key", ""),
         gemini_model=cfg.get("gemini_model", "gemini-2.5-flash"),
-        joycaption_path=cfg.get("joycaption_path", ""),
+        joycaption_path=joycaption_path,
         custom_prompt=cfg.get("custom_prompt"),
     )
 
@@ -674,6 +686,33 @@ async def get_caption_health(provider: str = "lm_studio") -> dict:
     else:
         # API-based providers (nanogpt, gemini, joycaption) don't need local health checks
         return {"healthy": True, "message": "API-based provider — no local health check needed."}
+
+
+@router.get("/default-prompt")
+async def get_default_prompt(use_case: str | None = None) -> dict:
+    """Return the default prompt template for a given use case.
+
+    This lets the frontend show users what prompt will be used when
+    custom_prompt is left blank.
+
+    Args:
+        use_case: One of 'character', 'style', 'motion', 'object', or None.
+
+    Returns:
+        Dict with 'prompt' string.
+    """
+    from klippbok.caption.prompts import IMAGE_PROMPTS
+
+    template = IMAGE_PROMPTS.get(use_case, IMAGE_PROMPTS[None])
+    # Strip template placeholders for display — they'll be filled at generation time
+    clean = (
+        template
+        .replace("{anchor_line}", "")
+        .replace("{secondary_line}", "")
+        .replace("{style_anchor_line}", "")
+        .replace("{subject}", "[trigger word]")
+    )
+    return {"prompt": clean.strip()}
 
 
 @router.patch("/{image_id}", response_model=CaptionUpdateResponse)

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 interface CaptionProviderConfig {
@@ -27,7 +27,8 @@ async function fetchModels(provider: string, baseUrl: string): Promise<string[]>
   }
   const res = await fetch(`/api/v1/captions/models?${params.toString()}`)
   if (!res.ok) return []
-  return res.json() as Promise<string[]>
+  const data = await res.json() as { models: string[]; message?: string }
+  return data.models ?? []
 }
 
 const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']
@@ -46,7 +47,27 @@ export default function ProviderConfigSection({ config, onSave, triggerWord, onT
   const [localTriggerWord, setLocalTriggerWord] = useState(triggerWord)
   const [isSaving, setIsSaving] = useState(false)
 
+  // Re-sync local state when config prop updates (e.g. after async fetch resolves)
+  useEffect(() => {
+    setLocal({ ...config })
+  }, [config])
+
+  useEffect(() => {
+    setLocalTriggerWord(triggerWord)
+  }, [triggerWord])
+
   const queryClient = useQueryClient()
+
+  const { data: defaultPrompt = '' } = useQuery<string>({
+    queryKey: ['caption-default-prompt'],
+    queryFn: async () => {
+      const res = await fetch('/api/v1/captions/default-prompt')
+      if (!res.ok) return ''
+      const data = await res.json() as { prompt: string }
+      return data.prompt ?? ''
+    },
+    staleTime: 60_000,
+  })
 
   const modelsEnabled = local.provider === 'lm_studio' || local.provider === 'nanogpt'
   const { data: modelList = [] } = useQuery<string[]>({
@@ -278,7 +299,7 @@ export default function ProviderConfigSection({ config, onSave, triggerWord, onT
                 value={local.custom_prompt ?? ''}
                 onChange={(e) => setLocal({ ...local, custom_prompt: e.target.value || null })}
                 rows={4}
-                placeholder="Leave blank to use the default prompt for this provider..."
+                placeholder={defaultPrompt || 'Leave blank to use the default prompt for this provider...'}
               />
             </div>
           )}
