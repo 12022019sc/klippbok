@@ -131,6 +131,24 @@ async def upscale_status() -> dict:
     }
 
 
+@router.post("/{op_id}/cancel")
+async def cancel_upscale_operation(op_id: str) -> dict:
+    """Cancel a running upscale operation by killing its subprocess.
+
+    Args:
+        op_id: Operation ID returned by POST /upscale/start.
+
+    Returns:
+        {"cancelled": bool} indicating if the process was found and killed.
+    """
+    from klippbok.services.upscale_service import cancel_upscale
+
+    killed = cancel_upscale(op_id)
+    if not killed:
+        logger.debug("Cancel requested for %s but no running process found", op_id)
+    return {"cancelled": killed}
+
+
 @router.get("/{op_id}/events")
 async def upscale_events(op_id: str) -> EventSourceResponse:
     """Stream SSE progress events for a batch upscale operation.

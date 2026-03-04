@@ -24,6 +24,7 @@ export default function UpscaleStep({ selectedImageIds, onComplete, onSkip }: Up
   const [scaleFactor, setScaleFactor] = useState<ScaleFactor>(2)
   const [operationId, setOperationId] = useState<string | null>(null)
   const [isStarting, setIsStarting] = useState<boolean>(false)
+  const [isCancelling, setIsCancelling] = useState<boolean>(false)
 
   const upscaleProgress = useUpscaleEvents(operationId)
 
@@ -83,6 +84,18 @@ export default function UpscaleStep({ selectedImageIds, onComplete, onSkip }: Up
       console.error('Error starting upscale:', err)
     } finally {
       setIsStarting(false)
+    }
+  }
+
+  async function handleCancel() {
+    if (!operationId || isCancelling) return
+    setIsCancelling(true)
+    try {
+      await fetch(`/api/v1/upscale/${operationId}/cancel`, { method: 'POST' })
+    } catch (err) {
+      console.error('Error cancelling upscale:', err)
+    } finally {
+      setIsCancelling(false)
     }
   }
 
@@ -217,6 +230,13 @@ export default function UpscaleStep({ selectedImageIds, onComplete, onSkip }: Up
               {upscaleProgress.message && (
                 <p className="upscale-progress-message">{upscaleProgress.message}</p>
               )}
+              <button
+                className="upscale-cancel-btn"
+                onClick={() => void handleCancel()}
+                disabled={isCancelling}
+              >
+                {isCancelling ? 'Cancelling...' : 'Cancel Upscale'}
+              </button>
             </>
           )}
         </div>

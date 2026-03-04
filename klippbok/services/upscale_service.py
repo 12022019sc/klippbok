@@ -48,7 +48,7 @@ def detect_seedvr2() -> Path | None:
 
     Checks each candidate path for the presence of both:
     - venv/Scripts/python.exe (Windows) or venv/bin/python (Linux/macOS)
-    - batch_upscale.py
+    - inference_cli.py (primary) or batch_upscale.py (fallback)
 
     Also checks the SEEDVR2_PATH environment variable.
 
@@ -63,10 +63,12 @@ def detect_seedvr2() -> Path | None:
             candidate / "venv" / "Scripts" / "python.exe",  # Windows
             candidate / "venv" / "bin" / "python",           # Linux/macOS
         ]
+        # Prefer inference_cli.py (direct invocation avoids subprocess-in-subprocess)
+        cli_script = candidate / "inference_cli.py"
         batch_script = candidate / "batch_upscale.py"
 
         has_python = any(p.is_file() for p in python_candidates)
-        if has_python and batch_script.is_file():
+        if has_python and (cli_script.is_file() or batch_script.is_file()):
             logger.debug("Found SeedVR2 installation at: %s", candidate)
             return candidate
 
@@ -134,29 +136,58 @@ def detect_nmkd_siax() -> Path | None:
 
 # ── Upscale subprocess ────────────────────────────────────────────────────
 
+# Module-level dict to store subprocess references for cancellation.
+# Keyed by operation ID. Cleaned up when process exits.
+_procs: dict[str, subprocess.Popen] = {}
+
+
+def cancel_upscale(op_id: str) -> bool:
+    """Kill a running upscale subprocess.
+
+    Args:
+        op_id: Operation UUID to cancel.
+
+    Returns:
+        True if the process was found and killed, False if not found.
+    """
+    proc = _procs.get(op_id)
+    if proc is None:
+        return False
+    try:
+        proc.kill()
+        logger.info("Killed upscale subprocess for operation %s (pid=%d)", op_id, proc.pid)
+    except OSError as exc:
+        logger.warning("Failed to kill upscale process %s: %s", op_id, exc)
+    return True
+
+
 def _stdout_reader(
     proc: subprocess.Popen,
     queue: asyncio.Queue,
     loop: asyncio.AbstractEventLoop,
     op_id: str,
     total: int,
+    upscaler: str,
 ) -> None:
     """Read upscaler stdout in a background thread and push progress to asyncio queue.
 
-    Parses lines matching "N/M" or "file N/total" patterns (flexible regex
-    to handle SeedVR2's "Processing file N/total" log format).
+    For SeedVR2: matches "Processing file N/M" lines from inference_cli.py.
+    For other upscalers: uses generic "N/M" pattern matching.
 
     Args:
         proc: Running subprocess.
         queue: asyncio.Queue to push UpscaleProgress events onto.
         loop: The event loop to schedule queue.put coroutines on.
         op_id: Operation UUID for event payloads.
-        total: Total number of images (used when parsed from stdout fails).
+        total: Total number of images (the ground truth for progress).
+        upscaler: Upscaler backend name ("seedvr2" or "nmkd_siax").
     """
     from klippbok.api.models import UpscaleProgress
 
-    # Flexible pattern matching: "N/M" where both are integers
-    progress_pattern = re.compile(r"(\d+)\s*/\s*(\d+)")
+    # SeedVR2: only match "Processing file N/M" (ignore tqdm batch noise)
+    file_pattern = re.compile(r"Processing file\s+(\d+)\s*/\s*(\d+)", re.IGNORECASE)
+    # NMKD / other: generic "N/M" pattern
+    generic_pattern = re.compile(r"(\d+)\s*/\s*(\d+)")
 
     try:
         for line in iter(proc.stdout.readline, ""):
@@ -165,24 +196,42 @@ def _stdout_reader(
                 continue
             logger.debug("upscaler stdout: %s", line)
 
-            match = progress_pattern.search(line)
-            if match:
-                current = int(match.group(1))
-                file_total = int(match.group(2))
-                event = UpscaleProgress(
-                    operation_id=op_id,
-                    current=current,
-                    total=file_total,
-                    message=f"Upscaling {current}/{file_total} images...",
-                    status="running",
-                )
-                asyncio.run_coroutine_threadsafe(queue.put(event), loop)
+            if upscaler == "seedvr2":
+                # Only match the specific "Processing file" line
+                file_match = file_pattern.search(line)
+                if file_match:
+                    current = int(file_match.group(1))
+                    event = UpscaleProgress(
+                        operation_id=op_id,
+                        current=current,
+                        total=total,
+                        message=f"Upscaling {current}/{total} images...",
+                        status="running",
+                    )
+                    asyncio.run_coroutine_threadsafe(queue.put(event), loop)
+            else:
+                # Generic fallback for NMKD-Siax etc.
+                match = generic_pattern.search(line)
+                if match:
+                    current = int(match.group(1))
+                    file_total = int(match.group(2))
+                    event = UpscaleProgress(
+                        operation_id=op_id,
+                        current=current,
+                        total=file_total,
+                        message=f"Upscaling {current}/{file_total} images...",
+                        status="running",
+                    )
+                    asyncio.run_coroutine_threadsafe(queue.put(event), loop)
     except Exception as exc:
         logger.error("upscaler stdout reader failed: %s", exc)
 
     # Wait for process completion
     proc.wait()
     return_code = proc.returncode
+
+    # Clean up proc reference
+    _procs.pop(op_id, None)
 
     if return_code == 0:
         final_event = UpscaleProgress(
@@ -191,6 +240,15 @@ def _stdout_reader(
             total=total,
             message="Upscaling complete.",
             status="complete",
+        )
+    elif return_code < 0 or return_code == 1:
+        # Negative return code = killed by signal (Unix), code 1 on Windows kill
+        final_event = UpscaleProgress(
+            operation_id=op_id,
+            current=0,
+            total=total,
+            message="Upscaling cancelled.",
+            status="error",
         )
     else:
         final_event = UpscaleProgress(
@@ -266,18 +324,31 @@ async def start_upscale(
             await queue.put(None)
             return
 
-        batch_script = seedvr2_root / "batch_upscale.py"
+        # Call inference_cli.py directly instead of batch_upscale.py to avoid
+        # subprocess-in-subprocess fragility and give us direct stdout control.
+        cli_script = seedvr2_root / "inference_cli.py"
         input_dir = image_paths[0].parent  # Assume all in same dir for batch
+
+        # Map scale factor to resolution (matching batch_upscale.py SCALE_PRESETS)
+        scale_to_resolution = {2: 1440, 4: 2160, 8: 4320}
+        resolution = scale_to_resolution.get(scale_factor, 1440)
 
         cmd = [
             str(python_exe),
-            str(batch_script),
+            str(cli_script),
             str(input_dir),
             "--output", str(output_dir),
-            "--scale", str(scale_factor),
+            "--dit_model", "seedvr2_ema_3b_fp8_e4m3fn.safetensors",
+            "--resolution", str(resolution),
+            "--max_resolution", str(resolution * 2),
+            "--batch_size", "1",
+            "--color_correction", "lab",
+            "--dit_offload_device", "cpu",
+            "--vae_offload_device", "cpu",
+            "--cache_dit", "--cache_vae",
         ]
 
-        env = {**os.environ, "PYTHONUNBUFFERED": "1"}
+        env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}
 
         try:
             proc = subprocess.Popen(
@@ -287,6 +358,8 @@ async def start_upscale(
                 text=True,
                 env=env,
                 cwd=str(seedvr2_root),
+                encoding="utf-8",
+                errors="replace",
             )
         except Exception as exc:
             err_event = UpscaleProgress(
@@ -361,17 +434,20 @@ async def start_upscale(
         await queue.put(None)
         return
 
+    # Store proc reference for cancellation support
+    _procs[op_id] = proc
+
     # Start background thread to read stdout without blocking the event loop
     loop = asyncio.get_event_loop()
     reader_thread = threading.Thread(
         target=_stdout_reader,
-        args=(proc, queue, loop, op_id, total),
+        args=(proc, queue, loop, op_id, total, upscaler),
         daemon=True,
         name=f"upscale-reader-{op_id}",
     )
     reader_thread.start()
 
     logger.info(
-        "Started %s upscale subprocess (op_id=%s, %d images)",
-        upscaler, op_id, total,
+        "Started %s upscale subprocess (op_id=%s, pid=%d, %d images)",
+        upscaler, op_id, proc.pid, total,
     )
