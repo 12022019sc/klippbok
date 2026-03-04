@@ -40,9 +40,9 @@
 ### Captioning
 
 - [x] **CAPT-01**: Booru-style tag generation via WD Tagger v3 (ONNX) for SD1.5 datasets
-- [ ] **CAPT-02**: Natural language caption generation via existing VLM backends (Gemini, Replicate, OpenAI-compatible)
-- [ ] **CAPT-03**: Caption style automatically selected based on target model (booru for SD1.5, NL for SDXL/Flux)
-- [ ] **CAPT-04**: User can override caption style per dataset regardless of model default
+- [x] **CAPT-02**: Natural language caption generation via existing VLM backends (Gemini, Replicate, OpenAI-compatible)
+- [x] **CAPT-03**: Caption style automatically selected based on target model (booru for SD1.5, NL for SDXL/Flux)
+- [x] **CAPT-04**: User can override caption style per dataset regardless of model default
 - [ ] **CAPT-05**: Manual caption editing: inline text editor per image in gallery view
 - [ ] **CAPT-06**: Trigger word injection: auto-prepend configurable trigger token to all captions
 - [ ] **CAPT-07**: Batch tag operations: add, remove, or replace tags across all captions at once
@@ -143,9 +143,9 @@
 | MODL-05 | Phase 2 | Complete |
 | MODL-06 | Phase 2 | Complete |
 | CAPT-01 | Phase 6 | Complete |
-| CAPT-02 | Phase 6 | Pending |
-| CAPT-03 | Phase 6 | Pending |
-| CAPT-04 | Phase 6 | Pending |
+| CAPT-02 | Phase 6 | Complete |
+| CAPT-03 | Phase 6 | Complete |
+| CAPT-04 | Phase 6 | Complete |
 | CAPT-05 | Phase 6 | Pending |
 | CAPT-06 | Phase 6 | Pending |
 | CAPT-07 | Phase 6 | Pending |

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06-01-PLAN.md (WD Tagger v3 ONNX module, unit tests)
-last_updated: "2026-03-04T00:14:31.663Z"
+stopped_at: Completed 06-02-PLAN.md (caption service, API models, captions router, 16 unit tests)
+last_updated: "2026-03-04T00:15:48.888Z"
 last_activity: 2026-03-03 -- Completed 05-04-PLAN.md (ProcessPage wizard, UpscaleStep, useUpscaleEvents, Proceed to Captioning save, source_path fix)
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 21
-  completed_plans: 17
+  completed_plans: 18
 ---
 
 ---
@@ -72,6 +72,7 @@ Progress: [████████████░] ~85% (15 of ~20 estimated pl
 | Phase 05 P03 | 8 | 2 tasks | 6 files |
 | Phase 05-04 P04 | 8 | 2 tasks | 5 files |
 | Phase 06-captioning-system P01 | 3min | 2 tasks | 3 files |
+| Phase 06-captioning-system P06-02 | 378 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -160,6 +161,9 @@ Recent decisions affecting current work:
 - [Phase 05-04 FIX]: CropApplyItem.source_path made optional -- already resolved from image_id by _resolve_image_path()
 - [Phase 06-01]: TAGGER-01: Tests use numpy arrays directly for mock tagger — avoids requiring pandas in CI/test environment
 - [Phase 06-01]: TAGGER-02: Parametrized threshold edge case uses clearly above/below values — float32 precision makes exact boundary testing an implementation detail
+- [Phase 06-02]: caption_style_override in manifest overrides profile default (CAPT-04)
+- [Phase 06-02]: save_caption mutates manifest in place; caller persists to disk
+- [Phase 06-02]: caption_error SSE event name avoids EventSource collision
 
 ### Pending Todos
 
@@ -173,6 +177,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-04T00:14:31.661Z
-Stopped at: Completed 06-01-PLAN.md (WD Tagger v3 ONNX module, unit tests)
+Last session: 2026-03-04T00:15:48.886Z
+Stopped at: Completed 06-02-PLAN.md (caption service, API models, captions router, 16 unit tests)
 Resume file: None

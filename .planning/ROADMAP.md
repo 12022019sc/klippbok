@@ -169,6 +169,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 3. Image Import and Quality | 3/3 | Complete | 2026-02-28 |
 | 4. Web GUI Foundation | 5/5 | Complete | 2026-02-28 |
 | 5. Interactive Crop Editor | 4/4 | Complete   | 2026-03-03 |
-| 6. Captioning System | 1/4 | In Progress|  |
+| 6. Captioning System | 2/4 | In Progress|  |
 | 7. Video and CLIP Integration | 0/2 | Not started | - |
 | 8. Export Pipeline | 0/3 | Not started | - |
