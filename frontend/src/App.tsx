@@ -7,6 +7,7 @@ import ImportPage from './pages/ImportPage'
 import SettingsPage from './pages/SettingsPage'
 import CropPage from './pages/CropPage'
 import ProcessPage from './pages/ProcessPage'
+import CaptionPage from './pages/CaptionPage'
 import ProjectPickerPage from './pages/ProjectPickerPage'
 
 export default function App() {
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="/import" element={<ImportPage />} />
           <Route path="/crop" element={<CropPage />} />
           <Route path="/process" element={<ProcessPage />} />
+          <Route path="/caption" element={<CaptionPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>

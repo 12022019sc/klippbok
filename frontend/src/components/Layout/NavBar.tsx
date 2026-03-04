@@ -3,7 +3,7 @@ import { NavLink } from 'react-router'
 export default function NavBar() {
   return (
     <nav className="navbar">
-      <span className="app-name">klippbok</span>
+      <NavLink to="/" className="app-name">klippbok</NavLink>
       <ul className="nav-links">
         <li>
           <NavLink to="/" end className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
@@ -18,6 +18,11 @@ export default function NavBar() {
         <li>
           <NavLink to="/crop" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
             Crop
+          </NavLink>
+        </li>
+        <li>
+          <NavLink to="/caption" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            Caption
           </NavLink>
         </li>
         <li>
