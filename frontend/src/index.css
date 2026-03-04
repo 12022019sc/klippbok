@@ -852,6 +852,48 @@ h1 {
   flex-shrink: 0;
 }
 
+.provider-config-test-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.provider-config-btn--test {
+  background: #1a3a2e;
+  border-color: #2d6b4f;
+  color: #86efac;
+  font-size: 0.8125rem;
+}
+
+.provider-config-btn--test:hover:not(:disabled) {
+  background: #1f4d3a;
+}
+
+.provider-config-btn--lms-start {
+  background: #1a2e3a;
+  border-color: #2d5a6b;
+  color: #7dd3fc;
+  font-size: 0.8125rem;
+}
+
+.provider-config-btn--lms-start:hover:not(:disabled) {
+  background: #1f3d4d;
+}
+
+.provider-config-test-result {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.provider-config-test-result--ok {
+  color: #4ade80;
+}
+
+.provider-config-test-result--fail {
+  color: #f87171;
+}
+
 .provider-config-actions {
   display: flex;
   gap: 0.5rem;
@@ -1052,6 +1094,20 @@ h1 {
   border-color: #4b5563;
   color: #6b7280;
   cursor: not-allowed;
+}
+
+.caption-overwrite-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #9ca3af;
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.caption-overwrite-label input[type="checkbox"] {
+  accent-color: #3b82f6;
 }
 
 .caption-progress-bar-track {

@@ -66,6 +66,7 @@ export default function CaptionPage() {
   const [editingCaption, setEditingCaption] = useState<string>('')
   const [isSavingCaption, setIsSavingCaption] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [overwriteExisting, setOverwriteExisting] = useState(false)
 
   const captionProgress = useCaptionEvents(captionOperationId)
 
@@ -83,9 +84,20 @@ export default function CaptionPage() {
     if (!captionOperationId) return
 
     if (captionProgress.isComplete) {
-      toast.success('Captions generated', {
+      // Show warning if some images failed, success if all passed
+      const hasErrors = captionProgress.errorCount > 0
+      const toastFn = hasErrors ? toast.warning : toast.success
+      let description = captionProgress.message
+      if (hasErrors && captionProgress.firstError) {
+        // Extract the error reason from "Error captioning foo.jpg: <reason>"
+        const match = captionProgress.firstError.match(/Error captioning [^:]+: (.+)/)
+        const reason = match ? match[1] : captionProgress.firstError
+        description += `\n${reason}`
+      }
+      toastFn(hasErrors ? 'Captioning finished with errors' : 'Captions generated', {
         id: 'caption-progress',
-        description: captionProgress.message,
+        description,
+        duration: hasErrors ? 8000 : 4000,
       })
       setCaptionOperationId(null)
       void queryClient.invalidateQueries({ queryKey: ['images'] })
@@ -113,6 +125,7 @@ export default function CaptionPage() {
         body: JSON.stringify({
           style: 'auto',
           provider_preset: config.provider,
+          overwrite: overwriteExisting,
         }),
       })
       if (!res.ok) {
@@ -208,6 +221,15 @@ export default function CaptionPage() {
               ? 'Starting...'
               : 'Generate Captions'}
         </button>
+        <label className="caption-overwrite-label">
+          <input
+            type="checkbox"
+            checked={overwriteExisting}
+            onChange={(e) => setOverwriteExisting(e.target.checked)}
+            disabled={isGenerating || isCaptioning}
+          />
+          Overwrite existing
+        </label>
         {isCaptioning && captionProgress.total > 0 && (
           <div className="caption-progress-bar-track">
             <div

@@ -46,6 +46,9 @@ export default function ProviderConfigSection({ config, onSave, triggerWord, onT
   const [local, setLocal] = useState<CaptionProviderConfig>({ ...config })
   const [localTriggerWord, setLocalTriggerWord] = useState(triggerWord)
   const [isSaving, setIsSaving] = useState(false)
+  const [testResult, setTestResult] = useState<{ healthy: boolean; message: string } | null>(null)
+  const [isTesting, setIsTesting] = useState(false)
+  const [isStartingLms, setIsStartingLms] = useState(false)
 
   // Re-sync local state when config prop updates (e.g. after async fetch resolves)
   useEffect(() => {
@@ -87,6 +90,44 @@ export default function ProviderConfigSection({ config, onSave, triggerWord, onT
           ? local.gemini_model
           : 'subprocess'
     return `${label} — ${model}`
+  }
+
+  async function handleTestConnection() {
+    setIsTesting(true)
+    setTestResult(null)
+    try {
+      const params = new URLSearchParams({ provider: local.provider })
+      if (local.provider === 'lm_studio' && local.lm_studio_base_url) {
+        params.set('base_url', local.lm_studio_base_url)
+      }
+      const res = await fetch(`/api/v1/captions/health?${params.toString()}`)
+      const data = await res.json() as { healthy: boolean; message: string }
+      setTestResult(data)
+    } catch {
+      setTestResult({ healthy: false, message: 'Request failed — is the klippbok server running?' })
+    } finally {
+      setIsTesting(false)
+    }
+  }
+
+  async function handleStartLms() {
+    setIsStartingLms(true)
+    setTestResult(null)
+    try {
+      const res = await fetch('/api/v1/captions/lms-start', { method: 'POST' })
+      const data = await res.json() as { success: boolean; message: string }
+      if (data.success) {
+        setTestResult({ healthy: true, message: data.message })
+        // Refresh model list after server starts
+        void queryClient.invalidateQueries({ queryKey: ['caption-models'] })
+      } else {
+        setTestResult({ healthy: false, message: data.message })
+      }
+    } catch {
+      setTestResult({ healthy: false, message: 'Failed to start LM Studio server' })
+    } finally {
+      setIsStartingLms(false)
+    }
   }
 
   async function handleSave() {
@@ -303,6 +344,33 @@ export default function ProviderConfigSection({ config, onSave, triggerWord, onT
               />
             </div>
           )}
+
+          {/* Test Connection + LMS Start */}
+          <div className="provider-config-test-row">
+            <button
+              type="button"
+              className="provider-config-btn provider-config-btn--test"
+              onClick={() => void handleTestConnection()}
+              disabled={isTesting}
+            >
+              {isTesting ? 'Testing...' : 'Test Connection'}
+            </button>
+            {local.provider === 'lm_studio' && (
+              <button
+                type="button"
+                className="provider-config-btn provider-config-btn--lms-start"
+                onClick={() => void handleStartLms()}
+                disabled={isStartingLms}
+              >
+                {isStartingLms ? 'Starting...' : 'Start LM Studio Server'}
+              </button>
+            )}
+            {testResult && (
+              <span className={`provider-config-test-result ${testResult.healthy ? 'provider-config-test-result--ok' : 'provider-config-test-result--fail'}`}>
+                {testResult.healthy ? '\u2713' : '\u2717'} {testResult.message}
+              </span>
+            )}
+          </div>
 
           {/* Save button */}
           <div className="provider-config-actions">

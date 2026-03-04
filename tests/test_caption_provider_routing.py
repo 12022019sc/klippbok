@@ -1,4 +1,4 @@
-"""Unit tests for build_vlm_config_from_global in klippbok.services.caption_service.
+"""Unit tests for build_vlm_config_from_global and JoyCaption routing.
 
 Tests cover:
 - lm_studio preset -> CaptionConfig with provider="openai", api_key="lm-studio"
@@ -7,13 +7,15 @@ Tests cover:
 - gemini preset -> falls back to GEMINI_API_KEY env var when config has no key
 - anchor_word passed from manifest.get("anchor_word")
 - custom_prompt passed from caption config section
-- joycaption preset raises ValueError
+- joycaption preset raises ValueError (for build_vlm_config_from_global)
 - unknown provider raises ValueError
+- JoyCaption detect + subprocess helpers
 """
 
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -260,3 +262,119 @@ def test_unknown_provider_raises_value_error() -> None:
 
     with pytest.raises(ValueError, match="unknown_provider"):
         build_vlm_config_from_global("unknown_provider", config, manifest)
+
+
+# ---------------------------------------------------------------------------
+# JoyCaption detection and subprocess helpers
+# ---------------------------------------------------------------------------
+
+
+def test_detect_joycaption_returns_none_when_not_installed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """detect_joycaption returns None when no installation exists."""
+    import klippbok.caption.joycaption as jc_mod
+
+    # Patch paths to a dir that doesn't have a venv
+    monkeypatch.setattr(jc_mod, "_JOYCAPTION_COMMON_PATHS", [tmp_path / "nonexistent"])
+    from klippbok.caption.joycaption import detect_joycaption
+    assert detect_joycaption() is None
+
+
+def test_detect_joycaption_returns_path_when_installed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """detect_joycaption returns the root path when a venv/Scripts/python.exe exists."""
+    import klippbok.caption.joycaption as jc_mod
+
+    # Create a fake JoyCaption installation
+    venv_dir = tmp_path / "venv" / "Scripts"
+    venv_dir.mkdir(parents=True)
+    (venv_dir / "python.exe").write_text("fake")
+
+    monkeypatch.setattr(jc_mod, "_JOYCAPTION_COMMON_PATHS", [tmp_path])
+    from klippbok.caption.joycaption import detect_joycaption
+    assert detect_joycaption() == tmp_path
+
+
+def test_get_venv_python_windows(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """get_venv_python returns the Windows python path when it exists."""
+    import klippbok.caption.joycaption as jc_mod
+
+    monkeypatch.setattr(jc_mod.platform, "system", lambda: "Windows")
+
+    venv_dir = tmp_path / "venv" / "Scripts"
+    venv_dir.mkdir(parents=True)
+    (venv_dir / "python.exe").write_text("fake")
+
+    from klippbok.caption.joycaption import get_venv_python
+    result = get_venv_python(tmp_path)
+    assert result == venv_dir / "python.exe"
+
+
+def test_get_venv_python_raises_when_not_found(tmp_path: Path) -> None:
+    """get_venv_python raises FileNotFoundError when venv python is missing."""
+    from klippbok.caption.joycaption import get_venv_python
+
+    with pytest.raises(FileNotFoundError, match="venv Python not found"):
+        get_venv_python(tmp_path)
+
+
+def test_custom_prompt_used_in_caption_image_for_project(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """caption_image_for_project uses custom_prompt when set on vlm_config."""
+    from klippbok.caption.models import CaptionConfig
+    from klippbok.services.caption_service import caption_image_for_project
+
+    # Create a test image
+    img_path = tmp_path / "test.png"
+    img_path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
+
+    captured_prompt = []
+
+    class FakeBackend:
+        def caption_image(self, path: Path, prompt: str) -> str:
+            captured_prompt.append(prompt)
+            return "test caption"
+
+    monkeypatch.setattr(
+        "klippbok.services.caption_service._create_backend",
+        lambda _cfg: FakeBackend(),
+        raising=False,
+    )
+    # Patch at the correct import location
+    import klippbok.caption.captioner as captioner_mod
+    monkeypatch.setattr(captioner_mod, "_create_backend", lambda _cfg: FakeBackend())
+    monkeypatch.setattr(
+        "klippbok.services.caption_service._create_backend",
+        lambda _cfg: FakeBackend(),
+        raising=False,
+    )
+
+    config = CaptionConfig(
+        provider="openai",
+        custom_prompt="My custom prompt here",
+    )
+    manifest = {"images": [], "caption_style_override": "natural_language"}
+
+    # Need to patch the import inside the function
+    import klippbok.services.caption_service as svc_mod
+    original_create = None
+    try:
+        from klippbok.caption import captioner
+        original_create = captioner._create_backend
+        captioner._create_backend = lambda _cfg: FakeBackend()
+
+        result = caption_image_for_project(img_path, manifest, config)
+        assert result == "test caption"
+        assert captured_prompt[0] == "My custom prompt here"
+    finally:
+        if original_create:
+            captioner._create_backend = original_create

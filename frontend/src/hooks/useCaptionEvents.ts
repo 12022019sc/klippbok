@@ -8,6 +8,10 @@ export interface CaptionProgress {
   status: string | null
   isComplete: boolean
   error: string | null
+  /** First per-image error message encountered during generation. */
+  firstError: string | null
+  /** Count of per-image errors reported during generation. */
+  errorCount: number
 }
 
 const INITIAL_STATE: CaptionProgress = {
@@ -18,6 +22,8 @@ const INITIAL_STATE: CaptionProgress = {
   status: null,
   isComplete: false,
   error: null,
+  firstError: null,
+  errorCount: 0,
 }
 
 /**
@@ -53,12 +59,17 @@ export function useCaptionEvents(operationId: string | null): CaptionProgress {
     es.addEventListener('progress', (e: MessageEvent) => {
       try {
         const data = JSON.parse(e.data)
+        const msg: string = data.message ?? ''
+        const isPerImageError = msg.startsWith('Error captioning ')
         setProgress((prev) => ({
           ...prev,
           current: data.current ?? prev.current,
           total: data.total ?? prev.total,
-          message: data.message ?? prev.message,
+          message: msg || prev.message,
           status: data.status ?? prev.status,
+          // Track per-image errors for surfacing in the completion toast
+          firstError: isPerImageError && !prev.firstError ? msg : prev.firstError,
+          errorCount: isPerImageError ? prev.errorCount + 1 : prev.errorCount,
         }))
       } catch {
         // Ignore malformed events
