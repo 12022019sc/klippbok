@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 06.1 context gathered
-last_updated: "2026-03-04T04:17:49.694Z"
+stopped_at: Completed 06.1-01-PLAN.md (global_config_service, joycaption detection, build_vlm_config_from_global, 4 caption config API endpoints)
+last_updated: "2026-03-04T04:58:17.714Z"
 last_activity: 2026-03-03 -- Completed 05-04-PLAN.md (ProcessPage wizard, UpscaleStep, useUpscaleEvents, Proceed to Captioning save, source_path fix)
 progress:
   total_phases: 9
   completed_phases: 5
-  total_plans: 21
-  completed_plans: 20
+  total_plans: 23
+  completed_plans: 21
 ---
 
 ---
@@ -90,6 +90,7 @@ Progress: [████████████░] ~85% (15 of ~20 estimated pl
 | Phase 06-captioning-system P06-02 | 378 | 2 tasks | 5 files |
 | Phase 06-captioning-system P06-03 | 10 | 2 tasks | 9 files |
 | Phase 06-captioning-system P06-04 | 9 | 1 tasks | 6 files |
+| Phase 06.1-caption-provider-configuration P01 | 490 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -187,6 +188,9 @@ Recent decisions affecting current work:
 - [Phase 06-captioning-system]: 06-04 BATCH-01: batch functions return modified count (not list) for simple success reporting
 - [Phase 06-captioning-system]: 06-04 SCORE-01: IMAGE_SCORING_CONFIG has weight_temporal=0.0 (temporal awareness irrelevant for still images)
 - [Phase 06-captioning-system]: 06-04 ROUTE-01: /batch and /scores endpoints registered before /{image_id} PATCH to prevent path parameter capture
+- [Phase 06.1-01]: Atomic write pattern for global config: temp file in same dir + os.replace (prevents corruption)
+- [Phase 06.1-01]: Config.json API key always takes priority over env var for all providers
+- [Phase 06.1-01]: JoyCaption detection mirrors _SEEDVR2_COMMON_PATHS patchable module-level list pattern
 
 ### Roadmap Evolution
 
@@ -204,6 +208,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-04T04:17:49.692Z
-Stopped at: Phase 06.1 context gathered
-Resume file: .planning/phases/06.1-caption-provider-configuration/06.1-CONTEXT.md
+Last session: 2026-03-04T04:58:17.712Z
+Stopped at: Completed 06.1-01-PLAN.md (global_config_service, joycaption detection, build_vlm_config_from_global, 4 caption config API endpoints)
+Resume file: None
