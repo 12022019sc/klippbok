@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 06.2-04-PLAN.md (fix apply_vlm_pipeline step order — strip artifacts before anchor injection)
-last_updated: "2026-03-05T05:47:05.735Z"
+last_updated: "2026-03-05T05:52:09.160Z"
 last_activity: 2026-03-03 -- Completed 05-04-PLAN.md (ProcessPage wizard, UpscaleStep, useUpscaleEvents, Proceed to Captioning save, source_path fix)
 progress:
   total_phases: 10
