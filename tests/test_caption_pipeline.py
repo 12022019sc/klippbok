@@ -681,3 +681,38 @@ class TestJoyCaptionPipeline:
         )
         tags = [t.strip().lower() for t in result.split(",")]
         assert tags.count("luna") == 1
+
+
+# ---------------------------------------------------------------------------
+# apply_vlm_pipeline — anchor + artifact interaction
+# ---------------------------------------------------------------------------
+
+
+class TestVlmPipelineAnchorArtifact:
+    """Artifact stripping must work even when anchor_word is set."""
+
+    def test_strips_artifacts_with_anchor_word(self) -> None:
+        """Artifact stripping must work even when anchor_word is set."""
+        from klippbok.caption.pipeline import apply_vlm_pipeline
+
+        result = apply_vlm_pipeline(
+            "Here is a caption: a girl in the park",
+            anchor_word="Luna",
+            token_budget=200,
+            caption_mode="descriptive",
+        )
+        assert "here is a caption:" not in result.lower()
+        assert result.lower().startswith("luna")
+
+    def test_strips_artifacts_with_anchor_booru_mode(self) -> None:
+        """Artifact stripping works in tag mode with anchor_word set."""
+        from klippbok.caption.pipeline import apply_vlm_pipeline
+
+        result = apply_vlm_pipeline(
+            "Caption: smiling, park, standing",
+            anchor_word="Luna",
+            token_budget=200,
+            caption_mode="booru_tags",
+        )
+        assert "caption:" not in result.lower()
+        assert result.lower().startswith("luna")

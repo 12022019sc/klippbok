@@ -8,8 +8,8 @@ Two top-level pipelines:
 - apply_joycaption_pipeline: for JoyCaption subprocess output
 
 Pipeline stages:
-1. Trigger word injection (anchor_word prepended if not already present)
-2. Provider-specific artifact stripping
+1. Provider-specific artifact stripping (preambles, markdown, wrapping quotes)
+2. Trigger word injection (anchor_word prepended if not already present)
 3. Appearance tag filtering (context_only modes only)
 4. Tag deduplication
 5. Token budget trimming (anchor word never trimmed)
@@ -396,13 +396,13 @@ def apply_vlm_pipeline(
     """Post-processing pipeline for VLM provider output.
 
     Steps:
-    1. Trigger word injection (anchor prepended if not already present)
-    2. VLM artifact stripping (preambles, markdown, wrapping quotes)
+    1. VLM artifact stripping (preambles, markdown, wrapping quotes)
+    2. Trigger word injection (anchor prepended if not already present)
     3. Token budget trimming (anchor word protected)
 
-    Per RESEARCH.md: artifact stripping runs AFTER trigger injection to avoid
-    stripping a trigger word that looks like a preamble. Trimming runs last
-    to enforce the budget on the clean output.
+    Artifact stripping runs BEFORE trigger injection — preamble patterns only
+    match at position 0, so stripping first ensures ^-anchored regex works
+    correctly on raw VLM output.
 
     Args:
         caption: Raw VLM output string.
@@ -413,11 +413,11 @@ def apply_vlm_pipeline(
     Returns:
         Processed caption ready for storage.
     """
-    # 1. Trigger word injection (always first so it's protected from trimming)
+    # 1. Artifact stripping (strip preambles on raw VLM output before anchor injection)
+    caption = _strip_vlm_artifacts(caption)
+    # 2. Trigger word injection (anchor is never a preamble pattern)
     if anchor_word:
         caption = _prepend_anchor(caption, anchor_word)
-    # 2. Artifact stripping (removes extra text before budget calculation)
-    caption = _strip_vlm_artifacts(caption)
     # 3. Token budget trimming (trigger word is protected)
     caption = _trim_to_budget(caption, token_budget, anchor_word, caption_mode)
     return caption
