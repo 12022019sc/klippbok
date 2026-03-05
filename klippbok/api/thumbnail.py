@@ -62,6 +62,22 @@ def get_thumbnail(image_path: Path, cache_dir: Path) -> Path:
     return thumb_path
 
 
+def generate_video_thumbnail(video_path: Path, cache_dir: Path) -> Path:
+    """Alias for get_video_thumbnail — generate and cache a JPEG thumbnail for a video.
+
+    The cache key is SHA256[:16] of the absolute path, matching [04-01 API-02] pattern.
+    Returns the cached file path on subsequent calls without re-running ffmpeg.
+
+    Args:
+        video_path: Path to the source video file.
+        cache_dir: Directory where thumbnail JPEG files are cached.
+
+    Returns:
+        Path to the cached JPEG thumbnail file.
+    """
+    return get_video_thumbnail(video_path, cache_dir)
+
+
 def get_video_thumbnail(video_path: Path, cache_dir: Path) -> Path:
     """Return a cached JPEG thumbnail for a video, extracting a frame via ffmpeg if needed.
 
