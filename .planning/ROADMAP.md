@@ -173,11 +173,13 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Existing video ingest, scan, and triage workflows are accessible and operable from the web GUI
   2. CLIP-based triage (embedding similarity matching) works with standalone images, not just video frames
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 07-01: Video pipeline GUI integration
-- [ ] 07-02: CLIP triage extension for standalone images
+- [ ] 07-01-PLAN.md -- Video service extraction, video API router with SSE, video thumbnail generation
+- [ ] 07-02-PLAN.md -- Triage service (CLIP for images), face embedding service (InsightFace), triage API router
+- [ ] 07-03-PLAN.md -- VideoPage with Ingest/Scan/Extract tabs, SSE hooks, NavBar and routing updates
+- [ ] 07-04-PLAN.md -- TriagePage with CLIP triage UI, concepts gallery, face clusters, gallery video extensions
 
 ### Phase 8: Export Pipeline
 **Goal**: Users can export their cropped, captioned dataset in the format required by their chosen trainer -- ready to train with no manual file manipulation
@@ -211,5 +213,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 6.2 -> 7 -
 | 6. Captioning System | 4/4 | Complete   | 2026-03-04 |
 | 6.1 Caption Provider Config | 2/2 | Complete   | 2026-03-04 |
 | 6.2 Caption Enhancement: JoyCaption | 3/3 | Complete   | 2026-03-05 |
-| 7. Video and CLIP Integration | 0/2 | Not started | - |
+| 7. Video and CLIP Integration | 0/4 | Not started | - |
 | 8. Export Pipeline | 0/3 | Not started | - |
