@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 7 context gathered
-last_updated: "2026-03-05T23:02:28.763Z"
+stopped_at: Completed 07-01-PLAN.md (video_service, video router with SSE, thumbnails)
+last_updated: "2026-03-05T23:38:15.878Z"
 last_activity: 2026-03-03 -- Completed 05-04-PLAN.md (ProcessPage wizard, UpscaleStep, useUpscaleEvents, Proceed to Captioning save, source_path fix)
 progress:
   total_phases: 10
   completed_phases: 7
-  total_plans: 27
-  completed_plans: 26
+  total_plans: 31
+  completed_plans: 28
 ---
 
 ---
@@ -111,6 +111,8 @@ Progress: [████████████░] ~85% (15 of ~20 estimated pl
 | Phase 06.2 P02 | 30 | 2 tasks | 7 files |
 | Phase 06.2 P03 | 37 | 2 tasks | 4 files |
 | Phase 06.2 P04 | 5 | 1 tasks | 2 files |
+| Phase 07 P02 | 422 | 2 tasks | 7 files |
+| Phase 07 P01 | 473 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -223,6 +225,12 @@ Recent decisions affecting current work:
 - [Phase 06.2-03]: Default token budget 150 (SDXL) for over-budget warning when max_tokens null — avoids extra API call
 - [Phase 06.2-03]: Over-budget warning shown in caption editor panel above textarea (not thumbnail badge) — visible during editing
 - [Phase 06.2-04]: 06.2-04 PIPELINE-01: _strip_vlm_artifacts runs BEFORE _prepend_anchor — ^-anchored regex patterns require raw VLM output at position 0 to match preambles correctly
+- [Phase 07]: TRIAGE-01: Module-level CLIPEmbedder singleton via _get_or_create_embedder() avoids reloading 600MB model on each triage call
+- [Phase 07]: FACE-01: InsightFace CPU mode (ctx_id=-1) avoids CUDA setup requirement
+- [Phase 07]: TRIAGE-02: match/borderline/no_match classification with borderline range = (threshold-0.1, threshold)
+- [Phase 07-01]: [07-01 VID-01]: generate_video_thumbnail is alias for get_video_thumbnail -- provides documented export without duplicating logic
+- [Phase 07-01]: [07-01 VID-02]: Thumbnail endpoint resolves clip via scan then clip_id match -- consistent with clips list endpoint
+- [Phase 07-01]: [07-01 VID-03]: extract_frames returns list[Path] not ExtractionReport -- simpler API for service consumers
 
 ### Roadmap Evolution
 
@@ -241,6 +249,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-05T23:02:28.760Z
-Stopped at: Phase 7 context gathered
-Resume file: .planning/phases/07-video-and-clip-integration/07-CONTEXT.md
+Last session: 2026-03-05T23:38:15.876Z
+Stopped at: Completed 07-01-PLAN.md (video_service, video router with SSE, thumbnails)
+Resume file: None

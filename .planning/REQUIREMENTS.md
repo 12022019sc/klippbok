@@ -79,7 +79,7 @@
 - [x] **ARCH-05**: GUI dependencies as optional `[gui]` extra group
 - [ ] **ARCH-06**: Server-side thumbnail generation for gallery (browser canvas pixel limits)
 - [x] **ARCH-07**: Existing CLI commands continue to work unchanged
-- [ ] **ARCH-08**: Existing CLIP triage extended to work with standalone images
+- [x] **ARCH-08**: Existing CLIP triage extended to work with standalone images
 
 ## v2 Requirements
 
@@ -173,7 +173,7 @@
 | ARCH-05 | Phase 1 | Complete |
 | ARCH-06 | Phase 4 | Pending |
 | ARCH-07 | Phase 1 | Complete |
-| ARCH-08 | Phase 7 | Pending |
+| ARCH-08 | Phase 7 | Complete |
 
 **Coverage:**
 - v1 requirements: 55 total
