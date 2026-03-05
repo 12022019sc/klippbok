@@ -48,16 +48,19 @@ def get_settings(request: Request) -> SettingsResponse:
         return SettingsResponse(project_dir=None, active_profile=None)
 
     active_profile: str | None = None
+    anchor_word: str | None = None
     try:
         manifest = load_manifest(project_dir)
         if manifest:
             active_profile = manifest.get("active_profile")
+            anchor_word = manifest.get("anchor_word")
     except Exception as exc:
-        logger.warning("Could not read active_profile from manifest: %s", exc)
+        logger.warning("Could not read settings from manifest: %s", exc)
 
     return SettingsResponse(
         project_dir=str(project_dir),
         active_profile=active_profile,
+        anchor_word=anchor_word,
     )
 
 
@@ -111,18 +114,27 @@ def update_settings(body: SettingsUpdate, request: Request) -> SettingsResponse:
         pass
 
     active_profile: str | None = body.active_profile
+    dirty = False
+
     if active_profile is not None and manifest is not None:
-        # Persist profile to manifest
-        import json
         manifest["active_profile"] = active_profile
+        dirty = True
+        logger.info("Active profile set to: %s", active_profile)
+    elif active_profile is None and manifest is not None:
+        active_profile = manifest.get("active_profile")
+
+    if body.anchor_word is not None and manifest is not None:
+        manifest["anchor_word"] = body.anchor_word
+        dirty = True
+        logger.info("Anchor word set to: %s", body.anchor_word)
+
+    if dirty:
+        import json
         manifest_path = project_dir / ".klippbok" / "manifest.json"
         manifest_path.write_text(
             json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
-        logger.info("Active profile set to: %s", active_profile)
-    elif active_profile is None and manifest is not None:
-        active_profile = manifest.get("active_profile")
 
     return SettingsResponse(
         project_dir=str(project_dir),

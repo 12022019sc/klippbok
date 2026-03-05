@@ -184,6 +184,55 @@ class TestUpdateCaption:
 # ---------------------------------------------------------------------------
 
 
+class TestAnchorWord:
+    def test_put_anchor_word_persists_to_manifest(self, tmp_path: Path) -> None:
+        """PUT /settings/ with anchor_word saves it to the project manifest."""
+        from klippbok.api.app import create_app
+
+        project_dir, _ = _make_project(tmp_path)
+        app = create_app(project_dir=project_dir)
+        client = TestClient(app, raise_server_exceptions=True)
+
+        resp = client.put("/api/v1/settings/", json={"anchor_word": "ohwx person"})
+        assert resp.status_code == 200
+
+        # Verify manifest has anchor_word
+        manifest_path = project_dir / ".klippbok" / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert manifest["anchor_word"] == "ohwx person"
+
+    def test_get_settings_returns_anchor_word(self, tmp_path: Path) -> None:
+        """GET /settings/ returns anchor_word from manifest."""
+        from klippbok.api.app import create_app
+
+        project_dir, _ = _make_project(tmp_path)
+
+        # Pre-populate manifest with anchor_word
+        manifest_path = project_dir / ".klippbok" / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["anchor_word"] = "sks woman"
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+        app = create_app(project_dir=project_dir)
+        client = TestClient(app, raise_server_exceptions=True)
+
+        resp = client.get("/api/v1/settings/")
+        assert resp.status_code == 200
+        assert resp.json()["anchor_word"] == "sks woman"
+
+    def test_get_settings_anchor_word_absent(self, tmp_path: Path) -> None:
+        """GET /settings/ returns null anchor_word when not in manifest."""
+        from klippbok.api.app import create_app
+
+        project_dir, _ = _make_project(tmp_path)
+        app = create_app(project_dir=project_dir)
+        client = TestClient(app, raise_server_exceptions=True)
+
+        resp = client.get("/api/v1/settings/")
+        assert resp.status_code == 200
+        assert resp.json()["anchor_word"] is None
+
+
 class TestListProfiles:
     def test_list_profiles_returns_expected_profiles(self) -> None:
         """GET /api/v1/settings/profiles returns sd15, sdxl, flux, and pony."""

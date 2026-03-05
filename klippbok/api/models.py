@@ -116,6 +116,9 @@ class SettingsResponse(BaseModel):
     active_profile: str | None
     """Currently active model profile name, or None if not set."""
 
+    anchor_word: str | None = None
+    """Trigger word prepended to all captions, or None if not set."""
+
 
 class SettingsUpdate(BaseModel):
     """Request body for updating project settings."""
@@ -125,6 +128,9 @@ class SettingsUpdate(BaseModel):
 
     active_profile: str | None = None
     """New active model profile name, or None to clear."""
+
+    anchor_word: str | None = None
+    """Trigger word prepended to all captions. Persisted per-project in manifest."""
 
 
 # --- Directory browser models ---
