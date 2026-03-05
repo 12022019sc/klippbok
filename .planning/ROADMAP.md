@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6: Captioning System** - Booru tag generation, NL captioning, model-aware defaults, manual editing, and batch operations (completed 2026-03-04)
 - [x] **Phase 6.1: Caption Provider Configuration** - Dedicated captioning page with provider config, model picker, API key management, and caption workspace (INSERTED) (completed 2026-03-04)
 - [x] **Phase 6.2: Captioning Enhancement: JoyCaption Integration Planning** - Caption modes, context-only modes, post-processing pipeline, token budgets, trigger word injection (INSERTED) (completed 2026-03-05)
-- [ ] **Phase 7: Video and CLIP Integration** - Existing video pipeline accessible from GUI, CLIP triage extended to standalone images
+- [x] **Phase 7: Video and CLIP Integration** - Existing video pipeline accessible from GUI, CLIP triage extended to standalone images (completed 2026-03-05)
 - [ ] **Phase 8: Export Pipeline** - Multi-trainer export with format-specific config generation and dataset download
 
 ## Phase Details
@@ -213,5 +213,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 6.2 -> 7 -
 | 6. Captioning System | 4/4 | Complete   | 2026-03-04 |
 | 6.1 Caption Provider Config | 2/2 | Complete   | 2026-03-04 |
 | 6.2 Caption Enhancement: JoyCaption | 3/3 | Complete   | 2026-03-05 |
-| 7. Video and CLIP Integration | 3/4 | In Progress|  |
+| 7. Video and CLIP Integration | 4/4 | Complete   | 2026-03-05 |
 | 8. Export Pipeline | 0/3 | Not started | - |
