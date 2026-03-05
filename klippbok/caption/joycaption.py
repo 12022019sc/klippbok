@@ -38,11 +38,40 @@ import json
 import sys
 from pathlib import Path
 
+# Mode-specific prompts for each of the 5 caption modes
+MODE_PROMPTS = {
+    "booru_tags": "Write a list of Booru-like tags for this image.",
+    "context_only_tags": (
+        "Write Booru-like tags for this image. "
+        "Do NOT include tags describing physical appearance (hair color, eye color, "
+        "clothing, body type, skin tone). Focus only on setting, action, pose, and context."
+    ),
+    "context_only_natural": (
+        "Describe what is happening in this image in a short natural language caption. "
+        "Do NOT describe any physical appearance. "
+        "Focus only on the action, setting, and context."
+    ),
+    "descriptive": (
+        "Write a detailed natural language caption for this image. "
+        "Describe the subject, their action, the setting, and relevant details."
+    ),
+    "straightforward": (
+        "Write a short factual caption for this image. "
+        "State what you can see directly. Do not speculate or infer."
+    ),
+}
+
+REMOVE_TAGS = [
+    "watermark", "signature", "text", "logo", "username",
+    "photograph", "photo",
+]
+
 def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", required=True, help="JSON file with image paths")
     parser.add_argument("--trigger", default="", help="Trigger word to prepend")
+    parser.add_argument("--mode", default="context_only_tags", help="Caption mode")
     args = parser.parse_args()
 
     manifest_data = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
@@ -53,17 +82,15 @@ def main():
         print(json.dumps({"type": "done", "total": 0}), flush=True)
         return
 
+    # Select prompt based on mode
+    caption_prompt = MODE_PROMPTS.get(args.mode, MODE_PROMPTS["context_only_tags"])
+
     # Import heavy deps only after arg parsing
     import torch
     from PIL import Image
     from transformers import AutoProcessor, LlavaForConditionalGeneration, BitsAndBytesConfig
 
     MODEL_PATH = "fancyfeast/llama-joycaption-beta-one-hf-llava"
-    CAPTION_PROMPT = "Write a list of Booru-like tags for this image."
-    REMOVE_TAGS = [
-        "watermark", "signature", "text", "logo", "username",
-        "photograph", "photo",
-    ]
 
     print(json.dumps({"type": "status", "message": "Loading JoyCaption model..."}), flush=True)
 
@@ -100,7 +127,7 @@ def main():
 
             convo = [
                 {"role": "system", "content": "You are a helpful image captioner."},
-                {"role": "user", "content": CAPTION_PROMPT},
+                {"role": "user", "content": caption_prompt},
             ]
             convo_string = processor.tokenizer.apply_chat_template(
                 convo, tokenize=False, add_generation_prompt=True
@@ -130,7 +157,7 @@ def main():
                 clean_up_tokenization_spaces=False,
             ).strip()
 
-            # Clean caption
+            # Basic cleanup in subprocess (pipeline.py handles the rest in parent process)
             caption = caption.lower().strip()
             prefixes = [
                 "here are the booru-like tags for the image:",
@@ -143,25 +170,27 @@ def main():
                     caption = caption[len(prefix):].strip()
             caption = caption.strip(".:;,!?\"'")
 
-            tags = [tag.strip() for tag in caption.split(",")]
-            tags = [tag for tag in tags if tag and len(tag) > 1]
-            tags = [tag for tag in tags if not any(r in tag for r in REMOVE_TAGS)]
+            # Basic noise tag removal (robustness; parent process applies full pipeline)
+            if "," in caption:
+                tags = [tag.strip() for tag in caption.split(",")]
+                tags = [tag for tag in tags if tag and len(tag) > 1]
+                tags = [tag for tag in tags if not any(r in tag for r in REMOVE_TAGS)]
 
-            seen = set()
-            unique_tags = []
-            for tag in tags:
-                if tag not in seen:
-                    seen.add(tag)
-                    unique_tags.append(tag)
+                seen = set()
+                unique_tags = []
+                for tag in tags:
+                    if tag not in seen:
+                        seen.add(tag)
+                        unique_tags.append(tag)
 
-            final_tags = []
-            trigger = args.trigger
-            if trigger:
-                final_tags.append(trigger)
-            final_tags.extend(
-                t for t in unique_tags if t.lower() not in [f.lower() for f in final_tags]
-            )
-            caption = ", ".join(final_tags)
+                # Trigger word prepending (basic, in subprocess)
+                trigger = args.trigger
+                if trigger:
+                    unique_tags = [t for t in unique_tags if t.lower() != trigger.lower()]
+                    unique_tags = [trigger] + unique_tags
+                caption = ", ".join(unique_tags)
+            elif args.trigger and not caption.lower().startswith(args.trigger.lower()):
+                caption = f"{args.trigger}, {caption}"
 
             del inputs, generate_ids
             gc.collect()
@@ -268,6 +297,7 @@ def run_joycaption_image(
     joycaption_root: Path,
     image_paths: list[Path],
     trigger_word: str = "",
+    caption_mode: str = "context_only_tags",
 ) -> subprocess.Popen:
     """Launch JoyCaption as a subprocess to caption a batch of images.
 
@@ -281,6 +311,9 @@ def run_joycaption_image(
         joycaption_root: Root directory of the JoyCaption installation.
         image_paths: List of absolute paths to images to caption.
         trigger_word: Optional trigger word to prepend to captions.
+        caption_mode: Caption mode controlling the prompt sent to JoyCaption.
+            One of 'booru_tags', 'context_only_tags', 'context_only_natural',
+            'descriptive', 'straightforward'. Passed as --mode to subprocess.
 
     Returns:
         subprocess.Popen instance with stdout=PIPE (line-buffered JSON-lines).
@@ -315,6 +348,7 @@ def run_joycaption_image(
         str(python_path),
         script_file.name,
         "--manifest", manifest_file.name,
+        "--mode", caption_mode,
     ]
     if trigger_word:
         cmd.extend(["--trigger", trigger_word])
@@ -322,8 +356,8 @@ def run_joycaption_image(
     env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}
 
     logger.info(
-        "Launching JoyCaption subprocess: %d images, trigger=%r",
-        len(image_paths), trigger_word,
+        "Launching JoyCaption subprocess: %d images, trigger=%r, mode=%r",
+        len(image_paths), trigger_word, caption_mode,
     )
 
     proc = subprocess.Popen(

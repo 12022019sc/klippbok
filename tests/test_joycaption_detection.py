@@ -6,6 +6,8 @@ Tests cover:
 - detect_joycaption() returns Path when venv/bin/python exists (Linux)
 - detect_joycaption() checks JOYCAPTION_PATH env var as a candidate
 - _JOYCAPTION_COMMON_PATHS is a patchable module-level list
+- _JOYCAPTION_RUNNER_SCRIPT has valid Python syntax
+- run_joycaption_image() accepts caption_mode parameter and passes --mode
 """
 
 from __future__ import annotations
@@ -127,3 +129,81 @@ def test_detect_joycaption_returns_first_match(tmp_path: Path, monkeypatch: pyte
     result = detect_joycaption()
 
     assert result == first_dir
+
+
+def test_runner_script_syntax() -> None:
+    """_JOYCAPTION_RUNNER_SCRIPT compiles without syntax errors.
+
+    The inline runner script executes in a separate Python interpreter where
+    syntax errors are only caught at runtime. This test catches them at test time.
+    (Pitfall 3 from RESEARCH.md)
+    """
+    from klippbok.caption.joycaption import _JOYCAPTION_RUNNER_SCRIPT
+
+    # compile() validates syntax without executing
+    compile(_JOYCAPTION_RUNNER_SCRIPT, "<joycaption_runner>", "exec")
+
+
+def test_runner_script_has_mode_argument() -> None:
+    """_JOYCAPTION_RUNNER_SCRIPT contains --mode argument for caption mode selection."""
+    from klippbok.caption.joycaption import _JOYCAPTION_RUNNER_SCRIPT
+
+    assert "--mode" in _JOYCAPTION_RUNNER_SCRIPT, (
+        "_JOYCAPTION_RUNNER_SCRIPT must add --mode argument to control prompt selection"
+    )
+
+
+def test_runner_script_has_all_mode_prompts() -> None:
+    """_JOYCAPTION_RUNNER_SCRIPT contains all 5 caption mode prompts."""
+    from klippbok.caption.joycaption import _JOYCAPTION_RUNNER_SCRIPT
+
+    required_modes = [
+        "booru_tags",
+        "context_only_tags",
+        "context_only_natural",
+        "descriptive",
+        "straightforward",
+    ]
+    for mode in required_modes:
+        assert mode in _JOYCAPTION_RUNNER_SCRIPT, (
+            f"MODE_PROMPTS in runner script must contain key '{mode}'"
+        )
+
+
+def test_run_joycaption_image_accepts_caption_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """run_joycaption_image() accepts caption_mode parameter and passes --mode to subprocess."""
+    import subprocess
+    import klippbok.caption.joycaption as jc_module
+
+    # Create a fake JoyCaption installation
+    venv_dir = tmp_path / "venv" / "Scripts"
+    venv_dir.mkdir(parents=True)
+    python_exe = venv_dir / "python.exe"
+    python_exe.write_text("fake")
+
+    # Capture subprocess.Popen call args
+    captured_cmd: list[list[str]] = []
+
+    class FakePopen:
+        def __init__(self, cmd, **kwargs):
+            captured_cmd.append(cmd)
+            self.stdout = None
+            self.returncode = 0
+
+    monkeypatch.setattr(jc_module.subprocess, "Popen", FakePopen)
+    monkeypatch.setattr(jc_module.platform, "system", lambda: "Windows")
+
+    from klippbok.caption.joycaption import run_joycaption_image
+
+    run_joycaption_image(tmp_path, [], trigger_word="", caption_mode="descriptive")
+
+    assert len(captured_cmd) == 1
+    cmd = captured_cmd[0]
+    assert "--mode" in cmd, "run_joycaption_image must pass --mode to subprocess"
+    mode_idx = cmd.index("--mode")
+    assert cmd[mode_idx + 1] == "descriptive", (
+        f"--mode value should be 'descriptive', got '{cmd[mode_idx + 1]}'"
+    )

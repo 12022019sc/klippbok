@@ -361,6 +361,11 @@ class CaptionProviderConfig(BaseModel):
     max_tokens: int | None = None
     """Override token budget. None = use model profile default."""
 
+    appearance_blacklist_extra: list[str] = []
+    """User-added appearance tags to filter beyond DEFAULT_APPEARANCE_BLACKLIST.
+    Merged with DEFAULT_APPEARANCE_BLACKLIST at call sites. An empty list means
+    'use defaults only'. Per CONTEXT.md: curated default + user-editable extras."""
+
 
 class CaptionGenerateRequest(BaseModel):
     """Request body for starting a batch caption generation operation."""

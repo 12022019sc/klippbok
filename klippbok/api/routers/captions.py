@@ -96,12 +96,16 @@ async def _run_joycaption_subprocess(
     op_id: str,
     total: int,
     trigger_word: str = "",
+    caption_mode: str = "context_only_tags",
+    token_budget: int = 150,
+    appearance_blacklist_extra: list[str] | None = None,
 ) -> tuple[int, int]:
     """Run JoyCaption via subprocess and stream progress to SSE queue.
 
     Launches the JoyCaption runner script in JoyCaption's venv, reads
-    JSON-lines from stdout for per-image progress, and saves captions
-    to manifest + sidecar files.
+    JSON-lines from stdout for per-image progress, post-processes each
+    caption through apply_joycaption_pipeline, and saves captions to
+    manifest + sidecar files.
 
     Args:
         joycaption_root: Root directory of JoyCaption installation.
@@ -112,6 +116,9 @@ async def _run_joycaption_subprocess(
         op_id: Operation UUID.
         total: Total number of images.
         trigger_word: Optional trigger word for captions.
+        caption_mode: Caption mode passed to subprocess as --mode.
+        token_budget: Token budget for apply_joycaption_pipeline trimming.
+        appearance_blacklist_extra: User-added appearance tags merged with defaults.
 
     Returns:
         Tuple of (completed_count, error_count).
@@ -120,7 +127,12 @@ async def _run_joycaption_subprocess(
 
     from klippbok.api.routers.images import _image_id
     from klippbok.caption.joycaption import run_joycaption_image
+    from klippbok.caption.pipeline import DEFAULT_APPEARANCE_BLACKLIST, apply_joycaption_pipeline
     from klippbok.services.caption_service import save_caption
+
+    # Merge user-editable extras with curated defaults (per CONTEXT.md decision)
+    user_extras = appearance_blacklist_extra or []
+    merged_blacklist = list(set(DEFAULT_APPEARANCE_BLACKLIST + user_extras))
 
     # Build list of absolute image paths
     image_paths = [project_dir / entry.get("path", "") for entry in images_to_process]
@@ -133,7 +145,9 @@ async def _run_joycaption_subprocess(
         path_lookup[abs_str] = (rel, _image_id(rel))
 
     try:
-        proc = run_joycaption_image(joycaption_root, image_paths, trigger_word)
+        proc = run_joycaption_image(
+            joycaption_root, image_paths, trigger_word, caption_mode=caption_mode
+        )
     except Exception as exc:
         logger.error("Failed to start JoyCaption subprocess: %s", exc, exc_info=True)
         await queue.put(CaptionProgress(
@@ -183,13 +197,24 @@ async def _run_joycaption_subprocess(
             ))
 
         elif msg_type == "caption":
-            caption = msg.get("caption", "")
+            raw_caption = msg.get("caption", "")
             img_path_str = msg.get("path", "")
             lookup = path_lookup.get(img_path_str)
-            if lookup and caption:
+            if lookup and raw_caption:
                 rel_path, img_id = lookup
                 abs_path = project_dir / rel_path
-                save_caption(abs_path, caption, manifest, img_id)
+
+                # Post-process through JoyCaption pipeline
+                # anchor_word is None here — trigger word was prepended by subprocess
+                processed_caption = apply_joycaption_pipeline(
+                    raw_caption,
+                    anchor_word=None,
+                    token_budget=token_budget,
+                    caption_mode=caption_mode,
+                    appearance_blacklist=merged_blacklist,
+                )
+
+                save_caption(abs_path, processed_caption, manifest, img_id)
                 completed += 1
                 await queue.put(CaptionProgress(
                     operation_id=op_id,
@@ -308,16 +333,31 @@ async def _run_caption_batch(
             status="running",
         ))
 
-        # Step 3: Build VLM config or detect JoyCaption
+        # Step 3: Load global config and resolve caption_mode, token_budget,
+        # and appearance_blacklist_extra once for the whole batch.
+        from klippbok.services.global_config_service import load_global_config
+        global_cfg = load_global_config()
+
+        # Resolve caption_mode: request body overrides global config
+        effective_caption_mode: str = (
+            body.caption_mode
+            or global_cfg.get("caption_mode", "context_only_tags")
+        )
+
+        # Resolve token_budget from global config (overrideable per vlm_config below)
+        global_max_tokens: int | None = global_cfg.get("max_tokens")
+
+        # Merge user appearance blacklist extras with defaults
+        appearance_blacklist_extra: list[str] = global_cfg.get("appearance_blacklist_extra", [])
+
+        # Build VLM config or detect JoyCaption
         is_joycaption = body.provider_preset == "joycaption"
         vlm_config = None
         joycaption_root: Path | None = None
 
         if is_joycaption:
             from klippbok.caption.joycaption import detect_joycaption
-            from klippbok.services.global_config_service import load_global_config
 
-            global_cfg = load_global_config()
             joycaption_path_str = global_cfg.get("joycaption_path", "")
             if joycaption_path_str:
                 joycaption_root = Path(joycaption_path_str)
@@ -336,14 +376,14 @@ async def _run_caption_batch(
         elif body.provider_preset is not None:
             # provider_preset takes priority -- resolve from global config
             from klippbok.services.caption_service import build_vlm_config_from_global
-            from klippbok.services.global_config_service import load_global_config
-            global_cfg = load_global_config()
             vlm_config = build_vlm_config_from_global(body.provider_preset, global_cfg, manifest)
         elif body.provider is not None:
             from klippbok.caption.models import CaptionConfig
             vlm_config = CaptionConfig(
                 provider=body.provider,  # type: ignore[arg-type]
                 api_key=body.api_key or "",
+                caption_mode=effective_caption_mode,
+                max_tokens=global_max_tokens,
             )
 
         # Step 4: Process images
@@ -352,6 +392,10 @@ async def _run_caption_batch(
 
         if is_joycaption and joycaption_root is not None:
             # JoyCaption subprocess path -- model loaded once, all images in batch
+            # Resolve token budget for pipeline post-processing
+            from klippbok.services.caption_service import _resolve_token_budget
+            token_budget = _resolve_token_budget(vlm_config, manifest)
+
             completed, errors = await _run_joycaption_subprocess(
                 joycaption_root=joycaption_root,
                 images_to_process=images_to_process,
@@ -361,6 +405,9 @@ async def _run_caption_batch(
                 op_id=op_id,
                 total=total,
                 trigger_word=manifest.get("anchor_word") or "",
+                caption_mode=effective_caption_mode,
+                token_budget=token_budget,
+                appearance_blacklist_extra=appearance_blacklist_extra,
             )
         else:
             # VLM API path -- process images one by one
@@ -370,17 +417,6 @@ async def _run_caption_batch(
                 img_id = _image_id(relative_path)
 
                 try:
-                    # Prepare manifest for style lookup, injecting style override if requested.
-                    # When a VLM provider_preset is set and style is "auto", force
-                    # "natural_language" -- all VLM providers are NL captioners, and without
-                    # this the profile default (e.g. SDXL → "booru") would route to WD Tagger.
-                    lookup_manifest = dict(manifest)
-                    effective_style = body.style
-                    if effective_style not in ("booru", "natural_language") and body.provider_preset:
-                        effective_style = "natural_language"
-                    if effective_style in ("booru", "natural_language"):
-                        lookup_manifest["caption_style_override"] = effective_style
-
                     # Run caption generation in thread (ONNX/VLM are blocking).
                     # Retry up to 2 times on transient API errors (e.g. LM Studio
                     # returning 400 when still processing the previous image).
@@ -390,8 +426,9 @@ async def _run_caption_batch(
                         try:
                             caption = await asyncio.get_event_loop().run_in_executor(
                                 None,
-                                lambda p=abs_path, m=lookup_manifest: caption_image_for_project(
-                                    p, m, vlm_config, body.general_threshold,
+                                lambda p=abs_path: caption_image_for_project(
+                                    p, manifest, vlm_config, body.general_threshold,
+                                    caption_mode=effective_caption_mode,
                                 ),
                             )
                             last_exc = None
@@ -409,6 +446,7 @@ async def _run_caption_batch(
                         raise last_exc
 
                     # Save: sidecar + manifest (manifest mutated in place)
+                    # Pipeline post-processing already applied inside caption_image_for_project
                     save_caption(abs_path, caption, manifest, img_id)
                     completed += 1
 
@@ -515,8 +553,8 @@ async def start_caption_generation(
     _tasks[op_id] = task
 
     logger.info(
-        "Started caption operation %s (style=%s, overwrite=%s, images=%s)",
-        op_id, body.style, body.overwrite,
+        "Started caption operation %s (caption_mode=%s, overwrite=%s, images=%s)",
+        op_id, body.caption_mode, body.overwrite,
         "all" if body.image_ids is None else len(body.image_ids),
     )
     return CaptionStarted(operation_id=op_id)
@@ -774,6 +812,9 @@ async def get_caption_config() -> CaptionProviderConfig:
         gemini_model=cfg.get("gemini_model", "gemini-2.5-flash"),
         joycaption_path=joycaption_path,
         custom_prompt=cfg.get("custom_prompt"),
+        caption_mode=cfg.get("caption_mode", "context_only_tags"),
+        max_tokens=cfg.get("max_tokens"),
+        appearance_blacklist_extra=cfg.get("appearance_blacklist_extra", []),
     )
 
 
@@ -806,6 +847,7 @@ async def save_caption_config(body: CaptionProviderConfig) -> CaptionProviderCon
             "nanogpt_api_key", "nanogpt_model",
             "gemini_api_key", "gemini_model",
             "joycaption_path", "custom_prompt",
+            "caption_mode", "max_tokens", "appearance_blacklist_extra",
         )
         if field in provided
     }
