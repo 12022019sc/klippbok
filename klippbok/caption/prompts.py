@@ -86,40 +86,45 @@ The object's look is learned from the video — just describe the world around i
 # ---------------------------------------------------------------------------
 
 IMAGE_PROMPT_GENERAL = """\
-Write a short caption for this image in prompt style.
+Write a single short caption for this image in prompt style.
 Use direct, comma-separated phrases — not prose or narration.
 Start with the framing if notable (e.g. "close-up," "wide shot,").
 Then describe the subject, setting, and mood.
 Do NOT start with "The image shows" or "This is".
-Do NOT describe color palettes, lighting mood, or cinematography."""
+Do NOT describe color palettes, lighting mood, or cinematography.
+Output ONLY the caption — no options, no numbering, no markdown formatting."""
 
 IMAGE_PROMPT_CHARACTER = """\
-Write a short caption for this image in prompt style.{anchor_line}{secondary_line}
+Write a single short caption for this image in prompt style.{anchor_line}{secondary_line}
 Use direct, comma-separated phrases — not prose or narration.
 Start with the framing if notable (e.g. "close-up," "portrait,").
 Then describe what {subject} is doing and the setting.
-Do NOT describe {subject}'s physical appearance, clothing, or features."""
+Do NOT describe {subject}'s physical appearance, clothing, or features.
+Output ONLY the caption — no options, no numbering, no markdown formatting."""
 
 IMAGE_PROMPT_STYLE = """\
-Write a short caption for this image in prompt style.{style_anchor_line}{secondary_line}
+Write a single short caption for this image in prompt style.{style_anchor_line}{secondary_line}
 Use direct, comma-separated phrases — not prose or narration.
 Start with the framing if notable (e.g. "close-up," "wide shot,").
 Describe the subject and what's happening.
-Do NOT describe the visual style, art medium, color grading, or lighting mood."""
+Do NOT describe the visual style, art medium, color grading, or lighting mood.
+Output ONLY the caption — no options, no numbering, no markdown formatting."""
 
 IMAGE_PROMPT_MOTION = """\
-Write a short caption for this image in prompt style.{anchor_line}{secondary_line}
+Write a single short caption for this image in prompt style.{anchor_line}{secondary_line}
 Use direct, comma-separated phrases — not prose or narration.
 Start with the framing if notable (e.g. "close-up," "wide shot,").
 Describe the implied motion or action.
-Do NOT describe identity, appearance, or clothing."""
+Do NOT describe identity, appearance, or clothing.
+Output ONLY the caption — no options, no numbering, no markdown formatting."""
 
 IMAGE_PROMPT_OBJECT = """\
-Write a short caption for this image in prompt style.{anchor_line}{secondary_line}
+Write a single short caption for this image in prompt style.{anchor_line}{secondary_line}
 Use direct, comma-separated phrases — not prose or narration.
 Start with the framing if notable (e.g. "close-up," "wide shot,").
 Describe the scene around {subject}.
-Do NOT describe {subject}'s appearance."""
+Do NOT describe {subject}'s appearance.
+Output ONLY the caption — no options, no numbering, no markdown formatting."""
 
 # ---------------------------------------------------------------------------
 # Lookup

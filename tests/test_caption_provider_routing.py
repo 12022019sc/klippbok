@@ -378,3 +378,58 @@ def test_custom_prompt_used_in_caption_image_for_project(
     finally:
         if original_create:
             captioner._create_backend = original_create
+
+
+# ---------------------------------------------------------------------------
+# Config PUT partial update (only update explicitly provided fields)
+# ---------------------------------------------------------------------------
+
+def test_config_put_partial_update_preserves_unset_fields():
+    """PUT /captions/config with partial body must NOT wipe existing values.
+
+    Regression test: sending {"provider": "nanogpt", "nanogpt_model": "X"}
+    should NOT clear nanogpt_api_key or other stored fields.
+    """
+    from klippbok.api.models import CaptionProviderConfig
+
+    # Simulate a partial request body (only provider + model set)
+    body = CaptionProviderConfig.model_validate(
+        {"provider": "nanogpt", "nanogpt_model": "test-model"}
+    )
+
+    # model_fields_set should only contain the explicitly provided fields
+    assert "provider" in body.model_fields_set
+    assert "nanogpt_model" in body.model_fields_set
+    assert "nanogpt_api_key" not in body.model_fields_set
+    assert "gemini_api_key" not in body.model_fields_set
+
+    # Build the update dict using the same logic as the endpoint
+    provided = body.model_fields_set
+    updates = {
+        field: getattr(body, field)
+        for field in (
+            "provider", "lm_studio_base_url", "lm_studio_model",
+            "nanogpt_api_key", "nanogpt_model",
+            "gemini_api_key", "gemini_model",
+            "joycaption_path", "custom_prompt",
+        )
+        if field in provided
+    }
+
+    # Only the explicitly provided fields should be in the update dict
+    assert updates == {"provider": "nanogpt", "nanogpt_model": "test-model"}
+
+    # Simulate merging into existing config with real API keys
+    existing = {
+        "provider": "lm_studio",
+        "nanogpt_api_key": "sk-secret-key-123",
+        "nanogpt_model": "old-model",
+        "gemini_api_key": "AIza-secret-456",
+    }
+    existing.update(updates)
+
+    # API key must be preserved, model must be updated
+    assert existing["nanogpt_api_key"] == "sk-secret-key-123"
+    assert existing["nanogpt_model"] == "test-model"
+    assert existing["gemini_api_key"] == "AIza-secret-456"
+    assert existing["provider"] == "nanogpt"

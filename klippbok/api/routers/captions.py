@@ -792,23 +792,31 @@ async def save_caption_config(body: CaptionProviderConfig) -> CaptionProviderCon
     """
     from klippbok.services.global_config_service import load_global_config, save_global_config
 
-    # Load existing config and merge (preserve fields not managed by this endpoint)
+    # Load existing config and merge — only update fields explicitly provided
+    # in the request body.  Pydantic v2's model_fields_set tells us which
+    # fields the client actually sent vs which fell back to defaults, so a
+    # partial PUT (e.g. `{"provider":"nanogpt","nanogpt_model":"X"}`) won't
+    # accidentally wipe API keys or other stored values.
     existing = load_global_config()
-    existing.update({
-        "provider": body.provider,
-        "lm_studio_base_url": body.lm_studio_base_url,
-        "lm_studio_model": body.lm_studio_model,
-        "nanogpt_api_key": body.nanogpt_api_key,
-        "nanogpt_model": body.nanogpt_model,
-        "gemini_api_key": body.gemini_api_key,
-        "gemini_model": body.gemini_model,
-        "joycaption_path": body.joycaption_path,
-        "custom_prompt": body.custom_prompt,
-    })
+    provided = body.model_fields_set
+    updates = {
+        field: getattr(body, field)
+        for field in (
+            "provider", "lm_studio_base_url", "lm_studio_model",
+            "nanogpt_api_key", "nanogpt_model",
+            "gemini_api_key", "gemini_model",
+            "joycaption_path", "custom_prompt",
+        )
+        if field in provided
+    }
+    existing.update(updates)
 
     save_global_config(existing)
-    logger.info("Saved caption provider config: provider=%s", body.provider)
-    return body
+    logger.info("Saved caption provider config: provider=%s", existing.get("provider"))
+    return CaptionProviderConfig(**{
+        field: existing.get(field, getattr(CaptionProviderConfig(), field))
+        for field in CaptionProviderConfig.model_fields
+    })
 
 
 @router.get("/models")
