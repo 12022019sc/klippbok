@@ -148,53 +148,47 @@ IMAGE_PROMPTS: dict[str | None, str] = {
 
 
 def get_video_prompt(
-    use_case: str | None = None,
+    caption_mode: str | None = None,
     anchor_word: str | None = None,
     secondary_anchors: list[str] | None = None,
 ) -> str:
-    """Get the appropriate video captioning prompt for a use case.
+    """Get the appropriate video captioning prompt for a caption mode.
 
     When an anchor word is provided, it's woven into the prompt so the
     VLM uses it as the character/object's name naturally. Secondary
     anchors are additional tags the VLM should try to mention.
 
     Args:
-        use_case: One of 'character', 'style', 'motion', 'object', or None.
+        caption_mode: One of 'booru_tags', 'context_only_tags', 'context_only_natural',
+            'descriptive', 'straightforward', or None (falls back to context_only_tags).
         anchor_word: Primary trigger word — used as the subject's name.
         secondary_anchors: Additional tags to mention (e.g. ["vintage", "retro"]).
 
     Returns:
         The prompt string, ready to send to the VLM.
-
-    Raises:
-        ValueError: if use_case is not recognized.
     """
-    if use_case not in VIDEO_PROMPTS:
-        valid = ", ".join(repr(k) for k in VIDEO_PROMPTS if k is not None)
-        raise ValueError(
-            f"Unknown use_case: {use_case!r}. Valid options: {valid}, or None for general."
-        )
-    template = VIDEO_PROMPTS[use_case]
+    template = VIDEO_PROMPTS.get(caption_mode, VIDEO_PROMPT_GENERAL)
     return _fill_prompt(template, anchor_word, secondary_anchors)
 
 
 def get_image_prompt(
-    use_case: str | None = None,
+    caption_mode: str | None = None,
     anchor_word: str | None = None,
     secondary_anchors: list[str] | None = None,
 ) -> str:
-    """Get the appropriate image captioning prompt for a use case.
+    """Get the appropriate image captioning prompt for a caption mode.
 
     Args:
-        use_case: One of 'character', 'style', 'motion', 'object', or None.
-            Unknown use cases fall back to the general prompt.
+        caption_mode: One of 'booru_tags', 'context_only_tags', 'context_only_natural',
+            'descriptive', 'straightforward', or None.
+            Unknown modes fall back to the general prompt.
         anchor_word: Primary trigger word — used as the subject's name.
         secondary_anchors: Additional tags to mention.
 
     Returns:
         The prompt string, ready to send to the VLM.
     """
-    template = IMAGE_PROMPTS.get(use_case, IMAGE_PROMPT_GENERAL)
+    template = IMAGE_PROMPTS.get(caption_mode, IMAGE_PROMPT_GENERAL)
     return _fill_prompt(template, anchor_word, secondary_anchors)
 
 

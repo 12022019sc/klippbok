@@ -125,12 +125,12 @@ def caption_image_for_project(
 
         backend = _create_backend(vlm_config)
 
-        # custom_prompt overrides use-case prompt (mirrors captioner.py CLI behavior)
+        # custom_prompt overrides caption_mode prompt (mirrors captioner.py CLI behavior)
         if vlm_config.custom_prompt:
             prompt = vlm_config.custom_prompt
         else:
             prompt = get_image_prompt(
-                use_case=vlm_config.use_case,
+                caption_mode=vlm_config.caption_mode,
                 anchor_word=vlm_config.anchor_word,
                 secondary_anchors=vlm_config.secondary_anchors,
             )

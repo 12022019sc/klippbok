@@ -353,7 +353,13 @@ class CaptionProviderConfig(BaseModel):
     """Path to the JoyCaption installation root (auto-detected if empty)."""
 
     custom_prompt: str | None = None
-    """Custom prompt that overrides the built-in use-case prompt when set."""
+    """Custom prompt that overrides the built-in caption mode prompt when set."""
+
+    caption_mode: str = "context_only_tags"
+    """Caption mode: 'booru_tags' | 'context_only_tags' | 'context_only_natural' | 'descriptive' | 'straightforward'."""
+
+    max_tokens: int | None = None
+    """Override token budget. None = use model profile default."""
 
 
 class CaptionGenerateRequest(BaseModel):
@@ -362,15 +368,16 @@ class CaptionGenerateRequest(BaseModel):
     image_ids: list[str] | None = None
     """SHA256[:16] image IDs to caption. None means caption all images."""
 
-    style: Literal["booru", "natural_language", "auto"] = "auto"
-    """Caption style override. 'auto' uses the active model profile default."""
+    caption_mode: str | None = None
+    """Caption mode override. None = use value from global config (CaptionProviderConfig).
+    Valid values: 'booru_tags' | 'context_only_tags' | 'context_only_natural' | 'descriptive' | 'straightforward'."""
 
     overwrite: bool = False
     """If True, re-caption images that already have a caption."""
 
     provider: str | None = None
-    """VLM provider for natural language captioning: 'gemini', 'replicate', or 'openai'.
-    Required when style is 'natural_language'; ignored for 'booru'."""
+    """VLM provider for captioning: 'gemini', 'replicate', or 'openai'.
+    Required when using a VLM backend; ignored for 'booru_tags' with WD Tagger."""
 
     api_key: str | None = None
     """API key for the VLM provider. Required for external providers."""
@@ -425,6 +432,9 @@ class ProfileInfo(BaseModel):
 
     base_resolution: int
     """Base training resolution in pixels (e.g. 512, 1024)."""
+
+    default_token_budget: int = 150
+    """Default max tokens for caption output. SD1.5=75, SDXL=150, Flux=225."""
 
 
 class CaptionUpdateRequest(BaseModel):

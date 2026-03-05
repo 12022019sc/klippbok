@@ -17,7 +17,8 @@ class TestCaptionConfig:
         """Default config uses Gemini with sensible settings."""
         config = CaptionConfig()
         assert config.provider == "gemini"
-        assert config.use_case is None
+        assert config.caption_mode == "context_only_tags"
+        assert config.max_tokens is None
         assert config.anchor_word is None
         assert config.overwrite is False
         assert config.timeout == 120
@@ -33,10 +34,10 @@ class TestCaptionConfig:
         config = CaptionConfig(provider="replicate")
         assert config.provider == "replicate"
 
-    def test_use_cases(self) -> None:
-        for uc in ["character", "style", "motion", "object"]:
-            config = CaptionConfig(use_case=uc)
-            assert config.use_case == uc
+    def test_caption_modes(self) -> None:
+        for mode in ["booru_tags", "context_only_tags", "context_only_natural", "descriptive", "straightforward"]:
+            config = CaptionConfig(caption_mode=mode)
+            assert config.caption_mode == mode
 
     def test_anchor_word(self) -> None:
         config = CaptionConfig(anchor_word="Luna")

@@ -40,10 +40,10 @@ class TestGetVideoPrompt:
         prompt = get_video_prompt("object")
         assert "do not describe" in prompt.lower()
 
-    def test_invalid(self) -> None:
-        """Invalid use_case raises ValueError."""
-        with pytest.raises(ValueError, match="Unknown use_case"):
-            get_video_prompt("invalid_use_case")
+    def test_unknown_mode_falls_back(self) -> None:
+        """Unknown caption_mode falls back to general prompt instead of raising."""
+        prompt = get_video_prompt("invalid_mode")
+        assert "caption" in prompt.lower() or "video" in prompt.lower()
 
 
 class TestAnchorWordInjection:
@@ -242,7 +242,7 @@ class TestCustomPrompt:
         assert config.custom_prompt is None
 
     def test_custom_prompt_overrides_in_captioner(self) -> None:
-        """custom_prompt takes priority over use_case in caption_clips."""
+        """custom_prompt takes priority over caption_mode in caption_clips."""
         from pathlib import Path
 
         from klippbok.caption.base import VLMBackend
@@ -273,7 +273,7 @@ class TestCustomPrompt:
             try:
                 config = CaptionConfig(
                     provider="gemini",
-                    use_case="character",
+                    caption_mode="context_only_tags",
                     custom_prompt="My totally custom prompt",
                     between_request_delay=0,
                 )

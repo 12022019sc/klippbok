@@ -35,6 +35,7 @@ SD15_PROFILE = ModelProfile(
         network_alpha_ratio=0.5,
     ),
     description="SD1.5 — 512px base, booru-style tags, 262K pixel budget",
+    default_token_budget=75,
 )
 
 SDXL_PROFILE = ModelProfile(
@@ -54,6 +55,7 @@ SDXL_PROFILE = ModelProfile(
         network_alpha_ratio=0.5,
     ),
     description="SDXL — 1024px base, natural language captions, 1M pixel budget",
+    default_token_budget=150,
 )
 
 FLUX_PROFILE = ModelProfile(
@@ -73,6 +75,7 @@ FLUX_PROFILE = ModelProfile(
         network_alpha_ratio=1.0,
     ),
     description="Flux — 1024px base, natural language captions, covers dev and schnell",
+    default_token_budget=225,
 )
 
 PONY_PROFILE = ModelProfile(
@@ -92,6 +95,7 @@ PONY_PROFILE = ModelProfile(
         network_alpha_ratio=0.5,
     ),
     description="Pony XL — 1024px base, booru-style tags (SDXL-based anime model)",
+    default_token_budget=75,
 )
 
 BUILTIN_PROFILES: dict[str, ModelProfile] = {

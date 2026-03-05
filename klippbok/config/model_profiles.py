@@ -129,6 +129,10 @@ class ModelProfile(BaseModel):
         default="",
         description="Human-readable description of this profile.",
     )
+    default_token_budget: int = Field(
+        default=150,
+        description="Default max tokens for caption output. SD1.5=75, SDXL=150, Flux=225, Pony=75.",
+    )
 
     @model_validator(mode="after")
     def validate_base_resolution_alignment(self) -> ModelProfile:

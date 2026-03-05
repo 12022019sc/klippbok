@@ -11,6 +11,29 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# ---------------------------------------------------------------------------
+# Caption mode type
+# ---------------------------------------------------------------------------
+
+CaptionMode = Literal[
+    "booru_tags",
+    "context_only_tags",
+    "context_only_natural",
+    "descriptive",
+    "straightforward",
+]
+"""5 universal caption modes across all providers.
+
+- booru_tags: comma-separated booru-style tags (SD1.5 LoRA)
+- context_only_tags: tags excluding physical appearance (Character LoRA)
+- context_only_natural: NL excluding physical appearance (Character LoRA)
+- descriptive: detailed natural language (SDXL/Flux)
+- straightforward: factual NL, no speculation (SDXL/Flux)
+"""
+
+CAPTION_MODE_DEFAULT: CaptionMode = "context_only_tags"
+"""Default caption mode — context_only_tags is the primary use case (SD1.5 character LoRAs)."""
+
 
 class CaptionConfig(BaseModel):
     """Configuration for the captioning pipeline.
@@ -18,15 +41,17 @@ class CaptionConfig(BaseModel):
     Controls which VLM backend to use, retry behavior, and output settings.
     API keys are read from environment variables by default.
     """
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     provider: Literal["gemini", "replicate", "openai"] = "gemini"
     """Which VLM backend to use for generating captions.
     'openai' uses any OpenAI-compatible endpoint (Ollama, vLLM, LM Studio)."""
 
-    use_case: Literal["character", "style", "motion", "object"] | None = None
-    """Dataset use case — determines which prompt template to use.
-    If None, uses the general-purpose prompt."""
+    caption_mode: CaptionMode = "context_only_tags"
+    """Caption mode — controls prompt style and post-processing pipeline."""
+
+    max_tokens: int | None = None
+    """Override token budget. None = use model profile default."""
 
     anchor_word: str | None = None
     """Primary trigger word — used as the character/object's name in the caption.

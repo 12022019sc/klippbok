@@ -278,8 +278,8 @@ class TestCaptionClips:
         # Caption was overwritten
         assert (tmp_path / "clip_00.txt").read_text(encoding="utf-8") == "Caption for clip_00"
 
-    def test_anchor_word_in_prompt(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Anchor word is baked into the prompt sent to the VLM."""
+    def test_custom_prompt_used_when_set(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """custom_prompt overrides caption_mode prompt in caption_clips."""
         self._make_clips(tmp_path, 1)
 
         received_prompts: list[str] = []
@@ -296,16 +296,16 @@ class TestCaptionClips:
 
         config = CaptionConfig(
             provider="gemini",
-            use_case="character",
+            caption_mode="context_only_tags",
             anchor_word="Luna",
+            custom_prompt="Custom prompt for Luna",
             between_request_delay=0,
         )
         caption_clips(tmp_path, config)
 
         assert len(received_prompts) == 1
-        # The prompt itself should contain the anchor word as a name
-        assert "Luna" in received_prompts[0]
-        assert "naturally" in received_prompts[0].lower()
+        # custom_prompt takes priority over mode-based prompt
+        assert received_prompts[0] == "Custom prompt for Luna"
 
     def test_backend_failure_continues_batch(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """A failing clip doesn't stop the rest of the batch."""

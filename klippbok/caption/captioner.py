@@ -143,13 +143,13 @@ def caption_clips(
     # Create backend
     backend = _create_backend(config)
 
-    # Get the appropriate prompt — custom_prompt overrides use-case selection.
+    # Get the appropriate prompt — custom_prompt overrides caption_mode selection.
     # Anchor word is baked INTO the prompt so the VLM uses it as a name.
     if config.custom_prompt:
         prompt = config.custom_prompt
     else:
         prompt = get_video_prompt(
-            config.use_case,
+            config.caption_mode,
             anchor_word=config.anchor_word,
             secondary_anchors=config.secondary_anchors,
         )
@@ -278,7 +278,7 @@ def audit_captions(
 
     # Create backend
     backend = _create_backend(config)
-    prompt = config.custom_prompt or get_video_prompt(config.use_case)
+    prompt = config.custom_prompt or get_video_prompt(config.caption_mode)
 
     results: list[AuditResult] = []
     total = len(captioned)
