@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 07-01-PLAN.md (video_service, video router with SSE, thumbnails)
-last_updated: "2026-03-05T23:38:15.878Z"
+stopped_at: Completed 07-03-PLAN.md (VideoPage Ingest/Scan/Extract tabs, SSE hooks, NavBar Video+Triage)
+last_updated: "2026-03-05T23:45:43.240Z"
 last_activity: 2026-03-03 -- Completed 05-04-PLAN.md (ProcessPage wizard, UpscaleStep, useUpscaleEvents, Proceed to Captioning save, source_path fix)
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 31
-  completed_plans: 28
+  completed_plans: 29
 ---
 
 ---
@@ -113,6 +113,7 @@ Progress: [████████████░] ~85% (15 of ~20 estimated pl
 | Phase 06.2 P04 | 5 | 1 tasks | 2 files |
 | Phase 07 P02 | 422 | 2 tasks | 7 files |
 | Phase 07 P01 | 473 | 2 tasks | 6 files |
+| Phase 07 P03 | 258 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -231,6 +232,9 @@ Recent decisions affecting current work:
 - [Phase 07-01]: [07-01 VID-01]: generate_video_thumbnail is alias for get_video_thumbnail -- provides documented export without duplicating logic
 - [Phase 07-01]: [07-01 VID-02]: Thumbnail endpoint resolves clip via scan then clip_id match -- consistent with clips list endpoint
 - [Phase 07-01]: [07-01 VID-03]: extract_frames returns list[Path] not ExtractionReport -- simpler API for service consumers
+- [Phase 07-03]: NAV-01: Process removed from NavBar — reached via CropPage navigation only, not a top-level destination
+- [Phase 07-03]: INGEST-01: Ingest input mode defaults to Directory Path (not Upload) — large raw footage is typically on disk already per locked decision
+- [Phase 07-03]: TRIAGE-STUB-01: TriagePage created as minimal stub so /triage route resolves without 404; full implementation in Plan 04
 
 ### Roadmap Evolution
 
@@ -249,6 +253,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-05T23:38:15.876Z
-Stopped at: Completed 07-01-PLAN.md (video_service, video router with SSE, thumbnails)
+Last session: 2026-03-05T23:45:43.237Z
+Stopped at: Completed 07-03-PLAN.md (VideoPage Ingest/Scan/Extract tabs, SSE hooks, NavBar Video+Triage)
 Resume file: None
