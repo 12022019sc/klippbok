@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { CropState } from '../types/crop'
+import type { TriageScore } from '../types/triage'
 
 interface ImportProgress {
   current: number
@@ -35,6 +36,13 @@ interface AppState {
   // --- gallery filter ---
   galleryFilter: 'all' | 'images' | 'videos'
   setGalleryFilter: (filter: 'all' | 'images' | 'videos') => void
+
+  // --- triage results ---
+  triageResults: Record<string, TriageScore>
+  triageThreshold: number
+  setTriageResults: (results: Record<string, TriageScore>) => void
+  setTriageThreshold: (t: number) => void
+  clearTriageResults: () => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -99,4 +107,11 @@ export const useAppStore = create<AppState>((set) => ({
   // --- gallery filter state ---
   galleryFilter: 'all',
   setGalleryFilter: (filter) => set({ galleryFilter: filter }),
+
+  // --- triage results state ---
+  triageResults: {},
+  triageThreshold: 0.70,
+  setTriageResults: (results) => set({ triageResults: results }),
+  setTriageThreshold: (t) => set({ triageThreshold: t }),
+  clearTriageResults: () => set({ triageResults: {} }),
 }))

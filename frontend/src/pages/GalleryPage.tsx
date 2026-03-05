@@ -5,6 +5,7 @@ import { useAppStore } from '../stores/appStore'
 import { toast } from 'sonner'
 import MasonryGrid from '../components/Gallery/MasonryGrid'
 import SelectionToolbar from '../components/Gallery/SelectionToolbar'
+import { GalleryFilter } from '../components/Gallery/GalleryFilter'
 import ImageLightbox from '../components/Lightbox/ImageLightbox'
 import type { GalleryItem } from '../types/image'
 
@@ -140,7 +141,10 @@ export default function GalleryPage() {
 
   return (
     <>
-      <SelectionToolbar items={images} />
+      <div className="gallery-header-bar">
+        <SelectionToolbar items={images} />
+        <GalleryFilter />
+      </div>
       <MasonryGrid
         items={images}
         onItemClick={handleItemClick}
