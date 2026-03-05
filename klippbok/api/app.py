@@ -39,7 +39,9 @@ def create_app(project_dir: Path | None = None) -> FastAPI:
     from klippbok.api.routers.crop import router as crop_router
     from klippbok.api.routers.images import router as images_router
     from klippbok.api.routers.settings import router as settings_router
+    from klippbok.api.routers.triage import router as triage_router
     from klippbok.api.routers.upscale import router as upscale_router
+    from klippbok.api.routers.video import router as video_router
 
     # project_dir starts as None when no --project-dir is passed.
     # The user selects a project directory from the web UI.
@@ -49,15 +51,24 @@ def create_app(project_dir: Path | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         """Lifespan context manager: cancel active import tasks on shutdown."""
         yield
-        # Shutdown: cancel all in-flight import, upscale, and caption tasks
+        # Shutdown: cancel all in-flight import, upscale, caption, triage, and video tasks
         from klippbok.api.routers.captions import _tasks as caption_tasks
         from klippbok.api.routers.import_ import _tasks as import_tasks
+        from klippbok.api.routers.triage import _face_tasks, _triage_tasks
         from klippbok.api.routers.upscale import _tasks as upscale_tasks
+        from klippbok.api.routers.video import (
+            _extract_tasks as video_extract_tasks,
+            _ingest_tasks as video_ingest_tasks,
+        )
 
         for task_dict, label in [
             (import_tasks, "import"),
             (upscale_tasks, "upscale"),
             (caption_tasks, "caption"),
+            (_triage_tasks, "triage"),
+            (_face_tasks, "face-embedding"),
+            (video_ingest_tasks, "video-ingest"),
+            (video_extract_tasks, "video-extract"),
         ]:
             if task_dict:
                 logger.info(
@@ -88,6 +99,8 @@ def create_app(project_dir: Path | None = None) -> FastAPI:
     app.include_router(crop_router, prefix="/api/v1")
     app.include_router(upscale_router, prefix="/api/v1")
     app.include_router(captions_router, prefix="/api/v1")
+    app.include_router(triage_router, prefix="/api/v1")
+    app.include_router(video_router, prefix="/api/v1")
 
     # SPA static files + fallback to index.html for client-side routes.
     # StaticFiles(html=True) alone only serves index.html at "/" — it 404s
