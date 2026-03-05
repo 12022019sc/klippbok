@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06.2-01-PLAN.md (CaptionMode, pipeline.py, prompts rewrite, model token budgets)
-last_updated: "2026-03-05T04:38:33.369Z"
+stopped_at: Completed 06.2-02-PLAN.md (caption_mode routing, JoyCaption --mode, appearance_blacklist_extra, pipeline integration)
+last_updated: "2026-03-05T04:52:17.060Z"
 last_activity: 2026-03-03 -- Completed 05-04-PLAN.md (ProcessPage wizard, UpscaleStep, useUpscaleEvents, Proceed to Captioning save, source_path fix)
 progress:
   total_phases: 10
   completed_phases: 6
   total_plans: 26
-  completed_plans: 23
+  completed_plans: 24
 ---
 
 ---
@@ -108,6 +108,7 @@ Progress: [████████████░] ~85% (15 of ~20 estimated pl
 | Phase 06.1-caption-provider-configuration P01 | 490 | 2 tasks | 8 files |
 | Phase 06.1 P02 | 292 | 2 tasks | 8 files |
 | Phase 06.2 P01 | 688 | 2 tasks | 12 files |
+| Phase 06.2 P02 | 30 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -213,6 +214,9 @@ Recent decisions affecting current work:
 - [Phase 06.2-01]: extra='forbid' added to CaptionConfig to make use_case removal a hard break
 - [Phase 06.2-01]: Token counting uses word-based approximation (1 token ~= 0.75 words) — no tiktoken dependency
 - [Phase 06.2-01]: context_only_tags is fallback for unknown/None caption_mode (not general prompt)
+- [Phase 06.2-02]: caption_style_override in manifest ignored for mode routing (mode is global, not per-project)
+- [Phase 06.2-02]: apply_vlm_pipeline called inside caption_image_for_project (not in router)
+- [Phase 06.2-02]: appearance_blacklist_extra merged at call sites with list(set(defaults + extras))
 
 ### Roadmap Evolution
 
@@ -231,6 +235,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-05T04:38:33.365Z
-Stopped at: Completed 06.2-01-PLAN.md (CaptionMode, pipeline.py, prompts rewrite, model token budgets)
+Last session: 2026-03-05T04:52:17.057Z
+Stopped at: Completed 06.2-02-PLAN.md (caption_mode routing, JoyCaption --mode, appearance_blacklist_extra, pipeline integration)
 Resume file: None

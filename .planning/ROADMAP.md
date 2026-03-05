@@ -210,6 +210,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 6.2 -> 7 -
 | 5. Interactive Crop Editor | 4/4 | Complete   | 2026-03-03 |
 | 6. Captioning System | 4/4 | Complete   | 2026-03-04 |
 | 6.1 Caption Provider Config | 2/2 | Complete   | 2026-03-04 |
-| 6.2 Caption Enhancement: JoyCaption | 1/3 | In Progress|  |
+| 6.2 Caption Enhancement: JoyCaption | 2/3 | In Progress|  |
 | 7. Video and CLIP Integration | 0/2 | Not started | - |
 | 8. Export Pipeline | 0/3 | Not started | - |
