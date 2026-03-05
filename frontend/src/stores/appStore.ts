@@ -31,6 +31,10 @@ interface AppState {
   setCropState: (id: string, state: CropState) => void
   removeCropState: (id: string) => void
   clearCropStates: () => void
+
+  // --- gallery filter ---
+  galleryFilter: 'all' | 'images' | 'videos'
+  setGalleryFilter: (filter: 'all' | 'images' | 'videos') => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -91,4 +95,8 @@ export const useAppStore = create<AppState>((set) => ({
 
   clearCropStates: () =>
     set({ cropStates: new Map<string, CropState>() }),
+
+  // --- gallery filter state ---
+  galleryFilter: 'all',
+  setGalleryFilter: (filter) => set({ galleryFilter: filter }),
 }))
