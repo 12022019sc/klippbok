@@ -11,6 +11,8 @@ interface CaptionProviderConfig {
   gemini_model: string
   joycaption_path: string
   custom_prompt: string | null
+  caption_mode: string
+  max_tokens: number | null
 }
 
 interface Props {
@@ -32,6 +34,13 @@ async function fetchModels(provider: string, baseUrl: string): Promise<string[]>
 }
 
 const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']
+const CAPTION_MODES: { value: string; label: string }[] = [
+  { value: 'context_only_tags',    label: 'Context Only (Tags)' },
+  { value: 'context_only_natural', label: 'Context Only (Natural)' },
+  { value: 'booru_tags',           label: 'Booru Tags' },
+  { value: 'descriptive',          label: 'Descriptive' },
+  { value: 'straightforward',      label: 'Straightforward' },
+]
 const PROVIDER_LABELS: Record<string, string> = {
   lm_studio: 'LM Studio',
   nanogpt: 'NanoGPT',
@@ -177,6 +186,41 @@ export default function ProviderConfigSection({ config, onSave, triggerWord, onT
 
       {isExpanded && (
         <div className="provider-config-body">
+          {/* Caption Mode dropdown */}
+          <div className="provider-config-field">
+            <label className="provider-config-label">Caption Mode</label>
+            <select
+              className="provider-config-select"
+              value={local.caption_mode}
+              onChange={(e) => setLocal({ ...local, caption_mode: e.target.value })}
+            >
+              {CAPTION_MODES.map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+            <span className="provider-config-hint">
+              Context Only modes exclude appearance (for Character LoRA)
+            </span>
+          </div>
+
+          {/* Max Tokens field */}
+          <div className="provider-config-field">
+            <label className="provider-config-label">Max Tokens</label>
+            <input
+              type="number"
+              className="provider-config-input"
+              value={local.max_tokens ?? ''}
+              onChange={(e) => setLocal({
+                ...local,
+                max_tokens: e.target.value ? parseInt(e.target.value, 10) : null,
+              })}
+              placeholder="Auto (from model profile)"
+              min={10}
+              max={500}
+            />
+            <span className="provider-config-hint">Leave blank for model default (SD1.5=75, SDXL=150, Flux=225)</span>
+          </div>
+
           {/* Provider dropdown */}
           <div className="provider-config-field">
             <label className="provider-config-label">Provider</label>

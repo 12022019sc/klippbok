@@ -18,6 +18,8 @@ interface CaptionProviderConfig {
   gemini_model: string
   joycaption_path: string
   custom_prompt: string | null
+  caption_mode: string
+  max_tokens: number | null
 }
 
 const DEFAULT_CONFIG: CaptionProviderConfig = {
@@ -30,6 +32,8 @@ const DEFAULT_CONFIG: CaptionProviderConfig = {
   gemini_model: 'gemini-2.5-flash',
   joycaption_path: '',
   custom_prompt: null,
+  caption_mode: 'context_only_tags',
+  max_tokens: null,
 }
 
 async function fetchConfig(): Promise<CaptionProviderConfig> {
@@ -123,7 +127,7 @@ export default function CaptionPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          style: 'auto',
+          caption_mode: config.caption_mode,
           provider_preset: config.provider,
           overwrite: overwriteExisting,
         }),
@@ -183,6 +187,14 @@ export default function CaptionPage() {
   }
 
   const isCaptioning = captionOperationId !== null && !captionProgress.isComplete && !captionProgress.error
+
+  // Over-budget warning: approximate token count using word-count heuristic (1 token ~= 0.75 words)
+  const tokenBudget = config.max_tokens ?? 150
+  function isOverBudget(caption: string | null | undefined): boolean {
+    if (!caption) return false
+    const approxTokens = Math.ceil(caption.split(' ').length / 0.75)
+    return approxTokens > tokenBudget
+  }
 
   return (
     <div className="caption-page">
@@ -256,6 +268,11 @@ export default function CaptionPage() {
             </p>
           </div>
           <div className="caption-editor">
+            {isOverBudget(editingCaption) && (
+              <span className="caption-over-budget">
+                Over budget (~{Math.ceil(editingCaption.split(' ').length / 0.75)} tokens &gt; {tokenBudget})
+              </span>
+            )}
             <textarea
               className="caption-textarea"
               value={editingCaption}

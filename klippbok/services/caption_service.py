@@ -1,11 +1,12 @@
 """Caption service -- model-aware caption routing and persistence.
 
 Orchestrates caption generation by routing to the appropriate backend
-based on the active model profile (booru vs natural language), and
-persisting captions to both the manifest and sidecar .txt files.
+based on the active caption mode (booru_tags, context_only_tags, etc.),
+and persisting captions to both the manifest and sidecar .txt files.
 
 Key functions:
-  - get_caption_style_for_project: determine style from profile + override
+  - get_caption_mode_for_project: determine caption_mode from global config or profile
+  - get_caption_style_for_project: legacy style routing (deprecated, kept for compatibility)
   - caption_image_for_project: generate caption using appropriate backend
   - save_caption: atomically write sidecar + update manifest entry
   - build_vlm_config_from_global: map named provider preset to CaptionConfig
@@ -37,10 +38,50 @@ def _image_id(relative_path: str) -> str:
     return hashlib.sha256(relative_path.encode()).hexdigest()[:16]
 
 
+def get_caption_mode_for_project(
+    manifest: dict,
+    global_config: dict | None = None,
+) -> str:
+    """Determine the caption mode for a project.
+
+    Reads from global config first (caption_mode is a global preference),
+    falls back to model profile's caption_style mapped to a mode.
+
+    Note: ``caption_style_override`` in the manifest is intentionally IGNORED.
+    Caption mode is a global concern, not a per-project override (per CONTEXT.md).
+
+    Args:
+        manifest: Project manifest dict (from load_manifest).
+        global_config: Global config dict (from load_global_config), or None.
+
+    Returns:
+        A CaptionMode string: one of 'booru_tags', 'context_only_tags',
+        'context_only_natural', 'descriptive', 'straightforward'.
+    """
+    from klippbok.config.model_config import get_profile
+
+    # 1. Global config caption_mode takes priority
+    if global_config:
+        mode = global_config.get("caption_mode")
+        if mode:
+            return mode
+
+    # 2. Fall back to model profile's caption_style → map to mode
+    active_profile = manifest.get("active_profile", "sdxl")
+    try:
+        profile = get_profile(active_profile)
+        # Map old caption_style to new caption_mode
+        if profile.caption_style == "booru":
+            return "booru_tags"
+        return "descriptive"  # natural_language → descriptive
+    except (KeyError, Exception):
+        return "context_only_tags"  # safe default
+
+
 def get_caption_style_for_project(
     manifest: dict,
 ) -> Literal["booru", "natural_language"]:
-    """Determine the caption style for a project.
+    """Determine the caption style for a project (legacy API, kept for compatibility).
 
     Checks the manifest for a ``caption_style_override`` key first (CAPT-04).
     If no override is set, falls back to the active profile's ``caption_style``.
@@ -72,36 +113,79 @@ def get_caption_style_for_project(
         return "natural_language"
 
 
+def _resolve_token_budget(
+    vlm_config: CaptionConfig | None,
+    manifest: dict,
+) -> int:
+    """Resolve effective token budget.
+
+    Resolution chain: vlm_config.max_tokens > profile default.
+
+    Args:
+        vlm_config: CaptionConfig (may have max_tokens override), or None.
+        manifest: Project manifest dict (for active_profile lookup).
+
+    Returns:
+        Resolved token budget as an integer.
+    """
+    if vlm_config is not None and vlm_config.max_tokens is not None:
+        return vlm_config.max_tokens
+
+    from klippbok.config.model_config import get_profile
+
+    active_profile = manifest.get("active_profile", "sdxl")
+    try:
+        profile = get_profile(active_profile)
+        return profile.default_token_budget
+    except Exception:
+        return 150  # safe default (SDXL)
+
+
 def caption_image_for_project(
     image_path: Path,
     manifest: dict,
     vlm_config: CaptionConfig | None = None,
     general_threshold: float = 0.35,
+    caption_mode: str = "context_only_tags",
 ) -> str:
     """Generate a caption for an image using the appropriate backend.
 
-    Routes to WD Tagger v3 (booru) or a VLM backend (natural language)
-    based on the active model profile and any manifest override.
+    Routes to WD Tagger v3 (booru tags) or a VLM backend based on caption_mode.
+    VLM captions are post-processed through apply_vlm_pipeline before returning.
+
+    Routing logic:
+    - ``booru_tags`` with no VLM config → WD Tagger (raw tags)
+    - ``context_only_tags`` with no VLM config → WD Tagger + appearance filter
+    - Any mode with VLM config → VLM backend + apply_vlm_pipeline
+
+    The effective caption_mode is taken from vlm_config.caption_mode when a
+    VLM config is provided; otherwise the ``caption_mode`` parameter is used.
 
     Args:
         image_path: Absolute path to the image file.
-        manifest: Project manifest dict (used for profile/override lookup).
-        vlm_config: CaptionConfig for NL backends. Required when style is
-            "natural_language"; ignored for "booru".
+        manifest: Project manifest dict (used for profile/token budget lookup).
+        vlm_config: CaptionConfig for VLM backends. When None, routes to WD Tagger.
         general_threshold: Confidence threshold for booru general tags (0.0-1.0).
             Tags below this score are filtered out. Default 0.35 (WD Tagger standard).
+        caption_mode: Caption mode to use when vlm_config is None. Ignored when
+            vlm_config is provided (vlm_config.caption_mode takes precedence).
 
     Returns:
         Caption string ready to write to manifest and sidecar .txt.
 
     Raises:
-        ValueError: If style is "natural_language" but vlm_config is not provided.
-        ImportError: If WD Tagger dependencies are not installed.
+        ImportError: If WD Tagger dependencies are not installed (booru paths).
     """
-    style = get_caption_style_for_project(manifest)
+    from klippbok.caption.pipeline import (
+        DEFAULT_APPEARANCE_BLACKLIST,
+        apply_vlm_pipeline,
+    )
 
-    if style == "booru":
-        # Lazy import — onnxruntime/pandas are optional [tagger] dependencies
+    # Determine effective caption_mode
+    effective_mode = vlm_config.caption_mode if vlm_config is not None else caption_mode
+
+    if vlm_config is None:
+        # WD Tagger paths
         from klippbok.caption.wd_tagger import tag_image_booru
 
         general_tags, char_tags = tag_image_booru(
@@ -109,17 +193,21 @@ def caption_image_for_project(
             general_threshold=general_threshold,
         )
         # Characters first (most relevant), then general tags
-        all_tags = char_tags + general_tags
-        return ", ".join(all_tags)
+        raw_tags = char_tags + general_tags
+
+        if effective_mode == "context_only_tags":
+            # Apply appearance filter for context_only_tags mode
+            from klippbok.caption.pipeline import _filter_appearance_tags, _dedup_tags
+
+            filtered = _filter_appearance_tags(raw_tags, DEFAULT_APPEARANCE_BLACKLIST)
+            filtered = _dedup_tags(filtered)
+            return ", ".join(filtered)
+        else:
+            # booru_tags or any other mode without VLM → raw WD Tagger output
+            return ", ".join(raw_tags)
 
     else:
-        # natural_language — requires VLM config
-        if vlm_config is None:
-            raise ValueError(
-                "vlm_config is required for natural_language captioning. "
-                "Provide a CaptionConfig with provider and api_key."
-            )
-
+        # VLM backend path
         from klippbok.caption.captioner import _create_backend
         from klippbok.caption.prompts import get_image_prompt
 
@@ -130,11 +218,21 @@ def caption_image_for_project(
             prompt = vlm_config.custom_prompt
         else:
             prompt = get_image_prompt(
-                caption_mode=vlm_config.caption_mode,
+                caption_mode=effective_mode,
                 anchor_word=vlm_config.anchor_word,
                 secondary_anchors=vlm_config.secondary_anchors,
             )
-        return backend.caption_image(image_path, prompt)
+
+        raw_caption = backend.caption_image(image_path, prompt)
+
+        # Post-process through VLM pipeline (artifact strip, token trim, anchor inject)
+        token_budget = _resolve_token_budget(vlm_config, manifest)
+        return apply_vlm_pipeline(
+            raw_caption,
+            anchor_word=vlm_config.anchor_word,
+            token_budget=token_budget,
+            caption_mode=effective_mode,
+        )
 
 
 def save_caption(
@@ -368,6 +466,10 @@ def build_vlm_config_from_global(
     anchor_word: str | None = manifest.get("anchor_word") or None
     custom_prompt: str | None = global_config.get("custom_prompt") or None
 
+    # Caption mode and token budget from global config (Pitfall 2 from RESEARCH.md)
+    caption_mode: str = global_config.get("caption_mode", "context_only_tags")
+    max_tokens: int | None = global_config.get("max_tokens")
+
     if provider == "lm_studio":
         base_url = global_config.get("lm_studio_base_url", "http://localhost:1234/v1")
         model = global_config.get("lm_studio_model", "")
@@ -378,6 +480,8 @@ def build_vlm_config_from_global(
             api_key="lm-studio",  # LM Studio ignores the key but requires one
             anchor_word=anchor_word,
             custom_prompt=custom_prompt,
+            caption_mode=caption_mode,
+            max_tokens=max_tokens,
         )
 
     elif provider == "nanogpt":
@@ -390,6 +494,8 @@ def build_vlm_config_from_global(
             api_key=api_key or None,
             anchor_word=anchor_word,
             custom_prompt=custom_prompt,
+            caption_mode=caption_mode,
+            max_tokens=max_tokens,
         )
 
     elif provider == "gemini":
@@ -406,6 +512,8 @@ def build_vlm_config_from_global(
             api_key=api_key or None,
             anchor_word=anchor_word,
             custom_prompt=custom_prompt,
+            caption_mode=caption_mode,
+            max_tokens=max_tokens,
         )
 
     elif provider == "joycaption":
