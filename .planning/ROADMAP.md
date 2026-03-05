@@ -18,7 +18,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Web GUI Foundation** - FastAPI+React shell, image gallery, thumbnails, and progress indicators
 - [x] **Phase 5: Interactive Crop Editor** - Canvas-based crop tool with snap-to-bucket, zoom, rotation, and auto-crop (completed 2026-03-03)
 - [x] **Phase 6: Captioning System** - Booru tag generation, NL captioning, model-aware defaults, manual editing, and batch operations (completed 2026-03-04)
-- [x] **Phase 6.1: Caption Provider Configuration** - Dedicated captioning page with provider config, model picker, API key management, and caption workspace (INSERTED) (completed 2026-03-04)
+- [x] **Phase 6.1: Caption Provider Configuration** - Dedicated captioning page with provider config, model picker, API key management, and caption workspace (INSERTED) (completed 2026-03-04)
+- [ ] **Phase 6.2: Captioning Enhancement: JoyCaption Integration Planning** - Caption modes, context-only modes, post-processing pipeline, token budgets, trigger word injection (INSERTED)
 - [ ] **Phase 7: Video and CLIP Integration** - Existing video pipeline accessible from GUI, CLIP triage extended to standalone images
 - [ ] **Phase 8: Export Pipeline** - Multi-trainer export with format-specific config generation and dataset download
 
@@ -146,6 +147,25 @@ Plans:
 - [ ] 06.1-01-PLAN.md -- Backend: global config service, JoyCaption detection, provider routing, API endpoints
 - [ ] 06.1-02-PLAN.md -- Frontend: CaptionPage UI, provider config panel, NavBar update, GalleryPage cleanup
 
+### Phase 06.2: Captioning Enhancement: JoyCaption Integration Planning (INSERTED)
+
+**Goal:** Enhance the captioning system with JoyCaption-inspired caption modes, context-only modes for character LoRA training, a multi-stage post-processing pipeline, model-aware token budgets, and trigger word/subject tag injection — applying to all providers and models
+**Requirements**: CENH-01, CENH-02, CENH-03, CENH-04, CENH-05, CENH-06, CENH-07, CENH-08, CENH-09, CENH-10
+**Depends on:** Phase 6, Phase 6.1
+**Success Criteria** (what must be TRUE):
+  1. 5 caption modes (Booru Tags, Context Only Tags, Context Only Natural, Descriptive, Straightforward) available across all providers
+  2. Context Only modes filter appearance tags (hair, eyes, body type) for character LoRA training
+  3. Post-processing pipelines (VLM artifact stripping, token budget trimming) produce clean output
+  4. Model-aware token budgets (SD1.5=75, SDXL=150, Flux=225) enforced with smart trimming
+  5. Mode dropdown and max-tokens field visible in CaptionPage config section
+  6. Over-budget warning indicator visible per image
+**Plans:** 3 plans
+
+Plans:
+- [ ] 06.2-01-PLAN.md -- Caption mode types, model updates, prompts rewrite, post-processing pipeline
+- [ ] 06.2-02-PLAN.md -- Service routing, router updates, JoyCaption runner mode parameterization
+- [ ] 06.2-03-PLAN.md -- Frontend: mode dropdown, max-tokens field, over-budget warning
+
 ### Phase 7: Video and CLIP Integration
 **Goal**: Users can access existing video pipeline workflows and CLIP-based triage from the web GUI, unifying image and video dataset preparation in one interface
 **Depends on**: Phase 4
@@ -179,7 +199,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 7 -> 8
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 6.2 -> 7 -> 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -190,5 +210,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 7 -> 8
 | 5. Interactive Crop Editor | 4/4 | Complete   | 2026-03-03 |
 | 6. Captioning System | 4/4 | Complete   | 2026-03-04 |
 | 6.1 Caption Provider Config | 2/2 | Complete   | 2026-03-04 |
+| 6.2 Caption Enhancement: JoyCaption | 0/3 | Not started | - |
 | 7. Video and CLIP Integration | 0/2 | Not started | - |
 | 8. Export Pipeline | 0/3 | Not started | - |
