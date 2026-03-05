@@ -1096,6 +1096,28 @@ h1 {
   cursor: not-allowed;
 }
 
+.caption-retry-btn {
+  background: transparent;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  color: #fbbf24;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.caption-retry-btn:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.caption-retry-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .caption-overwrite-label {
   display: flex;
   align-items: center;

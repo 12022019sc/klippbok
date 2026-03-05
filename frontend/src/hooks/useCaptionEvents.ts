@@ -12,6 +12,8 @@ export interface CaptionProgress {
   firstError: string | null
   /** Count of per-image errors reported during generation. */
   errorCount: number
+  /** Image IDs that failed all retry attempts (populated on completion). */
+  failedImageIds: string[]
 }
 
 const INITIAL_STATE: CaptionProgress = {
@@ -24,6 +26,7 @@ const INITIAL_STATE: CaptionProgress = {
   error: null,
   firstError: null,
   errorCount: 0,
+  failedImageIds: [],
 }
 
 /**
@@ -80,6 +83,7 @@ export function useCaptionEvents(operationId: string | null): CaptionProgress {
     es.addEventListener('done', (e: MessageEvent) => {
       try {
         const data = JSON.parse(e.data)
+        const failedIds: string[] = Array.isArray(data.failed_image_ids) ? data.failed_image_ids : []
         setProgress((prev) => ({
           ...prev,
           current: data.current ?? prev.current,
@@ -88,6 +92,7 @@ export function useCaptionEvents(operationId: string | null): CaptionProgress {
           status: data.status ?? 'done',
           isComplete: true,
           error: null,
+          failedImageIds: failedIds,
         }))
       } catch {
         setProgress((prev) => ({
@@ -125,15 +130,27 @@ export function useCaptionEvents(operationId: string | null): CaptionProgress {
     })
 
     // Network-level error (connection dropped, server unreachable)
+    // EventSource auto-reconnects by default (readyState goes to CONNECTING).
+    // Only treat it as fatal if the connection is fully closed.
     es.onerror = () => {
-      es.close()
-      esRef.current = null
-      setProgress((prev) => ({
-        ...prev,
-        error: 'Caption connection lost. The SSE connection was interrupted.',
-        status: 'error',
-        isComplete: false,
-      }))
+      if (es.readyState === EventSource.CLOSED) {
+        es.close()
+        esRef.current = null
+        setProgress((prev) => {
+          // If we already received progress, the backend may still be running —
+          // mark as complete rather than error so the UI doesn't show a false failure.
+          if (prev.current > 0 && prev.current >= prev.total && prev.total > 0) {
+            return { ...prev, isComplete: true, status: 'done' }
+          }
+          return {
+            ...prev,
+            error: 'Caption connection lost. Check server logs for results.',
+            status: 'error',
+            isComplete: false,
+          }
+        })
+      }
+      // If readyState is CONNECTING, EventSource is auto-reconnecting — do nothing.
     }
 
     return () => {

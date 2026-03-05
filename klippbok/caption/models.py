@@ -53,6 +53,13 @@ class CaptionConfig(BaseModel):
     max_tokens: int | None = None
     """Override token budget. None = use model profile default."""
 
+    temperature: float | None = None
+    """Sampling temperature override. None = server default.
+    Lower values (0.3-0.5) reduce sampling cost and output randomness."""
+
+    top_p: float | None = None
+    """Nucleus sampling threshold override. None = server default."""
+
     anchor_word: str | None = None
     """Primary trigger word — used as the character/object's name in the caption.
     The VLM is told to use this as the subject's name, not just a tag.

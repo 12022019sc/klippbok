@@ -215,6 +215,12 @@ def caption_image_for_project(
 
         backend = _create_backend(vlm_config)
 
+        # Set max_tokens from resolved token budget so the model stops early
+        # instead of generating unlimited tokens that get post-trimmed.
+        token_budget = _resolve_token_budget(vlm_config, manifest)
+        if hasattr(backend, "max_tokens") and backend.max_tokens is None:
+            backend.max_tokens = token_budget
+
         # custom_prompt overrides caption_mode prompt (mirrors captioner.py CLI behavior)
         if vlm_config.custom_prompt:
             prompt = vlm_config.custom_prompt
@@ -228,12 +234,12 @@ def caption_image_for_project(
         raw_caption = backend.caption_image(image_path, prompt)
 
         # Post-process through VLM pipeline (artifact strip, token trim, anchor inject)
-        token_budget = _resolve_token_budget(vlm_config, manifest)
         return apply_vlm_pipeline(
             raw_caption,
             anchor_word=vlm_config.anchor_word,
             token_budget=token_budget,
             caption_mode=effective_mode,
+            appearance_blacklist=DEFAULT_APPEARANCE_BLACKLIST,
         )
 
 
@@ -556,7 +562,7 @@ def batch_prepend_trigger(
     Returns:
         Number of captions that were modified.
     """
-    from klippbok.caption.captioner import _prepend_anchor
+    from klippbok.caption.pipeline import _prepend_anchor
 
     modified = 0
     for entry in manifest.get("images", []):

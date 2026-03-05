@@ -58,6 +58,9 @@ def _create_backend(config: CaptionConfig) -> VLMBackend:
             api_key=config.api_key,
             timeout=config.timeout,
             caption_fps=config.caption_fps,
+            max_tokens=config.max_tokens,
+            temperature=config.temperature,
+            top_p=config.top_p,
         )
     else:
         raise ValueError(
@@ -84,30 +87,13 @@ def _find_video_files(directory: Path) -> list[Path]:
 def _prepend_anchor(caption: str, anchor_word: str) -> str:
     """Prepend anchor word to caption if not already present.
 
-    Checks if the caption already starts with the anchor word
-    (case-insensitive). If not, prepends it naturally.
-
-    Args:
-        caption: The generated caption text.
-        anchor_word: The anchor word to prepend.
-
-    Returns:
-        Caption with anchor word at the start.
-
-    Examples:
-        >>> _prepend_anchor("A girl walks", "Luna")
-        "Luna, a girl walks"
-        >>> _prepend_anchor("Luna is walking", "Luna")
-        "Luna is walking"
+    .. deprecated::
+        Use :func:`klippbok.caption.pipeline._prepend_anchor` instead.
+        This re-export exists only for backward compatibility.
     """
-    if caption.lower().startswith(anchor_word.lower()):
-        return caption
+    from klippbok.caption.pipeline import _prepend_anchor as _impl
 
-    # Lowercase the first character of the caption for natural flow
-    if caption and caption[0].isupper():
-        caption = caption[0].lower() + caption[1:]
-
-    return f"{anchor_word}, {caption}"
+    return _impl(caption, anchor_word)
 
 
 def caption_clips(

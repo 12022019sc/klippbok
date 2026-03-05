@@ -20,6 +20,7 @@ interface CaptionProviderConfig {
   custom_prompt: string | null
   caption_mode: string
   max_tokens: number | null
+  appearance_blacklist_extra: string[]
 }
 
 const DEFAULT_CONFIG: CaptionProviderConfig = {
@@ -34,6 +35,7 @@ const DEFAULT_CONFIG: CaptionProviderConfig = {
   custom_prompt: null,
   caption_mode: 'context_only_tags',
   max_tokens: null,
+  appearance_blacklist_extra: [],
 }
 
 async function fetchConfig(): Promise<CaptionProviderConfig> {
@@ -71,6 +73,7 @@ export default function CaptionPage() {
   const [isSavingCaption, setIsSavingCaption] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [overwriteExisting, setOverwriteExisting] = useState(false)
+  const [failedImageIds, setFailedImageIds] = useState<string[]>([])
 
   const captionProgress = useCaptionEvents(captionOperationId)
 
@@ -103,6 +106,8 @@ export default function CaptionPage() {
         description,
         duration: hasErrors ? 8000 : 4000,
       })
+      // Store failed IDs for retry, or clear if all succeeded
+      setFailedImageIds(hasErrors ? captionProgress.failedImageIds : [])
       setCaptionOperationId(null)
       void queryClient.invalidateQueries({ queryKey: ['images'] })
     } else if (captionProgress.error) {
@@ -119,9 +124,42 @@ export default function CaptionPage() {
     }
   }, [captionProgress, captionOperationId, queryClient])
 
+  async function handleRetryFailed() {
+    if (isGenerating || captionOperationId || failedImageIds.length === 0) return
+    setIsGenerating(true)
+    try {
+      const res = await fetch('/api/v1/captions/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image_ids: failedImageIds,
+          caption_mode: config.caption_mode,
+          provider_preset: config.provider,
+          overwrite: true,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
+        toast.error('Failed to start retry', { description: (err as { detail: string }).detail })
+        return
+      }
+      const data = await res.json() as { operation_id: string }
+      setFailedImageIds([])
+      setCaptionOperationId(data.operation_id)
+      toast.loading('Retrying failed images...', { id: 'caption-progress' })
+    } catch (err) {
+      toast.error('Failed to start retry', {
+        description: err instanceof Error ? err.message : String(err),
+      })
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   async function handleGenerateCaptions() {
     if (isGenerating || captionOperationId) return
     setIsGenerating(true)
+    setFailedImageIds([])
     try {
       const res = await fetch('/api/v1/captions/generate', {
         method: 'POST',
@@ -233,6 +271,15 @@ export default function CaptionPage() {
               ? 'Starting...'
               : 'Generate Captions'}
         </button>
+        {failedImageIds.length > 0 && !isCaptioning && (
+          <button
+            className="caption-retry-btn"
+            onClick={() => void handleRetryFailed()}
+            disabled={isGenerating}
+          >
+            Retry Failed ({failedImageIds.length})
+          </button>
+        )}
         <label className="caption-overwrite-label">
           <input
             type="checkbox"

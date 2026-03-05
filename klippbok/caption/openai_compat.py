@@ -27,6 +27,11 @@ from klippbok.caption.base import VLMBackend
 from klippbok.video.frames import extract_frames
 
 
+class VLMClientError(RuntimeError):
+    """Non-retryable client error (4xx) from the VLM API."""
+    pass
+
+
 # Frame prefix template — tells the VLM how to interpret the images
 _FRAME_PREFIX = (
     "The following {count} images are frames extracted at {fps} fps "
@@ -51,6 +56,9 @@ class OpenAICompatBackend(VLMBackend):
         api_key: str | None = None,
         timeout: int = 120,
         caption_fps: int = 1,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+        top_p: float | None = None,
     ) -> None:
         """Initialize the OpenAI-compatible backend.
 
@@ -63,6 +71,11 @@ class OpenAICompatBackend(VLMBackend):
             caption_fps: Frames per second to extract from video clips.
                 Higher = more frames = better motion capture, but slower.
                 Default 1 FPS is standard for most captioning.
+            max_tokens: Maximum tokens to generate. None = server default.
+                Setting this to the token budget enables early stopping.
+            temperature: Sampling temperature. None = server default.
+                Lower values (0.3-0.5) reduce sampling cost and randomness.
+            top_p: Nucleus sampling threshold. None = server default.
         """
         import requests as _requests  # noqa: F401 — verify available
 
@@ -71,6 +84,9 @@ class OpenAICompatBackend(VLMBackend):
         self.api_key = api_key or "not-needed"  # Many local servers ignore this
         self.timeout = timeout
         self.caption_fps = caption_fps
+        self.max_tokens = max_tokens
+        self.temperature = temperature
+        self.top_p = top_p
 
     def caption_video(self, path: Path, prompt: str) -> str:
         """Caption a video by extracting frames and sending as images.
@@ -195,7 +211,7 @@ class OpenAICompatBackend(VLMBackend):
             "Authorization": f"Bearer {self.api_key}",
         }
 
-        payload = {
+        payload: dict = {
             "model": self.model,
             "messages": [
                 {
@@ -203,7 +219,12 @@ class OpenAICompatBackend(VLMBackend):
                     "content": content,
                 }
             ],
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
         }
+        # Strip None values — only send params that are explicitly set
+        payload = {k: v for k, v in payload.items() if v is not None}
 
         response = requests.post(
             url,
@@ -213,10 +234,10 @@ class OpenAICompatBackend(VLMBackend):
         )
 
         if response.status_code != 200:
-            raise RuntimeError(
-                f"API error {response.status_code}: "
-                f"{response.text[:300]}"
-            )
+            msg = f"API error {response.status_code}: {response.text[:300]}"
+            if 400 <= response.status_code < 500:
+                raise VLMClientError(msg)
+            raise RuntimeError(msg)
 
         result = response.json()
 

@@ -422,6 +422,9 @@ class CaptionProgress(BaseModel):
     status: str
     """Operation status: 'running' | 'complete' | 'error'."""
 
+    failed_image_ids: list[str] = []
+    """Image IDs that failed all retry attempts (only populated in 'complete' status)."""
+
 
 class ProfileInfo(BaseModel):
     """Summary of an available model profile for the Settings UI dropdown."""
@@ -509,3 +512,40 @@ class CaptionScoreResponse(BaseModel):
 
     issues: list[str]
     """Human-readable descriptions of detected problems."""
+
+
+class CaptionModelsResponse(BaseModel):
+    """Response from GET /captions/models."""
+
+    models: list[str]
+    """List of available model IDs for the provider."""
+
+    message: str | None = None
+    """Optional warning or error message."""
+
+
+class CaptionHealthResponse(BaseModel):
+    """Response from GET /captions/health."""
+
+    healthy: bool
+    """Whether the provider is reachable and configured."""
+
+    message: str
+    """Human-readable status description."""
+
+
+class DefaultPromptResponse(BaseModel):
+    """Response from GET /captions/default-prompt."""
+
+    prompt: str
+    """The default prompt template with placeholders stripped."""
+
+
+class LmsServerResponse(BaseModel):
+    """Response from POST /captions/lms-server/start."""
+
+    success: bool
+    """Whether the server start command succeeded."""
+
+    message: str
+    """Human-readable result description."""

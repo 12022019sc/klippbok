@@ -6,11 +6,11 @@ interface Props {
   imageIds?: string[]
 }
 
-async function batchOp(action: string, body: Record<string, unknown>): Promise<void> {
+async function batchOp(operation: string, body: Record<string, unknown>): Promise<void> {
   const res = await fetch('/api/v1/captions/batch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, ...body }),
+    body: JSON.stringify({ operation, ...body }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
@@ -31,7 +31,7 @@ export default function BatchTagBar({ triggerWord, imageIds }: Props) {
     if (!addTag.trim()) return
     setIsLoading(true)
     try {
-      await batchOp('add_tag', { tag: addTag.trim(), ...scope })
+      await batchOp('add_tag', { value: addTag.trim(), ...scope })
       toast.success(`Tag "${addTag.trim()}" added`)
       setAddTag('')
     } catch (err) {
@@ -45,7 +45,7 @@ export default function BatchTagBar({ triggerWord, imageIds }: Props) {
     if (!removeTag.trim()) return
     setIsLoading(true)
     try {
-      await batchOp('remove_tag', { tag: removeTag.trim(), ...scope })
+      await batchOp('remove_tag', { value: removeTag.trim(), ...scope })
       toast.success(`Tag "${removeTag.trim()}" removed`)
       setRemoveTag('')
     } catch (err) {
@@ -59,7 +59,7 @@ export default function BatchTagBar({ triggerWord, imageIds }: Props) {
     if (!replaceFrom.trim()) return
     setIsLoading(true)
     try {
-      await batchOp('replace_tag', { old_tag: replaceFrom.trim(), new_tag: replaceTo.trim(), ...scope })
+      await batchOp('replace_tag', { value: replaceFrom.trim(), replace_with: replaceTo.trim(), ...scope })
       toast.success(`Replaced "${replaceFrom.trim()}" with "${replaceTo.trim()}"`)
       setReplaceFrom('')
       setReplaceTo('')
@@ -77,7 +77,7 @@ export default function BatchTagBar({ triggerWord, imageIds }: Props) {
     }
     setIsLoading(true)
     try {
-      await batchOp('prepend_trigger', { trigger_word: triggerWord, ...scope })
+      await batchOp('prepend_trigger', { value: triggerWord, ...scope })
       toast.success(`Prepended trigger word "${triggerWord}"`)
     } catch (err) {
       toast.error('Failed to prepend trigger', { description: err instanceof Error ? err.message : String(err) })

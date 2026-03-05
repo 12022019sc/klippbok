@@ -348,7 +348,7 @@ class TestCaptionImageForProject:
 
         captured_pipeline_args = []
 
-        def capture_pipeline(caption, anchor_word, token_budget, caption_mode):
+        def capture_pipeline(caption, anchor_word, token_budget, caption_mode, appearance_blacklist=None):
             captured_pipeline_args.append(caption_mode)
             return "processed"
 

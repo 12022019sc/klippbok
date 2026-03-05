@@ -13,6 +13,7 @@ interface CaptionProviderConfig {
   custom_prompt: string | null
   caption_mode: string
   max_tokens: number | null
+  appearance_blacklist_extra: string[]
 }
 
 interface Props {
@@ -70,10 +71,18 @@ export default function ProviderConfigSection({ config, onSave, triggerWord, onT
 
   const queryClient = useQueryClient()
 
+  // Refresh model list every time the config panel is expanded
+  useEffect(() => {
+    if (isExpanded) {
+      void queryClient.invalidateQueries({ queryKey: ['caption-models'] })
+    }
+  }, [isExpanded, queryClient])
+
   const { data: defaultPrompt = '' } = useQuery<string>({
-    queryKey: ['caption-default-prompt'],
+    queryKey: ['caption-default-prompt', config.caption_mode],
     queryFn: async () => {
-      const res = await fetch('/api/v1/captions/default-prompt')
+      const mode = config.caption_mode ?? 'context_only_tags'
+      const res = await fetch(`/api/v1/captions/default-prompt?caption_mode=${mode}`)
       if (!res.ok) return ''
       const data = await res.json() as { prompt: string }
       return data.prompt ?? ''

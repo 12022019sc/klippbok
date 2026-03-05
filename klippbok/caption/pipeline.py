@@ -161,7 +161,7 @@ def _tag_is_appearance(tag: str, blacklist: list[str]) -> bool:
     """
     norm_tag = _normalize_tag(tag)
     return any(
-        _normalize_tag(bl) in norm_tag or norm_tag in _normalize_tag(bl)
+        _normalize_tag(bl) in norm_tag
         for bl in blacklist
     )
 
@@ -392,13 +392,15 @@ def apply_vlm_pipeline(
     anchor_word: str | None,
     token_budget: int,
     caption_mode: str,
+    appearance_blacklist: list[str] | None = None,
 ) -> str:
     """Post-processing pipeline for VLM provider output.
 
     Steps:
     1. VLM artifact stripping (preambles, markdown, wrapping quotes)
-    2. Trigger word injection (anchor prepended if not already present)
-    3. Token budget trimming (anchor word protected)
+    2. Appearance tag filter (only for context_only_tags and context_only_natural)
+    3. Trigger word injection (anchor prepended if not already present)
+    4. Token budget trimming (anchor word protected)
 
     Artifact stripping runs BEFORE trigger injection — preamble patterns only
     match at position 0, so stripping first ensures ^-anchored regex works
@@ -408,17 +410,23 @@ def apply_vlm_pipeline(
         caption: Raw VLM output string.
         anchor_word: Trigger word to prepend. None = no trigger.
         token_budget: Maximum token count for the output.
-        caption_mode: Caption mode — controls trimming behavior.
+        caption_mode: Caption mode — controls trimming and appearance filtering.
+        appearance_blacklist: Appearance tag patterns to filter for context_only
+            modes. Uses DEFAULT_APPEARANCE_BLACKLIST when None.
 
     Returns:
         Processed caption ready for storage.
     """
     # 1. Artifact stripping (strip preambles on raw VLM output before anchor injection)
     caption = _strip_vlm_artifacts(caption)
-    # 2. Trigger word injection (anchor is never a preamble pattern)
+    # 2. Appearance tag filter (safety net for context_only modes)
+    if caption_mode in ("context_only_tags", "context_only_natural"):
+        bl = appearance_blacklist if appearance_blacklist is not None else DEFAULT_APPEARANCE_BLACKLIST
+        caption = _filter_appearance_tags(caption, bl)
+    # 3. Trigger word injection (anchor is never a preamble pattern)
     if anchor_word:
         caption = _prepend_anchor(caption, anchor_word)
-    # 3. Token budget trimming (trigger word is protected)
+    # 4. Token budget trimming (trigger word is protected)
     caption = _trim_to_budget(caption, token_budget, anchor_word, caption_mode)
     return caption
 

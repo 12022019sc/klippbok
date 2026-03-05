@@ -37,12 +37,16 @@ from klippbok.api.models import (
     CaptionBatchRequest,
     CaptionBatchResponse,
     CaptionGenerateRequest,
+    CaptionHealthResponse,
+    CaptionModelsResponse,
     CaptionProgress,
     CaptionProviderConfig,
     CaptionScoreResponse,
     CaptionStarted,
     CaptionUpdateRequest,
     CaptionUpdateResponse,
+    DefaultPromptResponse,
+    LmsServerResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,6 +71,7 @@ _NANOGPT_VLM_PATTERNS = (
     "llama-4-",                  # All Llama 4 are multimodal
     "kimi-k2.5",                 # Kimi K2.5+ is multimodal (K2 is text-only)
     "minimax-m2",                # MiniMax M2+ are multimodal
+    "qwen3.5",                   # All Qwen 3.5 have vision architecture
 )
 _NANOGPT_VLM_EXPLICIT = frozenset({
     "qvq-max",
@@ -99,7 +104,7 @@ async def _run_joycaption_subprocess(
     caption_mode: str = "context_only_tags",
     token_budget: int = 150,
     appearance_blacklist_extra: list[str] | None = None,
-) -> tuple[int, int]:
+) -> tuple[int, int, list[str]]:
     """Run JoyCaption via subprocess and stream progress to SSE queue.
 
     Launches the JoyCaption runner script in JoyCaption's venv, reads
@@ -121,7 +126,7 @@ async def _run_joycaption_subprocess(
         appearance_blacklist_extra: User-added appearance tags merged with defaults.
 
     Returns:
-        Tuple of (completed_count, error_count).
+        Tuple of (completed_count, error_count, failed_image_ids).
     """
     import json as _json
 
@@ -157,13 +162,14 @@ async def _run_joycaption_subprocess(
             message=f"Failed to start JoyCaption: {exc}",
             status="error",
         ))
-        return 0, total
+        return 0, total, []
 
     completed = 0
     errors = 0
+    failed_ids: list[str] = []
 
     # Read stdout in executor to avoid blocking the event loop
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     def _read_lines():
         """Read all lines from subprocess stdout (blocking)."""
@@ -225,6 +231,9 @@ async def _run_joycaption_subprocess(
                 ))
             else:
                 errors += 1
+                # No caption returned — track as failed
+                if lookup:
+                    failed_ids.append(lookup[1])
 
         elif msg_type == "error":
             errors += 1
@@ -232,6 +241,8 @@ async def _run_joycaption_subprocess(
             error_msg = msg.get("error", "Unknown error")
             lookup = path_lookup.get(img_path_str)
             rel_path = lookup[0] if lookup else img_path_str
+            if lookup:
+                failed_ids.append(lookup[1])
             logger.error(
                 "JoyCaption failed for '%s' in operation %s: %s",
                 rel_path, op_id, error_msg,
@@ -250,7 +261,7 @@ async def _run_joycaption_subprocess(
     if proc.returncode != 0 and completed == 0:
         logger.error("JoyCaption subprocess exited with code %d", proc.returncode)
 
-    return completed, errors
+    return completed, errors, failed_ids
 
 
 async def _run_caption_batch(
@@ -389,6 +400,7 @@ async def _run_caption_batch(
         # Step 4: Process images
         completed = 0
         errors = 0
+        failed_ids: list[str] = []
 
         if is_joycaption and joycaption_root is not None:
             # JoyCaption subprocess path -- model loaded once, all images in batch
@@ -396,7 +408,7 @@ async def _run_caption_batch(
             from klippbok.services.caption_service import _resolve_token_budget
             token_budget = _resolve_token_budget(vlm_config, manifest)
 
-            completed, errors = await _run_joycaption_subprocess(
+            completed, errors, failed_ids = await _run_joycaption_subprocess(
                 joycaption_root=joycaption_root,
                 images_to_process=images_to_process,
                 manifest=manifest,
@@ -424,7 +436,7 @@ async def _run_caption_batch(
                     last_exc: Exception | None = None
                     for attempt in range(max_attempts):
                         try:
-                            caption = await asyncio.get_event_loop().run_in_executor(
+                            caption = await asyncio.get_running_loop().run_in_executor(
                                 None,
                                 lambda p=abs_path: caption_image_for_project(
                                     p, manifest, vlm_config, body.general_threshold,
@@ -433,15 +445,25 @@ async def _run_caption_batch(
                             )
                             last_exc = None
                             break
-                        except RuntimeError as retry_exc:
+                        except (RuntimeError, OSError, TimeoutError) as retry_exc:
+                            from klippbok.caption.openai_compat import VLMClientError
                             last_exc = retry_exc
                             if attempt < max_attempts - 1:
+                                # 4xx errors get shorter delay — often transient in
+                                # local VLM servers (e.g. LM Studio image processing)
+                                if isinstance(retry_exc, VLMClientError):
+                                    wait = 0.5
+                                else:
+                                    wait = 2 * (attempt + 1)
                                 logger.warning(
-                                    "Caption attempt %d/%d failed for '%s': %s — retrying",
-                                    attempt + 1, max_attempts, relative_path, retry_exc,
+                                    "Caption attempt %d/%d failed for '%s': %s — retrying in %.1fs",
+                                    attempt + 1, max_attempts, relative_path, retry_exc, wait,
                                 )
-                                await asyncio.sleep(2)
-                            # Non-RuntimeError exceptions (e.g. missing deps) bubble up immediately
+                                await asyncio.sleep(wait)
+                        except Exception as fatal_exc:
+                            # Non-retryable errors (e.g. missing deps, import errors)
+                            last_exc = fatal_exc
+                            break
                     if last_exc is not None:
                         raise last_exc
 
@@ -458,8 +480,15 @@ async def _run_caption_batch(
                         status="running",
                     ))
 
+                    # Pacing delay for local VLM servers (LM Studio) to release
+                    # GPU memory before the next request, preventing transient
+                    # "400: failed to process image" errors.
+                    if body.provider_preset == "lm_studio":
+                        await asyncio.sleep(0.3)
+
                 except Exception as exc:
                     errors += 1
+                    failed_ids.append(img_id)
                     logger.error(
                         "Caption failed for '%s' in operation %s: %s",
                         relative_path, op_id, exc, exc_info=True,
@@ -499,6 +528,7 @@ async def _run_caption_batch(
             total=total,
             message=". ".join(summary_parts),
             status="complete",
+            failed_image_ids=failed_ids,
         ))
 
     except Exception as exc:
@@ -861,23 +891,9 @@ async def save_caption_config(body: CaptionProviderConfig) -> CaptionProviderCon
     })
 
 
-@router.get("/models")
-async def get_caption_models(provider: str = "lm_studio") -> dict:
-    """Fetch the available models for a caption provider.
-
-    Returns a list of model IDs for the specified provider. For local providers
-    (LM Studio), makes an HTTP request. For API providers, returns a static list.
-
-    Args:
-        provider: Provider name: 'lm_studio' | 'nanogpt' | 'gemini' | 'joycaption'.
-
-    Returns:
-        Dict with 'models' list and optional 'message' for warnings.
-    """
+def _fetch_caption_models_sync(provider: str, cfg: dict) -> dict:
+    """Blocking helper — fetches model lists via HTTP (runs in executor)."""
     import requests
-    from klippbok.services.global_config_service import load_global_config
-
-    cfg = load_global_config()
 
     if provider == "lm_studio":
         base_url = cfg.get("lm_studio_base_url", "http://localhost:1234/v1")
@@ -937,24 +953,29 @@ async def get_caption_models(provider: str = "lm_studio") -> dict:
         return {"models": [], "message": f"Unknown provider: {provider}"}
 
 
-@router.get("/health")
-async def get_caption_health(provider: str = "lm_studio", base_url: str | None = None) -> dict:
-    """Probe provider health/connectivity.
+@router.get("/models")
+async def get_caption_models(provider: str = "lm_studio") -> CaptionModelsResponse:
+    """Fetch the available models for a caption provider.
 
-    Tests actual reachability for all providers — LM Studio via HTTP,
-    NanoGPT/Gemini via API key validation, JoyCaption via path check.
+    Returns a list of model IDs for the specified provider. For local providers
+    (LM Studio), makes an HTTP request. For API providers, returns a static list.
 
     Args:
         provider: Provider name: 'lm_studio' | 'nanogpt' | 'gemini' | 'joycaption'.
-        base_url: Optional override for LM Studio base URL.
 
     Returns:
-        Dict with 'healthy' bool and 'message' string.
+        Dict with 'models' list and optional 'message' for warnings.
     """
-    import requests
     from klippbok.services.global_config_service import load_global_config
 
     cfg = load_global_config()
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _fetch_caption_models_sync, provider, cfg)
+
+
+def _check_caption_health_sync(provider: str, base_url: str | None, cfg: dict) -> dict:
+    """Blocking helper — probes provider health via HTTP (runs in executor)."""
+    import requests
 
     if provider == "lm_studio":
         base_url = base_url or cfg.get("lm_studio_base_url", "http://localhost:1234/v1")
@@ -1031,8 +1052,29 @@ async def get_caption_health(provider: str = "lm_studio", base_url: str | None =
         return {"healthy": False, "message": f"Unknown provider: {provider}"}
 
 
+@router.get("/health")
+async def get_caption_health(provider: str = "lm_studio", base_url: str | None = None) -> CaptionHealthResponse:
+    """Probe provider health/connectivity.
+
+    Tests actual reachability for all providers — LM Studio via HTTP,
+    NanoGPT/Gemini via API key validation, JoyCaption via path check.
+
+    Args:
+        provider: Provider name: 'lm_studio' | 'nanogpt' | 'gemini' | 'joycaption'.
+        base_url: Optional override for LM Studio base URL.
+
+    Returns:
+        Dict with 'healthy' bool and 'message' string.
+    """
+    from klippbok.services.global_config_service import load_global_config
+
+    cfg = load_global_config()
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _check_caption_health_sync, provider, base_url, cfg)
+
+
 @router.post("/lms-start")
-async def start_lms_server() -> dict:
+async def start_lms_server() -> LmsServerResponse:
     """Start the LM Studio API server via the ``lms`` CLI.
 
     Runs ``lms server start`` as a subprocess. This is only useful on the
@@ -1069,28 +1111,28 @@ async def start_lms_server() -> dict:
 
 
 @router.get("/default-prompt")
-async def get_default_prompt(use_case: str | None = None) -> dict:
-    """Return the default prompt template for a given use case.
+async def get_default_prompt(caption_mode: str | None = None) -> DefaultPromptResponse:
+    """Return the default prompt template for a given caption mode.
 
     This lets the frontend show users what prompt will be used when
     custom_prompt is left blank.
 
     Args:
-        use_case: One of 'character', 'style', 'motion', 'object', or None.
+        caption_mode: One of 'booru_tags', 'context_only_tags',
+            'context_only_natural', 'descriptive', 'straightforward'.
+            Defaults to 'context_only_tags' when omitted.
 
     Returns:
         Dict with 'prompt' string.
     """
-    from klippbok.caption.prompts import IMAGE_PROMPTS
+    from klippbok.caption.prompts import IMAGE_PROMPT_CONTEXT_ONLY_TAGS, IMAGE_PROMPTS
 
-    template = IMAGE_PROMPTS.get(use_case, IMAGE_PROMPTS[None])
+    template = IMAGE_PROMPTS.get(caption_mode, IMAGE_PROMPT_CONTEXT_ONLY_TAGS)
     # Strip template placeholders for display — they'll be filled at generation time
     clean = (
         template
         .replace("{anchor_line}", "")
         .replace("{secondary_line}", "")
-        .replace("{style_anchor_line}", "")
-        .replace("{subject}", "[trigger word]")
     )
     return {"prompt": clean.strip()}
 
