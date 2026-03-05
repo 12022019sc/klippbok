@@ -8,6 +8,8 @@ import SettingsPage from './pages/SettingsPage'
 import CropPage from './pages/CropPage'
 import ProcessPage from './pages/ProcessPage'
 import CaptionPage from './pages/CaptionPage'
+import VideoPage from './pages/VideoPage'
+import TriagePage from './pages/TriagePage'
 import ProjectPickerPage from './pages/ProjectPickerPage'
 
 export default function App() {
@@ -42,6 +44,8 @@ export default function App() {
           <Route path="/crop" element={<CropPage />} />
           <Route path="/process" element={<ProcessPage />} />
           <Route path="/caption" element={<CaptionPage />} />
+          <Route path="/video" element={<VideoPage />} />
+          <Route path="/triage" element={<TriagePage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>

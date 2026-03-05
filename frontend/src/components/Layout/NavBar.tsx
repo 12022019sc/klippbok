@@ -16,6 +16,11 @@ export default function NavBar() {
           </NavLink>
         </li>
         <li>
+          <NavLink to="/video" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            Video
+          </NavLink>
+        </li>
+        <li>
           <NavLink to="/crop" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
             Crop
           </NavLink>
@@ -23,6 +28,11 @@ export default function NavBar() {
         <li>
           <NavLink to="/caption" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
             Caption
+          </NavLink>
+        </li>
+        <li>
+          <NavLink to="/triage" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            Triage
           </NavLink>
         </li>
         <li>
