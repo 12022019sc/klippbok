@@ -197,11 +197,13 @@ def caption_image_for_project(
 
         if effective_mode == "context_only_tags":
             # Apply appearance filter for context_only_tags mode
-            from klippbok.caption.pipeline import _filter_appearance_tags, _dedup_tags
+            # Both pipeline functions operate on comma-separated strings
+            from klippbok.caption.pipeline import _dedup_tags, _filter_appearance_tags
 
-            filtered = _filter_appearance_tags(raw_tags, DEFAULT_APPEARANCE_BLACKLIST)
+            raw_str = ", ".join(raw_tags)
+            filtered = _filter_appearance_tags(raw_str, DEFAULT_APPEARANCE_BLACKLIST)
             filtered = _dedup_tags(filtered)
-            return ", ".join(filtered)
+            return filtered
         else:
             # booru_tags or any other mode without VLM → raw WD Tagger output
             return ", ".join(raw_tags)

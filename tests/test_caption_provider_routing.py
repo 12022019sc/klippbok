@@ -344,40 +344,77 @@ def test_custom_prompt_used_in_caption_image_for_project(
             captured_prompt.append(prompt)
             return "test caption"
 
-    monkeypatch.setattr(
-        "klippbok.services.caption_service._create_backend",
-        lambda _cfg: FakeBackend(),
-        raising=False,
-    )
-    # Patch at the correct import location
-    import klippbok.caption.captioner as captioner_mod
-    monkeypatch.setattr(captioner_mod, "_create_backend", lambda _cfg: FakeBackend())
-    monkeypatch.setattr(
-        "klippbok.services.caption_service._create_backend",
-        lambda _cfg: FakeBackend(),
-        raising=False,
-    )
-
     config = CaptionConfig(
         provider="openai",
         custom_prompt="My custom prompt here",
     )
-    manifest = {"images": [], "caption_style_override": "natural_language"}
+    manifest = {"images": [], "active_profile": "sdxl"}
 
-    # Need to patch the import inside the function
-    import klippbok.services.caption_service as svc_mod
-    original_create = None
+    # Patch _create_backend at captioner module where caption_service imports it
+    import klippbok.caption.captioner as captioner_mod
+    original_create = captioner_mod._create_backend
     try:
-        from klippbok.caption import captioner
-        original_create = captioner._create_backend
-        captioner._create_backend = lambda _cfg: FakeBackend()
+        captioner_mod._create_backend = lambda _cfg: FakeBackend()
 
+        # apply_vlm_pipeline is a pure function; let it run (returns whatever FakeBackend returns
+        # since there's no VLM artifacts in "test caption"). We just check the prompt was used.
         result = caption_image_for_project(img_path, manifest, config)
-        assert result == "test caption"
+        # Result goes through apply_vlm_pipeline — "test caption" has no artifacts so it's preserved
+        assert "test caption" in result or result == "test caption"
         assert captured_prompt[0] == "My custom prompt here"
     finally:
-        if original_create:
-            captioner._create_backend = original_create
+        captioner_mod._create_backend = original_create
+
+
+# ---------------------------------------------------------------------------
+# caption_mode and max_tokens passing from global config
+# ---------------------------------------------------------------------------
+
+
+def test_build_vlm_config_passes_caption_mode_from_global_config() -> None:
+    """build_vlm_config_from_global passes caption_mode from global_config to CaptionConfig."""
+    from klippbok.services.caption_service import build_vlm_config_from_global
+
+    config = _make_global_config(caption_mode="descriptive")
+    manifest = _make_manifest()
+    result = build_vlm_config_from_global("lm_studio", config, manifest)
+
+    assert result.caption_mode == "descriptive"
+
+
+def test_build_vlm_config_passes_max_tokens_from_global_config() -> None:
+    """build_vlm_config_from_global passes max_tokens from global_config to CaptionConfig."""
+    from klippbok.services.caption_service import build_vlm_config_from_global
+
+    config = _make_global_config(max_tokens=250)
+    manifest = _make_manifest()
+    result = build_vlm_config_from_global("gemini", config, manifest)
+
+    assert result.max_tokens == 250
+
+
+def test_build_vlm_config_default_caption_mode_is_context_only_tags() -> None:
+    """build_vlm_config_from_global defaults to 'context_only_tags' when mode not in config."""
+    from klippbok.services.caption_service import build_vlm_config_from_global
+
+    # Config without caption_mode key
+    config = {k: v for k, v in _make_global_config().items() if k != "caption_mode"}
+    manifest = _make_manifest()
+    result = build_vlm_config_from_global("nanogpt", config, manifest)
+
+    assert result.caption_mode == "context_only_tags"
+
+
+def test_build_vlm_config_none_max_tokens_when_not_in_config() -> None:
+    """build_vlm_config_from_global returns max_tokens=None when not in config."""
+    from klippbok.services.caption_service import build_vlm_config_from_global
+
+    # Config without max_tokens key
+    config = {k: v for k, v in _make_global_config().items() if k != "max_tokens"}
+    manifest = _make_manifest()
+    result = build_vlm_config_from_global("gemini", config, manifest)
+
+    assert result.max_tokens is None
 
 
 # ---------------------------------------------------------------------------
@@ -412,6 +449,7 @@ def test_config_put_partial_update_preserves_unset_fields():
             "nanogpt_api_key", "nanogpt_model",
             "gemini_api_key", "gemini_model",
             "joycaption_path", "custom_prompt",
+            "caption_mode", "max_tokens", "appearance_blacklist_extra",
         )
         if field in provided
     }

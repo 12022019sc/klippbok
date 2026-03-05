@@ -1,9 +1,11 @@
 """Unit tests for caption_service routing and persistence.
 
 Tests verify:
-  - get_caption_style_for_project: routes based on model profile
-  - get_caption_style_for_project: caption_style_override in manifest overrides profile
-  - caption_image_for_project: NL style calls _create_backend and caption_image
+  - get_caption_style_for_project: routes based on model profile (legacy)
+  - get_caption_style_for_project: caption_style_override in manifest overrides profile (legacy)
+  - get_caption_mode_for_project: routes based on global config or profile
+  - _resolve_token_budget: resolution chain vlm_config > profile > default
+  - caption_image_for_project: routes by caption_mode (booru_tags→WD Tagger, VLM→pipeline)
   - save_caption: writes sidecar .txt and updates manifest entry
 """
 from __future__ import annotations
@@ -169,46 +171,129 @@ class TestCaptionStyleOverride:
 # ---------------------------------------------------------------------------
 
 
+class TestGetCaptionModeForProject:
+    """Tests for get_caption_mode_for_project mode routing."""
+
+    def test_global_config_mode_takes_priority(self) -> None:
+        """Global config caption_mode overrides profile default."""
+        from klippbok.services.caption_service import get_caption_mode_for_project
+
+        manifest = _manifest(active_profile="sd15")
+        global_config = {"caption_mode": "descriptive"}
+        mode = get_caption_mode_for_project(manifest, global_config)
+        assert mode == "descriptive"
+
+    def test_sd15_profile_maps_to_booru_tags(self) -> None:
+        """SD1.5 profile (booru caption_style) maps to booru_tags mode."""
+        from klippbok.services.caption_service import get_caption_mode_for_project
+
+        manifest = _manifest(active_profile="sd15")
+        mode = get_caption_mode_for_project(manifest, global_config=None)
+        assert mode == "booru_tags"
+
+    def test_sdxl_profile_maps_to_descriptive(self) -> None:
+        """SDXL profile (natural_language caption_style) maps to descriptive mode."""
+        from klippbok.services.caption_service import get_caption_mode_for_project
+
+        manifest = _manifest(active_profile="sdxl")
+        mode = get_caption_mode_for_project(manifest, global_config=None)
+        assert mode == "descriptive"
+
+    def test_unknown_profile_defaults_to_context_only_tags(self) -> None:
+        """Unknown profile falls back to context_only_tags (safe default)."""
+        from klippbok.services.caption_service import get_caption_mode_for_project
+
+        manifest = _manifest(active_profile="nonexistent_profile_xyzzy")
+        mode = get_caption_mode_for_project(manifest, global_config=None)
+        assert mode == "context_only_tags"
+
+    def test_empty_global_config_falls_back_to_profile(self) -> None:
+        """Empty global config falls back to profile lookup."""
+        from klippbok.services.caption_service import get_caption_mode_for_project
+
+        manifest = _manifest(active_profile="sd15")
+        mode = get_caption_mode_for_project(manifest, global_config={})
+        assert mode == "booru_tags"
+
+    def test_caption_style_override_in_manifest_ignored(self) -> None:
+        """caption_style_override in manifest is intentionally ignored (mode is global)."""
+        from klippbok.services.caption_service import get_caption_mode_for_project
+
+        # SD1.5 profile → booru_tags; manifest override should be ignored
+        manifest = _manifest(active_profile="sd15", caption_style_override="natural_language")
+        mode = get_caption_mode_for_project(manifest, global_config=None)
+        assert mode == "booru_tags", (
+            "caption_style_override must be ignored; mode comes from profile only"
+        )
+
+
+class TestResolveTokenBudget:
+    """Tests for _resolve_token_budget helper."""
+
+    def test_vlm_config_max_tokens_overrides_profile(self) -> None:
+        """vlm_config.max_tokens takes priority over profile default."""
+        from klippbok.caption.models import CaptionConfig
+        from klippbok.services.caption_service import _resolve_token_budget
+
+        config = CaptionConfig(provider="gemini", api_key="k", max_tokens=300)
+        manifest = _manifest(active_profile="sd15")  # sd15 default is 75
+        assert _resolve_token_budget(config, manifest) == 300
+
+    def test_profile_default_used_when_no_max_tokens(self) -> None:
+        """Profile default_token_budget is used when vlm_config.max_tokens is None."""
+        from klippbok.caption.models import CaptionConfig
+        from klippbok.services.caption_service import _resolve_token_budget
+
+        config = CaptionConfig(provider="gemini", api_key="k", max_tokens=None)
+        manifest = _manifest(active_profile="sd15")  # sd15 default is 75
+        assert _resolve_token_budget(config, manifest) == 75
+
+    def test_fallback_when_no_vlm_config(self) -> None:
+        """Returns profile default when vlm_config is None."""
+        from klippbok.services.caption_service import _resolve_token_budget
+
+        manifest = _manifest(active_profile="sdxl")  # sdxl default is 150
+        assert _resolve_token_budget(None, manifest) == 150
+
+    def test_safe_default_for_unknown_profile(self) -> None:
+        """Returns 150 (SDXL default) when profile cannot be resolved."""
+        from klippbok.services.caption_service import _resolve_token_budget
+
+        manifest = _manifest(active_profile="nonexistent_xyzzy")
+        assert _resolve_token_budget(None, manifest) == 150
+
+
 class TestCaptionImageForProject:
     """Tests for caption_image_for_project routing to correct backend."""
 
-    def test_nl_caption_calls_backend(self, tmp_path: Path) -> None:
-        """NL caption style calls _create_backend and backend.caption_image."""
+    def test_vlm_caption_calls_backend_and_pipeline(self, tmp_path: Path) -> None:
+        """VLM path calls _create_backend, caption_image, and apply_vlm_pipeline."""
         from klippbok.caption.models import CaptionConfig
         from klippbok.services.caption_service import caption_image_for_project
 
-        # Create a dummy image file on disk
         image_path = tmp_path / "photo.jpg"
         image_path.write_bytes(b"fake-image")
 
         manifest = _manifest(active_profile="sdxl")
-        vlm_config = CaptionConfig(provider="gemini", api_key="test_key")
+        vlm_config = CaptionConfig(
+            provider="gemini",
+            api_key="test_key",
+            caption_mode="descriptive",
+        )
 
         mock_backend = MagicMock()
         mock_backend.caption_image.return_value = "a woman in a red dress"
 
-        with patch("klippbok.services.caption_service.get_caption_style_for_project", return_value="natural_language"), \
-             patch("klippbok.caption.captioner._create_backend", return_value=mock_backend):
+        with patch("klippbok.caption.captioner._create_backend", return_value=mock_backend), \
+             patch("klippbok.caption.pipeline.apply_vlm_pipeline", return_value="post-processed caption") as mock_pipeline:
             result = caption_image_for_project(image_path, manifest, vlm_config)
 
-        assert result == "a woman in a red dress", f"Got '{result}'"
+        assert result == "post-processed caption", f"Got '{result}'"
         mock_backend.caption_image.assert_called_once()
+        mock_pipeline.assert_called_once()
 
-    def test_nl_caption_requires_vlm_config(self, tmp_path: Path) -> None:
-        """NL captioning raises ValueError if vlm_config is None."""
-        from klippbok.services.caption_service import caption_image_for_project
-
-        image_path = tmp_path / "photo.jpg"
-        image_path.write_bytes(b"fake-image")
-
-        manifest = _manifest(active_profile="sdxl")
-
-        with patch("klippbok.services.caption_service.get_caption_style_for_project", return_value="natural_language"):
-            with pytest.raises(ValueError, match="vlm_config is required"):
-                caption_image_for_project(image_path, manifest, vlm_config=None)
-
-    def test_booru_caption_calls_tag_image_booru(self, tmp_path: Path) -> None:
-        """Booru caption style calls tag_image_booru and joins tags with chars first."""
+    def test_booru_tags_without_vlm_routes_to_wd_tagger(self, tmp_path: Path) -> None:
+        """booru_tags without VLM config routes to WD Tagger (raw tags)."""
         from klippbok.services.caption_service import caption_image_for_project
 
         image_path = tmp_path / "photo.jpg"
@@ -216,15 +301,67 @@ class TestCaptionImageForProject:
 
         manifest = _manifest(active_profile="sd15")
 
-        # Patch both the style routing and the WD tagger at its module location.
-        # tag_image_booru is lazy-imported inside caption_image_for_project, so
-        # patching the module attribute is the correct approach.
-        with patch("klippbok.services.caption_service.get_caption_style_for_project", return_value="booru"), \
-             patch("klippbok.caption.wd_tagger.tag_image_booru", return_value=(["1girl", "solo"], ["char_name"])):
-            result = caption_image_for_project(image_path, manifest, vlm_config=None)
+        with patch("klippbok.caption.wd_tagger.tag_image_booru", return_value=(["1girl", "solo"], ["char_name"])):
+            result = caption_image_for_project(
+                image_path, manifest, vlm_config=None, caption_mode="booru_tags"
+            )
 
-        # char_tags first + general_tags joined
+        # char_tags first + general_tags joined (no filtering)
         assert result == "char_name, 1girl, solo", f"Expected 'char_name, 1girl, solo', got '{result}'"
+
+    def test_context_only_tags_without_vlm_applies_appearance_filter(self, tmp_path: Path) -> None:
+        """context_only_tags without VLM routes to WD Tagger + appearance filter."""
+        from klippbok.services.caption_service import caption_image_for_project
+
+        image_path = tmp_path / "photo.jpg"
+        image_path.write_bytes(b"fake-image")
+
+        manifest = _manifest(active_profile="sdxl")
+
+        # Tags include an appearance tag (blue eyes) which should be filtered
+        with patch("klippbok.caption.wd_tagger.tag_image_booru", return_value=(["outdoors", "blue eyes", "solo"], [])):
+            result = caption_image_for_project(
+                image_path, manifest, vlm_config=None, caption_mode="context_only_tags"
+            )
+
+        # "blue eyes" is in DEFAULT_APPEARANCE_BLACKLIST and should be filtered
+        assert "blue eyes" not in result, f"Appearance tag should be filtered, got '{result}'"
+        assert "outdoors" in result, f"Non-appearance tags should be preserved, got '{result}'"
+
+    def test_vlm_config_caption_mode_overrides_parameter(self, tmp_path: Path) -> None:
+        """vlm_config.caption_mode takes precedence over the caption_mode parameter."""
+        from klippbok.caption.models import CaptionConfig
+        from klippbok.services.caption_service import caption_image_for_project
+
+        image_path = tmp_path / "photo.jpg"
+        image_path.write_bytes(b"fake-image")
+
+        manifest = _manifest(active_profile="sdxl")
+        vlm_config = CaptionConfig(
+            provider="gemini",
+            api_key="test_key",
+            caption_mode="straightforward",  # Mode set on config
+        )
+
+        mock_backend = MagicMock()
+        mock_backend.caption_image.return_value = "raw caption"
+
+        captured_pipeline_args = []
+
+        def capture_pipeline(caption, anchor_word, token_budget, caption_mode):
+            captured_pipeline_args.append(caption_mode)
+            return "processed"
+
+        with patch("klippbok.caption.captioner._create_backend", return_value=mock_backend), \
+             patch("klippbok.caption.pipeline.apply_vlm_pipeline", side_effect=capture_pipeline):
+            caption_image_for_project(
+                image_path, manifest, vlm_config, caption_mode="booru_tags"  # param says booru_tags
+            )
+
+        # Pipeline must be called with vlm_config.caption_mode ("straightforward"), not the parameter
+        assert captured_pipeline_args[0] == "straightforward", (
+            f"Expected 'straightforward' from vlm_config, got '{captured_pipeline_args[0]}'"
+        )
 
 
 # ---------------------------------------------------------------------------
