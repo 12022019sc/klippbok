@@ -1,11 +1,15 @@
 """Tests for klippbok.caption.prompts — pure Python, no API calls.
 
 Tests prompt template selection, anchor word injection, and secondary anchors.
+Uses caption_mode-based API (replaces old use_case-based API).
 """
 
 import pytest
 
 from klippbok.caption.prompts import (
+    IMAGE_PROMPTS,
+    VIDEO_PROMPTS,
+    _fill_prompt,
     format_prompt,
     get_image_prompt,
     get_video_prompt,
@@ -13,196 +17,257 @@ from klippbok.caption.prompts import (
 
 
 class TestGetVideoPrompt:
-    """Tests for video prompt selection."""
+    """Tests for video prompt selection by caption_mode."""
 
-    def test_general(self) -> None:
-        """None use_case returns a general prompt."""
-        prompt = get_video_prompt(None)
+    def test_booru_tags(self) -> None:
+        prompt = get_video_prompt("booru_tags")
+        assert "tags" in prompt.lower()
+        assert "comma" in prompt.lower() or "comma-separated" in prompt.lower()
+
+    def test_context_only_tags(self) -> None:
+        prompt = get_video_prompt("context_only_tags")
+        assert "do not" in prompt.lower() or "not include" in prompt.lower()
+        assert "appearance" in prompt.lower() or "physical" in prompt.lower()
+
+    def test_context_only_natural(self) -> None:
+        prompt = get_video_prompt("context_only_natural")
+        assert "do not" in prompt.lower() or "not describe" in prompt.lower()
+        assert "appearance" in prompt.lower() or "physical" in prompt.lower()
         assert "caption" in prompt.lower()
-        assert "prompt style" in prompt.lower()
 
-    def test_character(self) -> None:
-        prompt = get_video_prompt("character")
-        assert "do not describe" in prompt.lower()
-        assert "appearance" in prompt.lower()
+    def test_descriptive(self) -> None:
+        prompt = get_video_prompt("descriptive")
+        assert "detailed" in prompt.lower() or "describe" in prompt.lower()
+        assert "caption" in prompt.lower()
 
-    def test_style(self) -> None:
-        prompt = get_video_prompt("style")
-        assert "do not describe" in prompt.lower()
-        assert "style" in prompt.lower()
-
-    def test_motion(self) -> None:
-        prompt = get_video_prompt("motion")
-        assert "move" in prompt.lower()
-        assert "do not describe" in prompt.lower()
-
-    def test_object(self) -> None:
-        prompt = get_video_prompt("object")
-        assert "do not describe" in prompt.lower()
+    def test_straightforward(self) -> None:
+        prompt = get_video_prompt("straightforward")
+        assert "factual" in prompt.lower() or "observe" in prompt.lower()
+        assert "caption" in prompt.lower()
 
     def test_unknown_mode_falls_back(self) -> None:
-        """Unknown caption_mode falls back to general prompt instead of raising."""
+        """Unknown caption_mode falls back to context_only_tags (not raising)."""
         prompt = get_video_prompt("invalid_mode")
         assert "caption" in prompt.lower() or "video" in prompt.lower()
+
+    def test_none_mode_falls_back(self) -> None:
+        """None caption_mode falls back to context_only_tags."""
+        prompt = get_video_prompt(None)
+        # Should return some valid prompt
+        assert len(prompt) > 20
+
+    def test_all_5_modes_have_templates(self) -> None:
+        """All 5 modes have distinct templates."""
+        modes = ["booru_tags", "context_only_tags", "context_only_natural", "descriptive", "straightforward"]
+        prompts = [get_video_prompt(m) for m in modes]
+        # All prompts are different
+        assert len(set(prompts)) == 5
+
+
+class TestGetImagePrompt:
+    """Tests for image prompt selection by caption_mode."""
+
+    def test_booru_tags(self) -> None:
+        prompt = get_image_prompt("booru_tags")
+        assert "tags" in prompt.lower()
+        assert "image" in prompt.lower()
+
+    def test_context_only_tags(self) -> None:
+        prompt = get_image_prompt("context_only_tags")
+        assert "do not" in prompt.lower() or "not include" in prompt.lower()
+        assert "appearance" in prompt.lower() or "physical" in prompt.lower()
+
+    def test_context_only_natural(self) -> None:
+        prompt = get_image_prompt("context_only_natural")
+        assert "do not" in prompt.lower() or "not describe" in prompt.lower()
+        assert "caption" in prompt.lower()
+
+    def test_descriptive(self) -> None:
+        prompt = get_image_prompt("descriptive")
+        assert "detailed" in prompt.lower() or "describe" in prompt.lower()
+
+    def test_straightforward(self) -> None:
+        prompt = get_image_prompt("straightforward")
+        assert "factual" in prompt.lower() or "observe" in prompt.lower()
+
+    def test_unknown_mode_falls_back(self) -> None:
+        """Unknown caption_mode falls back gracefully."""
+        prompt = get_image_prompt("unknown_mode")
+        assert "image" in prompt.lower()
+
+    def test_none_mode_falls_back(self) -> None:
+        prompt = get_image_prompt(None)
+        assert len(prompt) > 20
+
+    def test_all_5_modes_have_templates(self) -> None:
+        modes = ["booru_tags", "context_only_tags", "context_only_natural", "descriptive", "straightforward"]
+        prompts = [get_image_prompt(m) for m in modes]
+        assert len(set(prompts)) == 5
 
 
 class TestAnchorWordInjection:
     """Tests that anchor words are woven into prompts naturally."""
 
-    def test_character_anchor_uses_name(self) -> None:
-        """Anchor word appears as the subject's name in the prompt."""
-        prompt = get_video_prompt("character", anchor_word="luna")
+    def test_anchor_injected_into_context_only_tags(self) -> None:
+        prompt = get_video_prompt("context_only_tags", anchor_word="luna")
         assert "luna" in prompt.lower()
-        # Should tell VLM to use it naturally
         assert "naturally" in prompt.lower()
 
-    def test_character_no_anchor_uses_generic(self) -> None:
-        """Without anchor, prompt uses a generic subject reference."""
-        prompt = get_video_prompt("character")
-        assert "the subject" in prompt.lower()
-        # No anchor instruction line
+    def test_anchor_injected_into_descriptive(self) -> None:
+        prompt = get_image_prompt("descriptive", anchor_word="luna")
+        assert "luna" in prompt.lower()
+        assert "naturally" in prompt.lower()
+
+    def test_no_anchor_no_placeholder_leak(self) -> None:
+        """Without anchor, no unfilled placeholders remain."""
+        for mode in ["booru_tags", "context_only_tags", "context_only_natural", "descriptive", "straightforward"]:
+            prompt = get_video_prompt(mode)
+            assert "{" not in prompt, f"{mode} without anchor has unfilled placeholder"
+            prompt = get_image_prompt(mode)
+            assert "{" not in prompt, f"image {mode} without anchor has unfilled placeholder"
+
+    def test_with_anchor_no_placeholder_leak(self) -> None:
+        """With anchor, no unfilled placeholders remain."""
+        for mode in ["booru_tags", "context_only_tags", "context_only_natural", "descriptive", "straightforward"]:
+            prompt = get_video_prompt(mode, anchor_word="testanchor")
+            assert "{" not in prompt, f"{mode} with anchor has unfilled placeholder"
+
+    def test_no_anchor_no_anchor_instruction(self) -> None:
+        """Without anchor, the anchor instruction line is absent."""
+        prompt = get_video_prompt("context_only_tags")
         assert "name is" not in prompt.lower()
 
-    def test_object_anchor(self) -> None:
-        """Object use case also accepts anchor words."""
-        prompt = get_video_prompt("object", anchor_word="shimmer")
-        assert "shimmer" in prompt.lower()
-
-    def test_style_anchor(self) -> None:
-        """Style use case accepts anchor word."""
-        prompt = get_video_prompt("style", anchor_word="vintage")
-        assert "vintage" in prompt.lower()
-
-    def test_general_no_placeholders_leak(self) -> None:
-        """General prompt doesn't have unfilled placeholders."""
-        prompt = get_video_prompt(None)
-        assert "{" not in prompt
-        assert "}" not in prompt
-
-    def test_all_prompts_no_placeholders_leak(self) -> None:
-        """No unfilled {placeholders} in any prompt, with or without anchor."""
-        for use_case in [None, "character", "style", "motion", "object"]:
-            prompt = get_video_prompt(use_case)
-            assert "{" not in prompt, f"{use_case} without anchor has unfilled placeholder"
-            prompt = get_video_prompt(use_case, anchor_word="test")
-            assert "{" not in prompt, f"{use_case} with anchor has unfilled placeholder"
+    def test_all_modes_accept_anchor(self) -> None:
+        for mode in ["booru_tags", "context_only_tags", "context_only_natural", "descriptive", "straightforward"]:
+            prompt = get_video_prompt(mode, anchor_word="testanchor")
+            assert "testanchor" in prompt.lower(), f"{mode} missing anchor"
 
 
 class TestSecondaryAnchors:
     """Tests for secondary anchor tags in prompts."""
 
     def test_secondary_anchors_included(self) -> None:
-        """Secondary anchors appear in the prompt."""
         prompt = get_video_prompt(
-            "character", anchor_word="luna",
+            "context_only_tags", anchor_word="luna",
             secondary_anchors=["vintage", "retro"],
         )
         assert "vintage" in prompt.lower()
         assert "retro" in prompt.lower()
 
-    def test_secondary_anchors_conditional(self) -> None:
-        """Prompt tells VLM to only use them if visible."""
+    def test_secondary_anchors_conditional_instruction(self) -> None:
         prompt = get_video_prompt(
-            "character", anchor_word="luna",
+            "context_only_tags", anchor_word="luna",
             secondary_anchors=["vintage"],
         )
         assert "only" in prompt.lower()
 
-    def test_no_secondary_anchors(self) -> None:
-        """Without secondary anchors, no extra tag instruction appears."""
-        prompt = get_video_prompt("character", anchor_word="luna")
+    def test_no_secondary_anchors_no_extra_instruction(self) -> None:
+        prompt = get_video_prompt("context_only_tags", anchor_word="luna")
         assert "may be relevant" not in prompt.lower()
 
-    def test_secondary_anchors_without_primary(self) -> None:
-        """Secondary anchors work even without a primary anchor word."""
+    def test_secondary_without_primary(self) -> None:
         prompt = get_video_prompt(
-            "character",
+            "context_only_tags",
             secondary_anchors=["vintage", "retro"],
         )
         assert "vintage" in prompt.lower()
         assert "retro" in prompt.lower()
 
-    def test_secondary_anchors_on_all_use_cases(self) -> None:
-        """All use cases support secondary anchors."""
-        for use_case in ["character", "style", "motion", "object"]:
-            prompt = get_video_prompt(
-                use_case, anchor_word="test",
-                secondary_anchors=["tag1"],
-            )
-            assert "tag1" in prompt.lower(), f"{use_case} missing secondary anchor"
+    def test_secondary_on_all_modes(self) -> None:
+        for mode in ["booru_tags", "context_only_tags", "context_only_natural", "descriptive", "straightforward"]:
+            prompt = get_video_prompt(mode, secondary_anchors=["tag1"])
+            assert "tag1" in prompt.lower(), f"{mode} missing secondary anchor"
 
 
 class TestPromptContent:
-    """Tests that prompts contain the right instructions."""
+    """Tests that prompts contain the right instructions for each mode."""
 
-    def test_character_omits_appearance(self) -> None:
-        """Character prompt tells VLM to skip appearance."""
-        prompt = get_video_prompt("character")
-        assert "do not describe" in prompt.lower()
-        assert "appearance" in prompt.lower()
+    def test_context_only_omits_appearance(self) -> None:
+        for mode in ["context_only_tags", "context_only_natural"]:
+            prompt = get_video_prompt(mode)
+            assert "do not" in prompt.lower() or "not include" in prompt.lower()
 
-    def test_style_omits_aesthetics(self) -> None:
-        """Style prompt tells VLM to skip style descriptors."""
-        prompt = get_video_prompt("style")
-        assert "do not describe" in prompt.lower()
-        assert "style" in prompt.lower()
+    def test_booru_tags_requests_tags_not_prose(self) -> None:
+        prompt = get_video_prompt("booru_tags")
+        assert "comma" in prompt.lower() or "tags" in prompt.lower()
 
-    def test_motion_focuses_on_movement(self) -> None:
-        """Motion prompt emphasizes movement description."""
-        prompt = get_video_prompt("motion")
-        assert "move" in prompt.lower()
-        assert "do not describe" in prompt.lower()
+    def test_descriptive_requests_detail(self) -> None:
+        prompt = get_image_prompt("descriptive")
+        assert "detailed" in prompt.lower() or "describe" in prompt.lower()
 
-    def test_all_prompts_request_brevity(self) -> None:
-        """All prompts ask for short captions."""
-        for use_case in [None, "character", "style", "motion", "object"]:
-            prompt = get_video_prompt(use_case)
-            assert "brief" in prompt.lower() or "short" in prompt.lower()
+    def test_straightforward_requests_factual(self) -> None:
+        prompt = get_image_prompt("straightforward")
+        assert "factual" in prompt.lower() or "observe" in prompt.lower()
+
+    def test_image_prompts_mention_image(self) -> None:
+        for mode in ["booru_tags", "context_only_tags", "context_only_natural", "descriptive", "straightforward"]:
+            prompt = get_image_prompt(mode)
+            assert "image" in prompt.lower(), f"Image prompt for {mode} doesn't mention 'image'"
+
+    def test_video_prompts_mention_video(self) -> None:
+        for mode in ["booru_tags", "context_only_tags", "context_only_natural", "descriptive", "straightforward"]:
+            prompt = get_video_prompt(mode)
+            assert "video" in prompt.lower() or "clip" in prompt.lower(), \
+                f"Video prompt for {mode} doesn't mention 'video' or 'clip'"
 
 
-class TestGetImagePrompt:
-    """Tests for image prompt selection."""
+class TestPromptDicts:
+    """Tests for IMAGE_PROMPTS and VIDEO_PROMPTS dicts."""
 
-    def test_general(self) -> None:
-        """Returns general image prompt."""
-        prompt = get_image_prompt(None)
-        assert "image" in prompt.lower()
+    def test_image_prompts_has_5_entries(self) -> None:
+        assert len(IMAGE_PROMPTS) == 5
 
-    def test_unknown_use_case_falls_back(self) -> None:
-        """Unknown use_case falls back to general."""
-        prompt = get_image_prompt("unknown")
-        assert "image" in prompt.lower()
+    def test_video_prompts_has_5_entries(self) -> None:
+        assert len(VIDEO_PROMPTS) == 5
 
-    def test_character_image_with_anchor(self) -> None:
-        """Character image prompt uses anchor word as name."""
-        prompt = get_image_prompt("character", anchor_word="luna")
-        assert "luna" in prompt.lower()
-        assert "do not describe" in prompt.lower()
+    def test_image_prompts_keys(self) -> None:
+        expected = {"booru_tags", "context_only_tags", "context_only_natural", "descriptive", "straightforward"}
+        assert set(IMAGE_PROMPTS.keys()) == expected
 
-    def test_style_image_prompt(self) -> None:
-        prompt = get_image_prompt("style")
-        assert "do not describe" in prompt.lower()
-        assert "style" in prompt.lower()
+    def test_video_prompts_keys(self) -> None:
+        expected = {"booru_tags", "context_only_tags", "context_only_natural", "descriptive", "straightforward"}
+        assert set(VIDEO_PROMPTS.keys()) == expected
 
-    def test_no_placeholders_in_image_prompts(self) -> None:
-        """No unfilled placeholders in any image prompt."""
-        for use_case in [None, "character", "style", "motion", "object"]:
-            prompt = get_image_prompt(use_case)
-            assert "{" not in prompt
-            prompt = get_image_prompt(use_case, anchor_word="test")
-            assert "{" not in prompt
+    def test_no_none_keys(self) -> None:
+        assert None not in IMAGE_PROMPTS
+        assert None not in VIDEO_PROMPTS
+
+
+class TestFillPrompt:
+    """Tests for _fill_prompt — anchor injection helper."""
+
+    def test_anchor_line_injected(self) -> None:
+        template = "Describe the scene.{anchor_line} Be concise."
+        result = _fill_prompt(template, anchor_word="luna")
+        assert "luna" in result.lower()
+        assert "{anchor_line}" not in result
+
+    def test_anchor_line_empty_without_anchor(self) -> None:
+        template = "Describe the scene.{anchor_line} Be concise."
+        result = _fill_prompt(template)
+        assert "name is" not in result.lower()
+        assert "{anchor_line}" not in result
+
+    def test_secondary_line_injected(self) -> None:
+        template = "Describe.{secondary_line}"
+        result = _fill_prompt(template, secondary_anchors=["vintage"])
+        assert "vintage" in result
+        assert "{secondary_line}" not in result
+
+    def test_secondary_empty_without_anchors(self) -> None:
+        template = "Describe.{secondary_line}"
+        result = _fill_prompt(template)
+        assert "{secondary_line}" not in result
 
 
 class TestFormatPrompt:
     """Tests for format_prompt() — safe template variable substitution."""
 
     def test_basic_substitution(self) -> None:
-        """Substitutes a known variable."""
         result = format_prompt("Describe {anchor_word} in detail", anchor_word="Luna")
         assert result == "Describe Luna in detail"
 
     def test_multiple_variables(self) -> None:
-        """Substitutes multiple variables."""
         result = format_prompt(
             "{name} is in {place}",
             name="Luna",
@@ -211,17 +276,14 @@ class TestFormatPrompt:
         assert result == "Luna is in the plaza"
 
     def test_no_variables(self) -> None:
-        """Prompt with no placeholders passes through unchanged."""
         result = format_prompt("No variables here")
         assert result == "No variables here"
 
     def test_missing_variable_preserved(self) -> None:
-        """Missing variables are left as-is (no KeyError)."""
         result = format_prompt("{missing} stays", other="ignored")
         assert result == "{missing} stays"
 
     def test_extra_variables_ignored(self) -> None:
-        """Extra variables that don't appear in the prompt are ignored."""
         result = format_prompt("Hello world", unused="value")
         assert result == "Hello world"
 
@@ -230,13 +292,11 @@ class TestCustomPrompt:
     """Tests for custom_prompt field on CaptionConfig."""
 
     def test_custom_prompt_field(self) -> None:
-        """CaptionConfig accepts custom_prompt."""
         from klippbok.caption.models import CaptionConfig
         config = CaptionConfig(custom_prompt="My custom instructions here")
         assert config.custom_prompt == "My custom instructions here"
 
     def test_custom_prompt_default_none(self) -> None:
-        """custom_prompt defaults to None."""
         from klippbok.caption.models import CaptionConfig
         config = CaptionConfig()
         assert config.custom_prompt is None

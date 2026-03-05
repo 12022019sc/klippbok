@@ -1,20 +1,20 @@
 """Prompt templates for VLM captioning.
 
-Each use case gets a tailored prompt that tells the VLM what to describe
-and — critically — what to OMIT. The LoRA learns what you leave out.
+Five caption modes covering the main LoRA training use cases:
 
-- character LoRA: DON'T describe appearance (the LoRA teaches that)
-- style LoRA: DON'T describe art style/medium (the LoRA teaches that)
-- motion LoRA: DON'T describe identity, focus on movement
-- object LoRA: DON'T describe the object, describe context
+1. booru_tags       — comma-separated tags (SD1.5 LoRA)
+2. context_only_tags  — tags WITHOUT physical appearance (Character LoRA)
+3. context_only_natural — NL WITHOUT physical appearance (Character LoRA)
+4. descriptive      — detailed natural language (SDXL/Flux)
+5. straightforward  — factual NL, no speculation (SDXL/Flux)
 
-Captions should read like GENERATION PROMPTS — short, direct,
-comma-separated phrases. Not prose, not narration, not film analysis.
+Context-only modes instruct the VLM to omit physical appearance.
+The LoRA learns appearance from images — captions should capture context.
 
 Good: "close-up, Luna looks up at the open sky"
-Bad:  "It's a close-up of Luna, shot from below, as she looks intently up at the open sky."
+Bad:  "It's a close-up of Luna, shot from below, as she looks intently up."
 
-Framing (closeup, wide shot, etc.) leads as a tag when notable.
+Framing (close-up, wide shot, etc.) leads as a tag when notable.
 The anchor word is used as a natural name, not mechanically prepended.
 """
 
@@ -22,129 +22,99 @@ from __future__ import annotations
 
 
 # ---------------------------------------------------------------------------
-# Video captioning prompts
+# Image captioning prompts — 5 modes
 # ---------------------------------------------------------------------------
 
-# Prompts use {anchor_word} and {secondary_anchors} placeholders.
-# These are filled in by format_prompt() before being sent to the VLM.
-# If no anchor word is set, the placeholders are stripped out.
+IMAGE_PROMPT_BOORU_TAGS = """\
+Write a list of Booru-like tags for this image, comma-separated.{anchor_line}{secondary_line}
+Include subject, action, setting, composition, and mood tags.
+Do NOT include quality tags (masterpiece, best quality, absurdres).
+Output ONLY the tags, no explanations, no numbering."""
 
-VIDEO_PROMPT_GENERAL = """\
-Write a short caption for this video clip in prompt style.
-Use direct, comma-separated phrases — not prose or narration.
-Start with the framing if notable (e.g. "close-up," "wide shot,").
-Then describe who or what, the action, and the setting.
-Good: "wide shot, a woman walks through a rain-soaked alley at night"
-Bad: "The video shows a wide shot of a woman walking through an alley in the rain at night."
-Do NOT start with "The video shows", "In this clip", or "It's a".
-Do NOT describe color palettes, lighting mood, or cinematography."""
+IMAGE_PROMPT_CONTEXT_ONLY_TAGS = """\
+Write Booru-like tags for this image, comma-separated.{anchor_line}{secondary_line}
+Do NOT include tags describing physical appearance (hair color, eye color, clothing, body type, skin tone).
+Focus ONLY on setting, action, pose, expression, and context.
+Output ONLY the tags, no explanations, no numbering."""
 
-VIDEO_PROMPT_CHARACTER = """\
-Write a short caption for this video clip in prompt style.{anchor_line}{secondary_line}
-Use direct, comma-separated phrases — not prose or narration.
-Start with the framing if notable (e.g. "close-up," "wide shot,").
-Then describe what {subject} is doing and the setting.
-Good: "close-up, {subject} looks up at the open sky"
-Good: "medium shot, {subject} sits on a rooftop, legs dangling over the edge"
-Bad: "It's a close-up of {subject}, shot from below, as they look intently up at the open sky."
-Do NOT describe {subject}'s physical appearance, clothing, or features.
-Do NOT describe color palettes, lighting mood, or cinematography.
-The visual details are learned from the video itself — just describe the action and setting."""
+IMAGE_PROMPT_CONTEXT_ONLY_NATURAL = """\
+Write a short natural language caption for this image.{anchor_line}{secondary_line}
+Do NOT describe any physical appearance (hair color, eye color, clothing, body type, skin tone).
+Focus ONLY on the action, setting, mood, and context.
+Output ONLY the caption — no options, no numbering, no markdown formatting."""
 
-VIDEO_PROMPT_STYLE = """\
-Write a short caption for this video clip in prompt style.{style_anchor_line}{secondary_line}
-Use direct, comma-separated phrases — not prose or narration.
-Start with the framing if notable (e.g. "close-up," "wide shot,").
-Then describe who is in the scene and what is happening.
-Good: "wide shot, a girl walks through a neon-lit market"
-Bad: "The scene captures a wide shot of a girl as she walks through a brightly lit market."
-Do NOT describe the visual style, art direction, color grading, or lighting mood.
-The style is learned from the video itself — just describe the content."""
+IMAGE_PROMPT_DESCRIPTIVE = """\
+Write a detailed natural language caption for this image.{anchor_line}{secondary_line}
+Describe the subject, their action, the setting, lighting, mood, and relevant details.
+Be thorough but natural — write as a generation prompt, not a film review.
+Output ONLY the caption — no options, no numbering, no markdown formatting."""
 
-VIDEO_PROMPT_MOTION = """\
-Write a short caption for this video clip in prompt style.{anchor_line}{secondary_line}
-Use direct, comma-separated phrases — not prose or narration.
-Start with the framing if notable (e.g. "tracking shot," "close-up,").
-Focus on how things MOVE — speed, direction, body mechanics, camera motion.
-Good: "tracking shot, figure sprints down a corridor, camera following from behind"
-Bad: "In this clip, a figure is shown sprinting rapidly down a long corridor."
-Do NOT describe identity, appearance, or clothing.
-Keep it short and focused on the dynamics."""
+IMAGE_PROMPT_STRAIGHTFORWARD = """\
+Write a short factual caption for this image.{anchor_line}{secondary_line}
+State only what you can directly observe. Do not speculate, interpret emotions, or infer context.
+Be concise and precise — describe what is visible, not what might be implied.
+Output ONLY the caption — no options, no numbering, no markdown formatting."""
 
-VIDEO_PROMPT_OBJECT = """\
-Write a short caption for this video clip in prompt style.{anchor_line}{secondary_line}
-Use direct, comma-separated phrases — not prose or narration.
-Start with the framing if notable (e.g. "close-up," "wide shot,").
-Describe the scene around {subject} — the setting, context, and what's happening.
-Good: "close-up, {subject} resting on a wooden table, warm kitchen in the background"
-Bad: "The clip shows a close-up of {subject}, which is resting on a wooden table in a warm kitchen."
-Do NOT describe {subject}'s appearance or details.
-The object's look is learned from the video — just describe the world around it."""
 
 # ---------------------------------------------------------------------------
-# Image captioning prompts
+# Video captioning prompts — 5 modes
 # ---------------------------------------------------------------------------
 
-IMAGE_PROMPT_GENERAL = """\
-Write a single short caption for this image in prompt style.
-Use direct, comma-separated phrases — not prose or narration.
-Start with the framing if notable (e.g. "close-up," "wide shot,").
-Then describe the subject, setting, and mood.
-Do NOT start with "The image shows" or "This is".
-Do NOT describe color palettes, lighting mood, or cinematography.
+VIDEO_PROMPT_BOORU_TAGS = """\
+Write a list of Booru-like tags for this video clip, comma-separated.{anchor_line}{secondary_line}
+Include subject, action, setting, composition, and motion tags.
+Do NOT include quality tags (masterpiece, best quality, absurdres).
+Output ONLY the tags, no explanations, no numbering."""
+
+VIDEO_PROMPT_CONTEXT_ONLY_TAGS = """\
+Write Booru-like tags for this video clip, comma-separated.{anchor_line}{secondary_line}
+Do NOT include tags describing physical appearance (hair color, eye color, clothing, body type, skin tone).
+Focus ONLY on setting, action, pose, expression, motion, and context.
+Output ONLY the tags, no explanations, no numbering."""
+
+VIDEO_PROMPT_CONTEXT_ONLY_NATURAL = """\
+Write a short natural language caption for this video clip.{anchor_line}{secondary_line}
+Do NOT describe any physical appearance (hair color, eye color, clothing, body type, skin tone).
+Focus ONLY on the action, movement, setting, mood, and context.
 Output ONLY the caption — no options, no numbering, no markdown formatting."""
 
-IMAGE_PROMPT_CHARACTER = """\
-Write a single short caption for this image in prompt style.{anchor_line}{secondary_line}
-Use direct, comma-separated phrases — not prose or narration.
-Start with the framing if notable (e.g. "close-up," "portrait,").
-Then describe what {subject} is doing and the setting.
-Do NOT describe {subject}'s physical appearance, clothing, or features.
+VIDEO_PROMPT_DESCRIPTIVE = """\
+Write a detailed natural language caption for this video clip.{anchor_line}{secondary_line}
+Describe the subject, their action and movement, the setting, lighting, mood, and relevant details.
+Note framing (close-up, wide shot) if notable. Be thorough but natural.
 Output ONLY the caption — no options, no numbering, no markdown formatting."""
 
-IMAGE_PROMPT_STYLE = """\
-Write a single short caption for this image in prompt style.{style_anchor_line}{secondary_line}
-Use direct, comma-separated phrases — not prose or narration.
-Start with the framing if notable (e.g. "close-up," "wide shot,").
-Describe the subject and what's happening.
-Do NOT describe the visual style, art medium, color grading, or lighting mood.
+VIDEO_PROMPT_STRAIGHTFORWARD = """\
+Write a short factual caption for this video clip.{anchor_line}{secondary_line}
+State only what you can directly observe: who is present, what they are doing, and where.
+Do not speculate, interpret emotions, or infer context beyond what is visible.
 Output ONLY the caption — no options, no numbering, no markdown formatting."""
 
-IMAGE_PROMPT_MOTION = """\
-Write a single short caption for this image in prompt style.{anchor_line}{secondary_line}
-Use direct, comma-separated phrases — not prose or narration.
-Start with the framing if notable (e.g. "close-up," "wide shot,").
-Describe the implied motion or action.
-Do NOT describe identity, appearance, or clothing.
-Output ONLY the caption — no options, no numbering, no markdown formatting."""
-
-IMAGE_PROMPT_OBJECT = """\
-Write a single short caption for this image in prompt style.{anchor_line}{secondary_line}
-Use direct, comma-separated phrases — not prose or narration.
-Start with the framing if notable (e.g. "close-up," "wide shot,").
-Describe the scene around {subject}.
-Do NOT describe {subject}'s appearance.
-Output ONLY the caption — no options, no numbering, no markdown formatting."""
 
 # ---------------------------------------------------------------------------
-# Lookup
+# Lookup dicts
 # ---------------------------------------------------------------------------
 
-VIDEO_PROMPTS: dict[str | None, str] = {
-    None: VIDEO_PROMPT_GENERAL,
-    "character": VIDEO_PROMPT_CHARACTER,
-    "style": VIDEO_PROMPT_STYLE,
-    "motion": VIDEO_PROMPT_MOTION,
-    "object": VIDEO_PROMPT_OBJECT,
+IMAGE_PROMPTS: dict[str, str] = {
+    "booru_tags": IMAGE_PROMPT_BOORU_TAGS,
+    "context_only_tags": IMAGE_PROMPT_CONTEXT_ONLY_TAGS,
+    "context_only_natural": IMAGE_PROMPT_CONTEXT_ONLY_NATURAL,
+    "descriptive": IMAGE_PROMPT_DESCRIPTIVE,
+    "straightforward": IMAGE_PROMPT_STRAIGHTFORWARD,
 }
 
-IMAGE_PROMPTS: dict[str | None, str] = {
-    None: IMAGE_PROMPT_GENERAL,
-    "character": IMAGE_PROMPT_CHARACTER,
-    "style": IMAGE_PROMPT_STYLE,
-    "motion": IMAGE_PROMPT_MOTION,
-    "object": IMAGE_PROMPT_OBJECT,
+VIDEO_PROMPTS: dict[str, str] = {
+    "booru_tags": VIDEO_PROMPT_BOORU_TAGS,
+    "context_only_tags": VIDEO_PROMPT_CONTEXT_ONLY_TAGS,
+    "context_only_natural": VIDEO_PROMPT_CONTEXT_ONLY_NATURAL,
+    "descriptive": VIDEO_PROMPT_DESCRIPTIVE,
+    "straightforward": VIDEO_PROMPT_STRAIGHTFORWARD,
 }
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
 
 
 def get_video_prompt(
@@ -160,14 +130,14 @@ def get_video_prompt(
 
     Args:
         caption_mode: One of 'booru_tags', 'context_only_tags', 'context_only_natural',
-            'descriptive', 'straightforward', or None (falls back to context_only_tags).
+            'descriptive', 'straightforward'. Unknown modes fall back to 'context_only_tags'.
         anchor_word: Primary trigger word — used as the subject's name.
         secondary_anchors: Additional tags to mention (e.g. ["vintage", "retro"]).
 
     Returns:
         The prompt string, ready to send to the VLM.
     """
-    template = VIDEO_PROMPTS.get(caption_mode, VIDEO_PROMPT_GENERAL)
+    template = VIDEO_PROMPTS.get(caption_mode, VIDEO_PROMPT_CONTEXT_ONLY_TAGS)
     return _fill_prompt(template, anchor_word, secondary_anchors)
 
 
@@ -180,15 +150,14 @@ def get_image_prompt(
 
     Args:
         caption_mode: One of 'booru_tags', 'context_only_tags', 'context_only_natural',
-            'descriptive', 'straightforward', or None.
-            Unknown modes fall back to the general prompt.
+            'descriptive', 'straightforward'. Unknown modes fall back to 'context_only_tags'.
         anchor_word: Primary trigger word — used as the subject's name.
         secondary_anchors: Additional tags to mention.
 
     Returns:
         The prompt string, ready to send to the VLM.
     """
-    template = IMAGE_PROMPTS.get(caption_mode, IMAGE_PROMPT_GENERAL)
+    template = IMAGE_PROMPTS.get(caption_mode, IMAGE_PROMPT_CONTEXT_ONLY_TAGS)
     return _fill_prompt(template, anchor_word, secondary_anchors)
 
 
@@ -199,7 +168,7 @@ def _fill_prompt(
 ) -> str:
     """Fill a prompt template with anchor word and secondary anchors.
 
-    Handles the {subject}, {anchor_line}, and {secondary_line} placeholders.
+    Handles the {anchor_line} and {secondary_line} placeholders.
     When no anchor is set, these are cleaned out so the prompt reads naturally.
 
     The anchor word is presented as the subject's name — the VLM should
@@ -208,21 +177,13 @@ def _fill_prompt(
     Secondary anchors are things that may or may not be visible in the clip.
     The VLM should only mention them if it actually sees them.
     """
-    subject = anchor_word or "the subject"
-
     if anchor_word:
         anchor_line = (
             f"\nThe subject's name is \"{anchor_word}\". "
             f"Use \"{anchor_word}\" naturally in the caption as their name."
         )
-        # Style LoRAs: anchor is a style descriptor, not a character name
-        style_anchor_line = (
-            f"\nThe style is called \"{anchor_word}\". "
-            f"Use \"{anchor_word}\" naturally in the caption where it fits."
-        )
     else:
         anchor_line = ""
-        style_anchor_line = ""
 
     if secondary_anchors:
         tags = ", ".join(f'"{t}"' for t in secondary_anchors)
@@ -235,9 +196,7 @@ def _fill_prompt(
         secondary_line = ""
 
     result = template
-    result = result.replace("{subject}", subject)
     result = result.replace("{anchor_line}", anchor_line)
-    result = result.replace("{style_anchor_line}", style_anchor_line)
     result = result.replace("{secondary_line}", secondary_line)
     return result
 
