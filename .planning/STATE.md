@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06.2-03-PLAN.md (Caption Mode dropdown, Max Tokens field, over-budget warning, caption_mode in generate request)
-last_updated: "2026-03-05T05:21:38.434Z"
+stopped_at: Completed 06.2-04-PLAN.md (fix apply_vlm_pipeline step order — strip artifacts before anchor injection)
+last_updated: "2026-03-05T05:47:05.735Z"
 last_activity: 2026-03-03 -- Completed 05-04-PLAN.md (ProcessPage wizard, UpscaleStep, useUpscaleEvents, Proceed to Captioning save, source_path fix)
 progress:
   total_phases: 10
   completed_phases: 7
-  total_plans: 26
-  completed_plans: 25
+  total_plans: 27
+  completed_plans: 26
 ---
 
 ---
@@ -110,6 +110,7 @@ Progress: [████████████░] ~85% (15 of ~20 estimated pl
 | Phase 06.2 P01 | 688 | 2 tasks | 12 files |
 | Phase 06.2 P02 | 30 | 2 tasks | 7 files |
 | Phase 06.2 P03 | 37 | 2 tasks | 4 files |
+| Phase 06.2 P04 | 5 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -221,6 +222,7 @@ Recent decisions affecting current work:
 - [Phase 06.2-03]: Caption Mode dropdown placed before Provider dropdown — mode is more important user decision
 - [Phase 06.2-03]: Default token budget 150 (SDXL) for over-budget warning when max_tokens null — avoids extra API call
 - [Phase 06.2-03]: Over-budget warning shown in caption editor panel above textarea (not thumbnail badge) — visible during editing
+- [Phase 06.2-04]: 06.2-04 PIPELINE-01: _strip_vlm_artifacts runs BEFORE _prepend_anchor — ^-anchored regex patterns require raw VLM output at position 0 to match preambles correctly
 
 ### Roadmap Evolution
 
@@ -239,6 +241,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-05T05:21:38.431Z
-Stopped at: Completed 06.2-03-PLAN.md (Caption Mode dropdown, Max Tokens field, over-budget warning, caption_mode in generate request)
+Last session: 2026-03-05T05:47:05.731Z
+Stopped at: Completed 06.2-04-PLAN.md (fix apply_vlm_pipeline step order — strip artifacts before anchor injection)
 Resume file: None

@@ -159,7 +159,7 @@ Plans:
   4. Model-aware token budgets (SD1.5=75, SDXL=150, Flux=225) enforced with smart trimming
   5. Mode dropdown and max-tokens field visible in CaptionPage config section
   6. Over-budget warning indicator visible per image
-**Plans:** 3 plans
+**Plans:** 4/4 plans complete
 
 Plans:
 - [ ] 06.2-01-PLAN.md -- Caption mode types, model updates, prompts rewrite, post-processing pipeline
