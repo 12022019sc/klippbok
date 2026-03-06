@@ -21,6 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6.1: Caption Provider Configuration** - Dedicated captioning page with provider config, model picker, API key management, and caption workspace (INSERTED) (completed 2026-03-04)
 - [x] **Phase 6.2: Captioning Enhancement: JoyCaption Integration Planning** - Caption modes, context-only modes, post-processing pipeline, token budgets, trigger word injection (INSERTED) (completed 2026-03-05)
 - [x] **Phase 7: Video and CLIP Integration** - Existing video pipeline accessible from GUI, CLIP triage extended to standalone images (completed 2026-03-05)
+- [ ] **Phase 7.1: Gallery Cleanup Tool** - ML-powered media filtering for subject relevance (INSERTED)
 - [ ] **Phase 8: Export Pipeline** - Multi-trainer export with format-specific config generation and dataset download
 
 ## Phase Details
@@ -182,6 +183,23 @@ Plans:
 - [ ] 07-04-PLAN.md -- TriagePage with CLIP triage UI, concepts gallery, face clusters, gallery video extensions
 - [ ] 07-05-PLAN.md -- Gap closure: POST /triage/concepts/upload file upload endpoint
 
+### Phase 07.1: Gallery Cleanup Tool (INSERTED)
+
+**Goal:** Users can import a large mixed-content folder and run an ML-powered cleanup tool that scans all images and videos, identifies those containing an appropriate human female subject, and moves non-matching media to a separate review folder — enabling rapid dataset curation from raw media libraries without manual sorting
+**Requirements**: CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04, CLEAN-05
+**Depends on:** Phase 7
+**Success Criteria** (what must be TRUE):
+  1. User can trigger a cleanup scan on the current project from the GUI that analyzes all imported images and videos
+  2. ML-based person detection identifies images/videos containing a human female subject (using face detection, body detection, or CLIP-based classification)
+  3. Non-matching media (no subject, wrong subject type, inappropriate content) is flagged with a clear visual indicator in the gallery
+  4. User can review flagged items and confirm removal — removed media is moved to a configurable `_review/` subfolder on disk, NOT deleted
+  5. The cleanup process handles large folders (1000+ items) with progress indication and can be cancelled mid-operation
+**Plans:** 2 plans
+
+Plans:
+- [ ] 07.1-01-PLAN.md -- Backend: cleanup service (CLIP+InsightFace classification), cleanup API router with SSE
+- [ ] 07.1-02-PLAN.md -- Frontend: CleanupPage with scan progress, flagged-item review, confirm removal, NavBar/routing
+
 ### Phase 8: Export Pipeline
 **Goal**: Users can export their cropped, captioned dataset in the format required by their chosen trainer -- ready to train with no manual file manipulation
 **Depends on**: Phase 5, Phase 6
@@ -202,7 +220,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 6.2 -> 7 -> 8
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 6.2 -> 7 -> 7.1 -> 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -215,4 +233,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 6.2 -> 7 -
 | 6.1 Caption Provider Config | 2/2 | Complete   | 2026-03-04 |
 | 6.2 Caption Enhancement: JoyCaption | 3/3 | Complete   | 2026-03-05 |
 | 7. Video and CLIP Integration | 5/5 | Complete   | 2026-03-06 |
+| 7.1 Gallery Cleanup Tool | 0/2 | Not started | - |
 | 8. Export Pipeline | 0/3 | Not started | - |
