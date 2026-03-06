@@ -18,6 +18,7 @@ export default function CleanupPage() {
   const [selectedRefIds, setSelectedRefIds] = useState<string[]>([])
   const [galleryImages, setGalleryImages] = useState<Array<{ id: string; thumbnail_url: string; relative_path: string }>>([])
   const [loadingGallery, setLoadingGallery] = useState(false)
+  const [clipThreshold, setClipThreshold] = useState(0.65)
 
   const cleanupAutoStart = useAppStore((s) => s.cleanupAutoStart)
   const setCleanupAutoStart = useAppStore((s) => s.setCleanupAutoStart)
@@ -48,16 +49,25 @@ export default function CleanupPage() {
     }
   }, [events.isComplete, events.results, operationId, setCleanupResults])
 
-  // Auto-start behavior
+  const canStart =
+    mode === 'text' ? subjectDescription.trim().length > 0 : selectedRefIds.length > 0
+
+  // Auto-start behavior — only fires if the form is already filled in
   useEffect(() => {
     if (hasAutoStarted.current) return
     const shouldAutoStart = cleanupAutoStart || searchParams.get('autostart') === 'true'
     if (shouldAutoStart) {
       hasAutoStarted.current = true
       setCleanupAutoStart(false)
-      startScan()
+      if (canStart) {
+        startScan()
+      }
     }
   }, [cleanupAutoStart, searchParams, setCleanupAutoStart])
+
+  useEffect(() => {
+    setClipThreshold(mode === 'reference' ? 0.65 : 0.25)
+  }, [mode])
 
   useEffect(() => {
     if (mode === 'reference' && galleryImages.length === 0 && !loadingGallery) {
@@ -82,8 +92,8 @@ export default function CleanupPage() {
     clearCleanup()
     const body: Record<string, unknown> =
       mode === 'text'
-        ? { mode: 'text', subject_description: subjectDescription.trim() }
-        : { mode: 'reference', reference_image_ids: selectedRefIds }
+        ? { mode: 'text', subject_description: subjectDescription.trim(), clip_threshold: clipThreshold }
+        : { mode: 'reference', reference_image_ids: selectedRefIds, clip_threshold: clipThreshold }
 
     try {
       const res = await fetch('/api/v1/cleanup/start', {
@@ -155,8 +165,6 @@ export default function CleanupPage() {
     )
   }
 
-  const canStart =
-    mode === 'text' ? subjectDescription.trim().length > 0 : selectedRefIds.length > 0
 
   const isScanning = operationId !== null && !events.isComplete
   const hasResults = cleanupResults.length > 0
@@ -365,6 +373,26 @@ export default function CleanupPage() {
           )}
         </div>
       )}
+
+      {/* Threshold slider */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <label style={{ display: 'block', marginBottom: '0.5rem', color: '#d1d5db', fontSize: '0.85rem' }}>
+          CLIP threshold: <strong style={{ color: '#f3f4f6' }}>{clipThreshold.toFixed(2)}</strong>
+        </label>
+        <input
+          type="range"
+          min={mode === 'reference' ? 0.4 : 0.1}
+          max={mode === 'reference' ? 0.9 : 0.5}
+          step={0.05}
+          value={clipThreshold}
+          onChange={(e) => setClipThreshold(parseFloat(e.target.value))}
+          className="cleanup-threshold-slider"
+        />
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#6b7280' }}>
+          <span>Fewer items removed</span>
+          <span>More items removed</span>
+        </div>
+      </div>
 
       <button className="import-button" onClick={startScan} disabled={!canStart}>
         Start Cleanup Scan

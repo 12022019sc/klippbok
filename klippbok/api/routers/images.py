@@ -272,6 +272,7 @@ def list_images(request: Request) -> GalleryResponse:
     images = [
         _entry_to_response(entry, triage_lookup=triage_lookup)
         for entry in manifest["images"]
+        if (project_dir / entry.get("path", "")).exists()
     ]
     return GalleryResponse(total=len(images), images=images)
 

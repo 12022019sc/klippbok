@@ -157,6 +157,42 @@ def save_image_entries(
     return manifest_path
 
 
+def remove_image_entries(project_dir: Path, paths_to_remove: set[str]) -> int:
+    """Remove entries from the manifest's ``images`` list by relative path.
+
+    Atomically loads the manifest, filters out entries whose ``path`` is in
+    *paths_to_remove*, writes the manifest back with an updated timestamp,
+    and returns the count of entries actually removed.
+
+    Args:
+        project_dir: Root of the project directory.
+        paths_to_remove: Set of relative-path strings to remove.
+
+    Returns:
+        Number of entries removed. Zero if manifest doesn't exist or no
+        matching paths are found.
+    """
+    existing = load_manifest(project_dir)
+    if not existing or "images" not in existing:
+        return 0
+
+    old_images: list[dict] = existing["images"]
+    new_images = [e for e in old_images if e.get("path") not in paths_to_remove]
+    removed_count = len(old_images) - len(new_images)
+
+    if removed_count > 0:
+        existing["images"] = new_images
+        existing["updated"] = datetime.now(timezone.utc).isoformat()
+
+        manifest_path = project_dir / MANIFEST_DIR / MANIFEST_FILE
+        manifest_path.write_text(
+            json.dumps(existing, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+    return removed_count
+
+
 def sample_to_manifest_entry(
     sample: SamplePair,
     project_dir: Path,

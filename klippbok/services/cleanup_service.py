@@ -86,23 +86,30 @@ class CleanupClassification(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def compute_confidence(clip_score: float, has_face: bool, clip_threshold: float) -> float:
+def compute_confidence(
+    clip_score: float,
+    has_face: bool,
+    clip_threshold: float,
+    score_range: float = 0.15,
+) -> float:
     """Combine CLIP score and face detection into a single confidence value.
 
-    Normalizes the CLIP score relative to the threshold range (0.10-0.40 maps
-    to 0-1), adds a face boost (+0.3), and clamps to [0.0, 1.0].
+    Normalizes the CLIP score relative to the threshold range, adds a face
+    boost (+0.3), and clamps to [0.0, 1.0].
 
     Args:
         clip_score: Net CLIP score (max_positive - max_negative).
         has_face: Whether a face was detected by InsightFace.
         clip_threshold: The CLIP threshold used for classification.
+        score_range: Half-width of normalization window around threshold.
+            Use 0.15 for text-to-image, 0.25 for image-to-image reference mode.
 
     Returns:
         Confidence score in [0.0, 1.0].
     """
     # Normalize CLIP score: map the range [low, high] to [0, 1]
-    low = clip_threshold - 0.15
-    high = clip_threshold + 0.15
+    low = clip_threshold - score_range
+    high = clip_threshold + score_range
     normalized = (clip_score - low) / (high - low) if high > low else 0.5
     normalized = max(0.0, min(1.0, normalized))
 
@@ -279,7 +286,19 @@ def classify_item_by_reference(
         except Exception as exc:
             logger.warning("Face detection failed for %s: %s", image_path, exc)
 
-    confidence = compute_confidence(max_sim, has_face, clip_threshold)
+    # Reference mode: threshold is a direct decision boundary.
+    # Above threshold → keep (ramps to 1.0 over +0.15).
+    # Below threshold → quadratic falloff toward remove.
+    if max_sim >= clip_threshold:
+        confidence = 0.6 + 0.4 * min(1.0, (max_sim - clip_threshold) / 0.15)
+    else:
+        ratio = max_sim / clip_threshold if clip_threshold > 0 else 0.0
+        confidence = 0.6 * ratio * ratio
+
+    # Face boost
+    if has_face:
+        confidence = min(1.0, confidence + 0.3)
+
     label = _classify_label(confidence)
 
     if project_dir is not None:
