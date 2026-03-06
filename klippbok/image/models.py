@@ -171,6 +171,9 @@ class ImageImportEntry(BaseModel):
     skipped: bool = False
     """True if this image was skipped (e.g. already imported in a prior run)."""
 
+    video_meta: dict[str, float | str] | None = None
+    """Video-specific metadata from ffprobe: duration, fps, codec. None for images."""
+
 
 class ImageImportReport(BaseModel):
     """Summary of a batch image import operation.

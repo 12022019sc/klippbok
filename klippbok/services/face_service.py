@@ -213,6 +213,8 @@ def cluster_face_embeddings(
             cluster_id=cluster_id,
             image_paths=image_paths,
         )
+        # Auto-select the highest-resolution image as primary reference
+        cluster.primary_reference = select_best_reference(cluster)
         clusters.append(cluster)
 
     return clusters

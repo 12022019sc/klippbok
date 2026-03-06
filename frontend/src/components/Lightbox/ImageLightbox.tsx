@@ -4,6 +4,15 @@ import 'yet-another-react-lightbox/styles.css'
 import CaptionPanel from '../Caption/CaptionPanel'
 import type { GalleryItem } from '../../types/image'
 
+function formatDuration(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds.toFixed(1)}s`
+  }
+  const min = Math.floor(seconds / 60)
+  const sec = seconds % 60
+  return `${min}:${sec.toFixed(0).padStart(2, '0')}`
+}
+
 interface ImageLightboxProps {
   items: GalleryItem[]
   currentIndex: number
@@ -90,7 +99,15 @@ export default function ImageLightbox({
                 </span>
               )}
               {item.media_type === 'video' && (
-                <span style={{ color: '#818cf8' }}>Video</span>
+                <span style={{ color: '#818cf8' }}>
+                  {[
+                    item.fps ? `${item.fps.toFixed(1)} fps` : null,
+                    item.duration ? formatDuration(item.duration) : null,
+                    item.codec ?? null,
+                  ]
+                    .filter(Boolean)
+                    .join(' \u00b7 ') || 'Video'}
+                </span>
               )}
               {item.is_near_duplicate && (
                 <span style={{ color: '#f97316' }}>Near-duplicate</span>

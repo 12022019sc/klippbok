@@ -13,6 +13,11 @@ export interface GalleryItem {
   media_type: 'image' | 'video';
   full_url: string;
   video_url: string | null;
+  duration?: number;
+  fps?: number;
+  codec?: string;
+  triage_classification?: string;
+  best_score?: number;
 }
 
 export interface GalleryResponse {

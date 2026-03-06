@@ -3,6 +3,7 @@ import { Outlet } from 'react-router'
 import { toast } from 'sonner'
 import NavBar from './NavBar'
 import { useAppStore } from '../../stores/appStore'
+import { useImportEvents } from '../../hooks/useImportEvents'
 
 /**
  * AppLayout wraps all pages with the NavBar and a persistent import progress
@@ -15,6 +16,9 @@ export default function AppLayout() {
   const importOperationId = useAppStore((s) => s.importOperationId)
   const importProgress = useAppStore((s) => s.importProgress)
   const toastIdRef = useRef<string | number | null>(null)
+
+  // Global SSE subscription — keeps import alive during page navigation
+  useImportEvents(importOperationId)
 
   useEffect(() => {
     if (importOperationId) {

@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { useAppStore } from '../stores/appStore'
-import { useImportEvents } from '../hooks/useImportEvents'
 import DirectoryBrowser from '../components/DirectoryBrowser/DirectoryBrowser'
 
 /**
@@ -19,9 +18,6 @@ export default function ImportPage() {
   const importOperationId = useAppStore((s) => s.importOperationId)
   const importProgress = useAppStore((s) => s.importProgress)
   const setImportOperationId = useAppStore((s) => s.setImportOperationId)
-
-  // Subscribe to SSE events for the active operation
-  useImportEvents(importOperationId)
 
   const isImporting = importOperationId !== null
 

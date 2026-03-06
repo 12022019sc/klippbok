@@ -60,6 +60,21 @@ class ImageStatusResponse(BaseModel):
     video_url: str | None = None
     """URL to stream the video file, or None for images."""
 
+    duration: float | None = None
+    """Video duration in seconds, or None for images."""
+
+    fps: float | None = None
+    """Video frame rate, or None for images."""
+
+    codec: str | None = None
+    """Video codec name (e.g. 'h264'), or None for images."""
+
+    triage_classification: str | None = None
+    """Triage classification: 'match' | 'borderline' | 'no_match', or None."""
+
+    best_score: float | None = None
+    """Best CLIP similarity score from triage, or None."""
+
 
 class GalleryResponse(BaseModel):
     """Response model for the image gallery list endpoint."""

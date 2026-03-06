@@ -5,7 +5,7 @@ import { useExtractEvents } from '../hooks/useExtractEvents'
 import type { ScanResultItem, VideoClip } from '../types/video'
 
 type ActiveTab = 'ingest' | 'scan' | 'extract'
-type InputMode = 'upload' | 'directory'
+type InputMode = 'file' | 'directory'
 
 /**
  * VideoPage provides three tabs for the video pipeline:
@@ -18,7 +18,7 @@ export default function VideoPage() {
 
   // ---- Ingest tab state ----
   const [inputMode, setInputMode] = useState<InputMode>('directory')
-  const [videoFile, setVideoFile] = useState<File | null>(null)
+  const [videoFilePath, setVideoFilePath] = useState('')
   const [directoryPath, setDirectoryPath] = useState('')
   const [fps, setFps] = useState(16)
   const [resolution, setResolution] = useState(720)
@@ -79,8 +79,8 @@ export default function VideoPage() {
         setScanError(err.detail)
         return
       }
-      const data = await res.json() as { clips: ScanResultItem[]; total: number }
-      setScanResults(data.clips)
+      const data = await res.json() as ScanResultItem[]
+      setScanResults(data)
     } catch (err) {
       setScanError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -100,8 +100,8 @@ export default function VideoPage() {
   }
 
   async function handleStartIngest() {
-    if (inputMode === 'upload' && !videoFile) {
-      toast.error('Please select a video file')
+    if (inputMode === 'file' && !videoFilePath.trim()) {
+      toast.error('Please enter a video file path')
       return
     }
     if (inputMode === 'directory' && !directoryPath.trim()) {
@@ -113,9 +113,9 @@ export default function VideoPage() {
     setIngestClipCount(null)
     try {
       const body: Record<string, unknown> = { fps, resolution, threshold }
-      if (inputMode === 'upload' && videoFile) {
-        body.video_path = videoFile.name // server-side will handle file lookup
-      } else if (inputMode === 'directory') {
+      if (inputMode === 'file') {
+        body.video_path = videoFilePath.trim()
+      } else {
         body.directory_path = directoryPath.trim()
       }
       if (maxFrames !== '') body.max_frames = maxFrames
@@ -127,8 +127,9 @@ export default function VideoPage() {
       })
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: 'Unknown error' })) as { detail: string }
-        toast.error('Failed to start ingest', { description: err.detail })
+        const err = await res.json().catch(() => ({ detail: 'Unknown error' })) as { detail: string | unknown[] }
+        const detail = typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail)
+        toast.error('Failed to start ingest', { description: detail })
         return
       }
 
@@ -276,14 +277,14 @@ export default function VideoPage() {
               onClick={() => setInputMode('directory')}
               disabled={ingestInProgress}
             >
-              Directory Path
+              Directory
             </button>
             <button
-              className={`video-mode-btn${inputMode === 'upload' ? ' active' : ''}`}
-              onClick={() => setInputMode('upload')}
+              className={`video-mode-btn${inputMode === 'file' ? ' active' : ''}`}
+              onClick={() => setInputMode('file')}
               disabled={ingestInProgress}
             >
-              Upload Video
+              Single File
             </button>
           </div>
 
@@ -293,23 +294,25 @@ export default function VideoPage() {
               <input
                 type="text"
                 className="video-input"
-                placeholder="/path/to/raw/footage"
+                placeholder="C:\Videos\raw-footage"
                 value={directoryPath}
                 onChange={(e) => setDirectoryPath(e.target.value)}
                 disabled={ingestInProgress}
               />
-              <span className="video-hint">Path to directory containing raw video files</span>
+              <span className="video-hint">Path to directory containing raw video files (.mp4, .mov, .avi, .mkv, .webm)</span>
             </div>
           ) : (
             <div className="video-field">
-              <label className="video-label">Video file</label>
+              <label className="video-label">Video file path</label>
               <input
-                type="file"
-                accept="video/*"
-                className="video-file-input"
-                onChange={(e) => setVideoFile(e.target.files?.[0] ?? null)}
+                type="text"
+                className="video-input"
+                placeholder="C:\Videos\my-video.mp4"
+                value={videoFilePath}
+                onChange={(e) => setVideoFilePath(e.target.value)}
                 disabled={ingestInProgress}
               />
+              <span className="video-hint">Full path to a single video file</span>
             </div>
           )}
 

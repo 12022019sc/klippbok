@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { useImages } from '../hooks/useImages'
-import { useImportEvents } from '../hooks/useImportEvents'
 import { useAppStore } from '../stores/appStore'
 import { toast } from 'sonner'
 import MasonryGrid from '../components/Gallery/MasonryGrid'
@@ -24,9 +23,6 @@ export default function GalleryPage() {
   const selectionMode = useAppStore((s) => s.selectionMode)
   const selectedImageIds = useAppStore((s) => s.selectedImageIds)
   const toggleImageSelection = useAppStore((s) => s.toggleImageSelection)
-
-  // Subscribe to SSE events for active import
-  useImportEvents(importOperationId)
 
   const isImporting = importOperationId !== null
 

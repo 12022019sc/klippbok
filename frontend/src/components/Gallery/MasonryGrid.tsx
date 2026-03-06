@@ -1,5 +1,6 @@
 import { Masonry } from 'masonic'
 import type { GalleryItem } from '../../types/image'
+import { useAppStore } from '../../stores/appStore'
 import ThumbnailCard from './ThumbnailCard'
 
 interface MasonryGridProps {
@@ -21,6 +22,8 @@ export default function MasonryGrid({
   selectionMode = false,
   selectedIds,
 }: MasonryGridProps) {
+  const galleryFilter = useAppStore((s) => s.galleryFilter)
+
   function CardRenderer({ index, width, data }: RenderProps) {
     return (
       <ThumbnailCard
@@ -36,11 +39,13 @@ export default function MasonryGrid({
   return (
     <div className="gallery-container">
       <Masonry
+        key={galleryFilter}
         items={items}
         render={CardRenderer}
         columnGutter={8}
         columnWidth={220}
         overscanBy={2}
+        itemKey={(data: GalleryItem) => data.id}
       />
     </div>
   )

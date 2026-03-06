@@ -436,6 +436,11 @@ def _import_video(video_path: Path) -> ImageImportEntry:
             path=video_path,
             metadata=metadata,
             skipped=False,
+            video_meta={
+                "duration": video_meta.get("duration", 0),
+                "fps": video_meta.get("fps", 0),
+                "codec": video_meta.get("codec", "unknown"),
+            },
         )
     except Exception as exc:
         logger.error("Failed to probe video '%s': %s", video_path, exc)
@@ -471,6 +476,11 @@ def _entry_to_dict(entry: ImageImportEntry, to_rel: Callable[[Path], str]) -> di
         d["width"] = entry.metadata.width
         d["height"] = entry.metadata.height
         d["format"] = entry.metadata.format
+
+    if entry.video_meta:
+        d["duration"] = entry.video_meta.get("duration", 0)
+        d["fps"] = entry.video_meta.get("fps", 0)
+        d["codec"] = entry.video_meta.get("codec", "unknown")
 
     if entry.bucket:
         d["bucket"] = f"{entry.bucket[0]}x{entry.bucket[1]}"

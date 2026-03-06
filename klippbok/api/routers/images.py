@@ -37,6 +37,47 @@ MEDIA_TYPES: dict[str, str] = {
 router = APIRouter(prefix="/images", tags=["images"])
 
 
+# ---------------------------------------------------------------------------
+# File-serving endpoint — MUST be registered BEFORE /{image_id} catch-all
+# routes, otherwise FastAPI captures "file" as an image_id path parameter.
+# ---------------------------------------------------------------------------
+
+
+@router.get("/file")
+def serve_file(path: str, request: Request) -> FileResponse:
+    """Serve an arbitrary file from within the project directory.
+
+    Used by the frontend to display face cluster thumbnails and concept
+    reference images whose absolute paths are returned by the triage API.
+
+    Args:
+        path: Absolute path to the file to serve.
+        request: FastAPI request (used to access app.state.project_dir).
+
+    Returns:
+        FileResponse with appropriate MIME type.
+
+    Raises:
+        HTTPException 403: If the file is outside the project directory.
+        HTTPException 404: If the file does not exist.
+        HTTPException 409: If no project directory is selected.
+    """
+    project_dir: Path | None = request.app.state.project_dir
+    if project_dir is None:
+        raise HTTPException(status_code=409, detail="No project directory selected")
+
+    file_path = Path(path).resolve()
+    # Security: ensure file is under project_dir
+    if not str(file_path).startswith(str(project_dir.resolve())):
+        raise HTTPException(status_code=403, detail="Access denied")
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    suffix = file_path.suffix.lower()
+    media_type = MEDIA_TYPES.get(suffix, "application/octet-stream")
+    return FileResponse(file_path, media_type=media_type)
+
+
 def _image_id(relative_path: str) -> str:
     """Compute the image ID from its relative path.
 
@@ -49,7 +90,10 @@ def _image_id(relative_path: str) -> str:
     return hashlib.sha256(relative_path.encode()).hexdigest()[:16]
 
 
-def _entry_to_response(entry: dict) -> ImageStatusResponse:
+def _entry_to_response(
+    entry: dict,
+    triage_lookup: dict[str, dict] | None = None,
+) -> ImageStatusResponse:
     """Convert a manifest image dict to an ImageStatusResponse.
 
     Args:
@@ -76,6 +120,9 @@ def _entry_to_response(entry: dict) -> ImageStatusResponse:
     media_type = entry.get("type", "image")
     is_video = media_type == "video"
 
+    # Triage results from path-based lookup
+    triage_data = triage_lookup.get(relative_path) if triage_lookup else None
+
     return ImageStatusResponse(
         id=image_id,
         relative_path=relative_path,
@@ -91,6 +138,11 @@ def _entry_to_response(entry: dict) -> ImageStatusResponse:
         media_type=media_type,
         full_url=f"/api/v1/images/{image_id}/full",
         video_url=f"/api/v1/images/{image_id}/video" if is_video else None,
+        duration=entry.get("duration"),
+        fps=entry.get("fps"),
+        codec=entry.get("codec"),
+        triage_classification=triage_data["classification"] if triage_data else None,
+        best_score=triage_data["best_score"] if triage_data else None,
     )
 
 
@@ -137,6 +189,53 @@ def _find_entry_by_id(
     raise HTTPException(status_code=404, detail=f"Image '{image_id}' not found")
 
 
+def _build_triage_lookup(project_dir: Path) -> dict[str, dict]:
+    """Build a lookup dict from triage results, keyed by relative path.
+
+    Triage results store item_path as absolute paths. We normalize them
+    to relative paths (stripping the project_dir prefix) so they match
+    the gallery manifest's path field.
+
+    Args:
+        project_dir: Project root directory.
+
+    Returns:
+        Dict mapping relative_path -> {classification, best_score}.
+        Empty dict if no triage manifest exists.
+    """
+    import json as _json
+
+    triage_path = project_dir / ".klippbok" / "triage_manifest.json"
+    if not triage_path.exists():
+        return {}
+
+    try:
+        data = _json.loads(triage_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+    lookup: dict[str, dict] = {}
+    project_str = str(project_dir.resolve())
+
+    for result in data.get("results", []):
+        item_path = result.get("item_path", "")
+        # Normalize: strip project_dir prefix to get relative path
+        resolved = str(Path(item_path).resolve())
+        if resolved.startswith(project_str):
+            rel = resolved[len(project_str):].lstrip("/\\")
+            # Normalize separators to forward slashes (matches manifest)
+            rel = rel.replace("\\", "/")
+        else:
+            rel = item_path
+
+        lookup[rel] = {
+            "classification": result.get("classification"),
+            "best_score": result.get("best_score"),
+        }
+
+    return lookup
+
+
 @router.get("/", response_model=GalleryResponse)
 def list_images(request: Request) -> GalleryResponse:
     """List all images from the project manifest.
@@ -166,7 +265,14 @@ def list_images(request: Request) -> GalleryResponse:
     if not manifest or "images" not in manifest:
         return GalleryResponse(total=0, images=[])
 
-    images = [_entry_to_response(entry) for entry in manifest["images"]]
+    # Load triage results and build a path-based lookup.
+    # Triage item_path is absolute; we normalize to relative_path for joining.
+    triage_lookup = _build_triage_lookup(project_dir)
+
+    images = [
+        _entry_to_response(entry, triage_lookup=triage_lookup)
+        for entry in manifest["images"]
+    ]
     return GalleryResponse(total=len(images), images=images)
 
 

@@ -1,4 +1,5 @@
-import { useAppStore } from '../../stores/appStore'
+import { useState } from 'react'
+import { toast } from 'sonner'
 import type { GalleryItem } from '../../types/image'
 import StatusStrip from './StatusStrip'
 
@@ -27,9 +28,32 @@ export default function ThumbnailCard({
   selectionMode = false,
 }: ThumbnailCardProps) {
   const height = Math.round(width * (item.height / item.width))
+  const [addingConcept, setAddingConcept] = useState(false)
 
-  // Read triage score for this item from the store
-  const triageScore = useAppStore((s) => s.triageResults[item.id])
+  async function handleAddToConcepts(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (addingConcept) return
+    setAddingConcept(true)
+    try {
+      const res = await fetch('/api/v1/triage/concepts/add-from-gallery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_id: item.id, category: 'character' }),
+      })
+      if (res.ok) {
+        toast.success('Added to concepts')
+      } else {
+        const err = await res.json().catch(() => ({ detail: 'Unknown error' })) as { detail: string }
+        toast.error('Failed to add concept', { description: err.detail })
+      }
+    } catch (err) {
+      toast.error('Failed to add concept', {
+        description: err instanceof Error ? err.message : String(err),
+      })
+    } finally {
+      setAddingConcept(false)
+    }
+  }
 
   // Badge color by classification
   const badgeStyle: Record<string, string> = {
@@ -82,24 +106,38 @@ export default function ThumbnailCard({
       )}
 
       {/* Video duration badge (bottom-right) */}
-      {item.media_type === 'video' && (item as GalleryItem & { duration?: number }).duration !== undefined && (
+      {item.media_type === 'video' && item.duration !== undefined && (
         <div className="video-duration-badge" aria-hidden="true">
-          {formatDuration((item as GalleryItem & { duration?: number }).duration!)}
+          {formatDuration(item.duration)}
         </div>
       )}
 
       {/* Triage score badge (top-right) */}
-      {triageScore && (
+      {item.triage_classification && item.best_score !== undefined && (
         <div
           className="triage-score-badge"
           style={{
-            backgroundColor: badgeStyle[triageScore.classification] ?? '#6b7280',
+            backgroundColor: badgeStyle[item.triage_classification] ?? '#6b7280',
           }}
-          title={`${triageScore.classification}: ${triageScore.best_score.toFixed(2)}`}
+          title={`${item.triage_classification}: ${item.best_score.toFixed(2)}`}
           aria-hidden="true"
         >
-          {triageScore.best_score.toFixed(2)}
+          {item.best_score.toFixed(2)}
         </div>
+      )}
+
+      {/* Add to Concepts button (top-left, visible on hover) */}
+      {item.media_type === 'image' && (
+        <button
+          className="add-concept-btn"
+          title="Add to Concepts"
+          onClick={handleAddToConcepts}
+          disabled={addingConcept}
+          type="button"
+          aria-label="Add to concepts"
+        >
+          +
+        </button>
       )}
 
       {isSelected && (

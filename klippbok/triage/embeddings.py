@@ -82,9 +82,10 @@ class CLIPEmbedder:
         """
         check_clip_available()
 
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model_name = model_name
         self._processor = CLIPProcessor.from_pretrained(model_name)
-        self._model = CLIPModel.from_pretrained(model_name)
+        self._model = CLIPModel.from_pretrained(model_name).to(self.device)
         self._model.eval()
 
     def _get_image_features(self, pixel_values: torch.Tensor) -> torch.Tensor:
@@ -133,10 +134,11 @@ class CLIPEmbedder:
 
         with torch.no_grad():
             inputs = self._processor(images=image, return_tensors="pt")
-            features = self._get_image_features(inputs["pixel_values"])
+            pixel_values = inputs["pixel_values"].to(self.device)
+            features = self._get_image_features(pixel_values)
 
         # features shape: (1, 512) — one image, 512-dim embedding
-        embedding = features[0].numpy()
+        embedding = features[0].cpu().numpy()
         norm = np.linalg.norm(embedding)
         if norm > 0:
             embedding = embedding / norm
@@ -167,12 +169,13 @@ class CLIPEmbedder:
 
         with torch.no_grad():
             inputs = self._processor(images=images, return_tensors="pt")
-            features = self._get_image_features(inputs["pixel_values"])
+            pixel_values = inputs["pixel_values"].to(self.device)
+            features = self._get_image_features(pixel_values)
 
         # features shape: (batch_size, 512)
         embeddings = []
         for i in range(len(image_paths)):
-            emb = features[i].numpy()
+            emb = features[i].cpu().numpy()
             norm = np.linalg.norm(emb)
             if norm > 0:
                 emb = emb / norm
@@ -197,15 +200,15 @@ class CLIPEmbedder:
         with torch.no_grad():
             inputs = self._processor(text=[text], return_tensors="pt", padding=True)
             text_outputs = self._model.text_model(
-                input_ids=inputs["input_ids"],
-                attention_mask=inputs["attention_mask"],
+                input_ids=inputs["input_ids"].to(self.device),
+                attention_mask=inputs["attention_mask"].to(self.device),
             )
             # pooler_output: CLS token after layer norm (batch_size, 512 or 768)
             pooled = text_outputs.pooler_output
             # text_projection maps to shared 512-dim space
             features = self._model.text_projection(pooled)
 
-        embedding = features[0].numpy()
+        embedding = features[0].cpu().numpy()
         norm = np.linalg.norm(embedding)
         if norm > 0:
             embedding = embedding / norm
@@ -226,15 +229,15 @@ class CLIPEmbedder:
         with torch.no_grad():
             inputs = self._processor(text=texts, return_tensors="pt", padding=True)
             text_outputs = self._model.text_model(
-                input_ids=inputs["input_ids"],
-                attention_mask=inputs["attention_mask"],
+                input_ids=inputs["input_ids"].to(self.device),
+                attention_mask=inputs["attention_mask"].to(self.device),
             )
             pooled = text_outputs.pooler_output
             features = self._model.text_projection(pooled)
 
         embeddings = []
         for i in range(len(texts)):
-            emb = features[i].numpy()
+            emb = features[i].cpu().numpy()
             norm = np.linalg.norm(emb)
             if norm > 0:
                 emb = emb / norm

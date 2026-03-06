@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { useAppStore } from '../stores/appStore'
 import { useTriageEvents } from '../hooks/useTriageEvents'
 import { useFaceEvents } from '../hooks/useFaceEvents'
@@ -47,6 +48,8 @@ export default function TriagePage() {
 
   // Results display
   const [resultsList, setResultsList] = useState<TriageResult[]>([])
+  // Track broken concept images for triage warning
+  const [brokenConcepts, setBrokenConcepts] = useState(0)
 
   // Fetch health check on mount
   useEffect(() => {
@@ -125,19 +128,31 @@ export default function TriagePage() {
 
   async function handleRunTriage() {
     if (!projectDir) return
+    if (brokenConcepts > 0) {
+      const ok = window.confirm(
+        `${brokenConcepts} concept reference image(s) failed to load. Triage results may be incomplete. Continue anyway?`
+      )
+      if (!ok) return
+    }
     try {
       const res = await fetch('/api/v1/triage/run/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ threshold: triageThreshold }),
       })
-      if (!res.ok) return
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Unknown error' })) as { detail: string }
+        toast.error('Failed to start triage', { description: err.detail })
+        return
+      }
       const data = await res.json() as { operation_id: string }
       clearTriageResults()
       setResultsList([])
       setTriageOpId(data.operation_id)
-    } catch {
-      // ignore
+    } catch (err) {
+      toast.error('Failed to start triage', {
+        description: err instanceof Error ? err.message : String(err),
+      })
     }
   }
 
@@ -147,6 +162,10 @@ export default function TriagePage() {
     try {
       await fetch(`/api/v1/triage/run/${triageOpId}/cancel`, { method: 'POST' })
       setTriageOpId(null)
+    } catch (err) {
+      toast.error('Failed to cancel triage', {
+        description: err instanceof Error ? err.message : String(err),
+      })
     } finally {
       setIsCancelling(false)
     }
@@ -160,12 +179,18 @@ export default function TriagePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       })
-      if (!res.ok) return
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Unknown error' })) as { detail: string }
+        toast.error('Failed to start face embedding', { description: err.detail })
+        return
+      }
       const data = await res.json() as { operation_id: string }
       setFaceOpId(data.operation_id)
       setFaceClusters([])
-    } catch {
-      // ignore
+    } catch (err) {
+      toast.error('Failed to start face embedding', {
+        description: err instanceof Error ? err.message : String(err),
+      })
     }
   }
 
@@ -175,6 +200,10 @@ export default function TriagePage() {
     try {
       await fetch(`/api/v1/triage/face/${faceOpId}/cancel`, { method: 'POST' })
       setFaceOpId(null)
+    } catch (err) {
+      toast.error('Failed to cancel face embedding', {
+        description: err instanceof Error ? err.message : String(err),
+      })
     } finally {
       setIsCancellingFace(false)
     }
@@ -184,15 +213,22 @@ export default function TriagePage() {
     const name = clusterNames[clusterId] ?? ''
     if (!name.trim()) return
     try {
-      await fetch(`/api/v1/triage/face/clusters/${clusterId}/name`, {
+      const res = await fetch(`/api/v1/triage/face/clusters/${clusterId}/name`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), confirmed: true }),
       })
-      // Refresh concepts after confirming cluster
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Unknown error' })) as { detail: string }
+        toast.error('Failed to confirm cluster', { description: err.detail })
+        return
+      }
+      toast.success(`Cluster named "${name.trim()}"`)
       fetchConcepts()
-    } catch {
-      // ignore
+    } catch (err) {
+      toast.error('Failed to confirm cluster', {
+        description: err instanceof Error ? err.message : String(err),
+      })
     }
   }
 
@@ -218,10 +254,16 @@ export default function TriagePage() {
         body: formData,
       })
       if (res.ok) {
+        toast.success('Concept uploaded')
         fetchConcepts()
+      } else {
+        const err = await res.json().catch(() => ({ detail: 'Unknown error' })) as { detail: string }
+        toast.error('Upload failed', { description: err.detail })
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      toast.error('Upload failed', {
+        description: err instanceof Error ? err.message : String(err),
+      })
     }
     // Reset input
     if (conceptFileInputRef.current) {
@@ -258,6 +300,12 @@ export default function TriagePage() {
                   src={`/api/v1/images/file?path=${encodeURIComponent(c.image_path)}`}
                   alt={c.name}
                   loading="lazy"
+                  onError={(e) => {
+                    e.currentTarget.style.background = '#374151'
+                    e.currentTarget.style.objectFit = 'contain'
+                    e.currentTarget.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%236b7280"><rect width="24" height="24" fill="%231f2937"/><path d="M12 4a4 4 0 100 8 4 4 0 000-8zm-6 14c0-3.31 4.03-5 6-5s6 1.69 6 5v1H6v-1z"/></svg>')
+                    setBrokenConcepts((n) => n + 1)
+                  }}
                 />
                 <div className="concept-thumb-label">{c.name}</div>
               </div>
@@ -573,6 +621,10 @@ export default function TriagePage() {
                               src={`/api/v1/images/file?path=${encodeURIComponent(imgPath)}`}
                               alt={`Face ${i + 1}`}
                               loading="lazy"
+                              onError={(e) => {
+                                e.currentTarget.style.background = '#374151'
+                                e.currentTarget.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%236b7280"><rect width="24" height="24" fill="%231f2937"/><path d="M12 4a4 4 0 100 8 4 4 0 000-8zm-6 14c0-3.31 4.03-5 6-5s6 1.69 6 5v1H6v-1z"/></svg>')
+                              }}
                             />
                           </div>
                         )
