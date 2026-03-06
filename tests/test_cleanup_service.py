@@ -193,8 +193,8 @@ class TestClassifyItem:
 class TestClassifyItems:
     """Test batch classification with mocked dependencies."""
 
-    @patch("klippbok.services.cleanup_service.check_insightface_available", return_value=False)
-    @patch("klippbok.services.cleanup_service._get_or_create_embedder")
+    @patch("klippbok.services.face_service.check_insightface_available", return_value=False)
+    @patch("klippbok.services.triage_service._get_or_create_embedder")
     def test_classify_items_calls_progress_callback(
         self, mock_embedder_fn, mock_insightface, tmp_path: Path
     ):
@@ -231,8 +231,8 @@ class TestClassifyItems:
         assert progress_calls[0] == (1, 2)
         assert progress_calls[1] == (2, 2)
 
-    @patch("klippbok.services.cleanup_service.check_insightface_available", return_value=False)
-    @patch("klippbok.services.cleanup_service._get_or_create_embedder")
+    @patch("klippbok.services.face_service.check_insightface_available", return_value=False)
+    @patch("klippbok.services.triage_service._get_or_create_embedder")
     def test_classify_items_encodes_prompts_once(
         self, mock_embedder_fn, mock_insightface, tmp_path: Path
     ):
@@ -265,14 +265,14 @@ class TestClassifyItems:
 class TestVideoClassification:
     """Test video classification with frame sampling."""
 
-    @patch("klippbok.services.cleanup_service.check_insightface_available", return_value=False)
-    @patch("klippbok.services.cleanup_service._get_or_create_embedder")
-    @patch("klippbok.services.cleanup_service.sample_clip_frames")
-    @patch("klippbok.services.cleanup_service.cleanup_frames")
+    @patch("klippbok.services.face_service.check_insightface_available", return_value=False)
+    @patch("klippbok.services.triage_service._get_or_create_embedder")
     def test_video_samples_frames_uses_best_score(
-        self, mock_cleanup, mock_sample, mock_embedder_fn, mock_insightface, tmp_path: Path
+        self, mock_embedder_fn, mock_insightface, tmp_path: Path
     ):
         """Video files should sample frames and use the best CLIP score."""
+        import klippbok.services.cleanup_service as cs
+
         video = tmp_path / "clip.mp4"
         video.write_bytes(b"\x00" * 100)
 
@@ -282,7 +282,12 @@ class TestVideoClassification:
         frame3 = tmp_path / "frame3.jpg"
         for f in [frame1, frame2, frame3]:
             f.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 100)
-        mock_sample.return_value = [frame1, frame2, frame3]
+
+        # Patch the module-level lazy-loaded sampler functions
+        mock_sample = MagicMock(return_value=[frame1, frame2, frame3])
+        mock_cleanup = MagicMock()
+        cs.sample_clip_frames = mock_sample
+        cs.cleanup_frames = mock_cleanup
 
         embedder = MagicMock()
         # Different scores per frame
@@ -310,6 +315,10 @@ class TestVideoClassification:
         assert results[0].clip_score > 0.2
         mock_sample.assert_called_once()
         mock_cleanup.assert_called_once()
+
+        # Reset module-level state
+        cs.sample_clip_frames = None
+        cs.cleanup_frames = None
 
 
 # ---------------------------------------------------------------------------
