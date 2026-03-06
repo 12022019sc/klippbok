@@ -3,11 +3,27 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
+stopped_at: Completed 07.1-02-PLAN.md (CleanupPage UI, Gallery button, NavBar routing, frontend build)
+last_updated: "2026-03-06T18:32:57.113Z"
+last_activity: 2026-03-06 -- Completed 07.1-01-PLAN.md (cleanup classification service, API router with SSE, 26 tests)
+progress:
+  total_phases: 11
+  completed_phases: 9
+  total_plans: 34
+  completed_plans: 33
+  percent: 97
+---
+
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: executing
 stopped_at: Phase 07.1 context gathered
 last_updated: "2026-03-06T17:55:55.120Z"
 last_activity: 2026-03-03 -- Completed 05-04-PLAN.md (ProcessPage wizard, UpscaleStep, useUpscaleEvents, Proceed to Captioning save, source_path fix)
 progress:
-  total_phases: 11
+  [██████████] 97%
   completed_phases: 8
   total_plans: 32
   completed_plans: 31
@@ -132,6 +148,7 @@ Progress: [█████████████░] ~90% (32 of ~34 estimated
 | Phase 07 P04 | 351 | 2 tasks | 9 files |
 | Phase 07 P05 | 5 | 1 tasks | 2 files |
 | Phase 07.1 P01 | 424 | 2 tasks | 5 files |
+| Phase 07.1 P02 | 240 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -262,6 +279,7 @@ Recent decisions affecting current work:
 - [Phase 07.1-01]: CLEAN-SCORE-01: CLIP score normalization maps [threshold-0.15, threshold+0.15] to [0,1] with +0.3 face boost
 - [Phase 07.1-01]: CLEAN-LAYER-01: InsightFace only runs on CLIP-positive items (clip_score >= threshold) -- saves compute
 - [Phase 07.1-01]: CLEAN-PATCH-01: cv2 imported at module level for testability; sampler functions lazy-loaded via module globals
+- [Phase 07.1]: CLEAN-UI-01: Auto-start uses appStore flag + URL param with hasAutoStarted ref guard
 
 ### Roadmap Evolution
 
@@ -281,6 +299,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-06T18:25:11Z
-Stopped at: Completed 07.1-01-PLAN.md (cleanup classification service, API router with SSE, 26 tests)
-Resume file: .planning/phases/07.1-gallery-cleanup-tool/07.1-01-SUMMARY.md
+Last session: 2026-03-06T18:32:57.110Z
+Stopped at: Completed 07.1-02-PLAN.md (CleanupPage UI, Gallery button, NavBar routing, frontend build)
+Resume file: None
