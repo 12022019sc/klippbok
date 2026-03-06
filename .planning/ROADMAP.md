@@ -194,7 +194,7 @@ Plans:
   3. Non-matching media (no subject, wrong subject type, inappropriate content) is flagged with a clear visual indicator in the gallery
   4. User can review flagged items and confirm removal — removed media is moved to a configurable `_review/` subfolder on disk, NOT deleted
   5. The cleanup process handles large folders (1000+ items) with progress indication and can be cancelled mid-operation
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 07.1-01-PLAN.md -- Backend: cleanup service (CLIP+InsightFace classification), cleanup API router with SSE

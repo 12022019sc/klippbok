@@ -62,11 +62,11 @@
 
 ### Cleanup
 
-- [ ] **CLEAN-01**: User can trigger a cleanup scan from the GUI that analyzes all imported images and videos
-- [ ] **CLEAN-02**: ML-based person detection identifies images/videos containing a human subject using CLIP + InsightFace
-- [ ] **CLEAN-03**: Non-matching media is flagged with clear visual indicator and confidence score in the cleanup review page
-- [ ] **CLEAN-04**: User can review flagged items and confirm removal -- moved to _review/ subfolder, NOT deleted
-- [ ] **CLEAN-05**: Cleanup handles large folders (1000+) with progress indication and can be cancelled mid-operation
+- [x] **CLEAN-01**: User can trigger a cleanup scan from the GUI that analyzes all imported images and videos
+- [x] **CLEAN-02**: ML-based person detection identifies images/videos containing a human subject using CLIP + InsightFace
+- [x] **CLEAN-03**: Non-matching media is flagged with clear visual indicator and confidence score in the cleanup review page
+- [x] **CLEAN-04**: User can review flagged items and confirm removal -- moved to _review/ subfolder, NOT deleted
+- [x] **CLEAN-05**: Cleanup handles large folders (1000+) with progress indication and can be cancelled mid-operation
 
 ### Export
 
@@ -182,11 +182,11 @@
 | ARCH-06 | Phase 4 | Pending |
 | ARCH-07 | Phase 1 | Complete |
 | ARCH-08 | Phase 7 | Complete |
-| CLEAN-01 | Phase 7.1 | Pending |
-| CLEAN-02 | Phase 7.1 | Pending |
-| CLEAN-03 | Phase 7.1 | Pending |
-| CLEAN-04 | Phase 7.1 | Pending |
-| CLEAN-05 | Phase 7.1 | Pending |
+| CLEAN-01 | Phase 7.1 | Complete |
+| CLEAN-02 | Phase 7.1 | Complete |
+| CLEAN-03 | Phase 7.1 | Complete |
+| CLEAN-04 | Phase 7.1 | Complete |
+| CLEAN-05 | Phase 7.1 | Complete |
 
 **Coverage:**
 - v1 requirements: 60 total
