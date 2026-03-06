@@ -81,16 +81,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** Take raw images/video of any size and produce correctly bucketed, captioned, training-ready datasets for any supported diffusion model through an intuitive web interface.
-**Current focus:** Phase 5 - Interactive Crop Editor (Complete)
+**Current focus:** Phase 07.1 - Gallery Cleanup Tool
 
 ## Current Position
 
-Phase: 5 of 8 (Interactive Crop Editor) -- Complete
-Plan: 4 of 4 in phase 5
-Status: Complete — awaiting phase verification
-Last activity: 2026-03-03 -- Completed 05-04-PLAN.md (ProcessPage wizard, UpscaleStep, useUpscaleEvents, Proceed to Captioning save, source_path fix)
+Phase: 07.1-gallery-cleanup-tool
+Plan: 1 of 2 in phase 07.1 (complete)
+Status: Executing
+Last activity: 2026-03-06 -- Completed 07.1-01-PLAN.md (cleanup classification service, API router with SSE, 26 tests)
 
-Progress: [████████████░] ~85% (15 of ~20 estimated plans)
+Progress: [█████████████░] ~90% (32 of ~34 estimated plans)
 
 ## Performance Metrics
 
@@ -131,6 +131,7 @@ Progress: [████████████░] ~85% (15 of ~20 estimated pl
 | Phase 07 P03 | 258 | 2 tasks | 8 files |
 | Phase 07 P04 | 351 | 2 tasks | 9 files |
 | Phase 07 P05 | 5 | 1 tasks | 2 files |
+| Phase 07.1 P01 | 424 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -258,6 +259,9 @@ Recent decisions affecting current work:
 - [Phase 07-05]: UPLOAD-01: Write upload to temp file in project root then use add_concept_reference() for copy — avoids shutil.SameFileError
 - [Phase 07-05]: UPLOAD-02: Register /concepts/upload BEFORE /concepts to prevent FastAPI path-param capture
 - [Phase 07-05]: UPLOAD-03: Rename temp file to original filename before passing to add_concept_reference() for correct ConceptReference name/extension
+- [Phase 07.1-01]: CLEAN-SCORE-01: CLIP score normalization maps [threshold-0.15, threshold+0.15] to [0,1] with +0.3 face boost
+- [Phase 07.1-01]: CLEAN-LAYER-01: InsightFace only runs on CLIP-positive items (clip_score >= threshold) -- saves compute
+- [Phase 07.1-01]: CLEAN-PATCH-01: cv2 imported at module level for testability; sampler functions lazy-loaded via module globals
 
 ### Roadmap Evolution
 
@@ -277,6 +281,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-06T17:55:55.117Z
-Stopped at: Phase 07.1 context gathered
-Resume file: .planning/phases/07.1-gallery-cleanup-tool/07.1-CONTEXT.md
+Last session: 2026-03-06T18:25:11Z
+Stopped at: Completed 07.1-01-PLAN.md (cleanup classification service, API router with SSE, 26 tests)
+Resume file: .planning/phases/07.1-gallery-cleanup-tool/07.1-01-SUMMARY.md
