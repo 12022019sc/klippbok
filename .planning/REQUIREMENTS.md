@@ -60,6 +60,14 @@
 - [x] **GUI-08**: Video pipeline accessible from GUI (existing ingest, scan, triage workflows)
 - [ ] **GUI-09**: Progress indicators for long-running operations (captioning, auto-crop batch, export)
 
+### Cleanup
+
+- [ ] **CLEAN-01**: User can trigger a cleanup scan from the GUI that analyzes all imported images and videos
+- [ ] **CLEAN-02**: ML-based person detection identifies images/videos containing a human subject using CLIP + InsightFace
+- [ ] **CLEAN-03**: Non-matching media is flagged with clear visual indicator and confidence score in the cleanup review page
+- [ ] **CLEAN-04**: User can review flagged items and confirm removal -- moved to _review/ subfolder, NOT deleted
+- [ ] **CLEAN-05**: Cleanup handles large folders (1000+) with progress indication and can be cancelled mid-operation
+
 ### Export
 
 - [ ] **EXPT-01**: Export dataset as kohya/sd-scripts folder structure (repeats_trigger class/ format)
@@ -174,10 +182,15 @@
 | ARCH-06 | Phase 4 | Pending |
 | ARCH-07 | Phase 1 | Complete |
 | ARCH-08 | Phase 7 | Complete |
+| CLEAN-01 | Phase 7.1 | Pending |
+| CLEAN-02 | Phase 7.1 | Pending |
+| CLEAN-03 | Phase 7.1 | Pending |
+| CLEAN-04 | Phase 7.1 | Pending |
+| CLEAN-05 | Phase 7.1 | Pending |
 
 **Coverage:**
-- v1 requirements: 55 total
-- Mapped to phases: 55
+- v1 requirements: 60 total
+- Mapped to phases: 60
 - Unmapped: 0
 
 ---

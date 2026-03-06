@@ -28,8 +28,19 @@ export default function CleanupPage() {
     if (events.isComplete && events.results.length > 0) {
       setCleanupResults(events.results)
       setOperationId(null) // disconnect SSE
+    } else if (events.isComplete && events.results.length === 0 && operationId) {
+      // Fallback: fetch results from GET endpoint if SSE payload was empty/too large
+      fetch(`/api/v1/cleanup/results/${operationId}`)
+        .then((res) => res.json())
+        .then((data: CleanupClassification[]) => {
+          if (data.length > 0) {
+            setCleanupResults(data)
+          }
+        })
+        .catch(() => {}) // Results endpoint is best-effort fallback
+        .finally(() => setOperationId(null))
     }
-  }, [events.isComplete, events.results, setCleanupResults])
+  }, [events.isComplete, events.results, operationId, setCleanupResults])
 
   // Auto-start behavior
   useEffect(() => {
