@@ -13,6 +13,12 @@ export default function CleanupPage() {
   const [confirming, setConfirming] = useState(false)
   const hasAutoStarted = useRef(false)
 
+  const [mode, setMode] = useState<'text' | 'reference'>('text')
+  const [subjectDescription, setSubjectDescription] = useState('')
+  const [selectedRefIds, setSelectedRefIds] = useState<string[]>([])
+  const [galleryImages, setGalleryImages] = useState<Array<{ id: string; thumbnail_url: string; relative_path: string }>>([])
+  const [loadingGallery, setLoadingGallery] = useState(false)
+
   const cleanupAutoStart = useAppStore((s) => s.cleanupAutoStart)
   const setCleanupAutoStart = useAppStore((s) => s.setCleanupAutoStart)
   const cleanupResults = useAppStore((s) => s.cleanupResults)
@@ -53,13 +59,37 @@ export default function CleanupPage() {
     }
   }, [cleanupAutoStart, searchParams, setCleanupAutoStart])
 
+  useEffect(() => {
+    if (mode === 'reference' && galleryImages.length === 0 && !loadingGallery) {
+      setLoadingGallery(true)
+      fetch('/api/v1/images/')
+        .then((res) => res.json())
+        .then((data: { total: number; images: Array<{ id: string; thumbnail_url: string; relative_path: string }> }) => {
+          setGalleryImages(data.images)
+        })
+        .catch(() => toast.error('Failed to load gallery'))
+        .finally(() => setLoadingGallery(false))
+    }
+  }, [mode, galleryImages.length, loadingGallery])
+
+  function toggleRef(id: string) {
+    setSelectedRefIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : prev.length < 3 ? [...prev, id] : prev,
+    )
+  }
+
   async function startScan() {
     clearCleanup()
+    const body: Record<string, unknown> =
+      mode === 'text'
+        ? { mode: 'text', subject_description: subjectDescription.trim() }
+        : { mode: 'reference', reference_image_ids: selectedRefIds }
+
     try {
       const res = await fetch('/api/v1/cleanup/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify(body),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
@@ -125,6 +155,9 @@ export default function CleanupPage() {
     )
   }
 
+  const canStart =
+    mode === 'text' ? subjectDescription.trim().length > 0 : selectedRefIds.length > 0
+
   const isScanning = operationId !== null && !events.isComplete
   const hasResults = cleanupResults.length > 0
   const flaggedItems = getFlaggedItems()
@@ -151,7 +184,7 @@ export default function CleanupPage() {
     return (
       <div style={{ padding: '2rem', maxWidth: 600 }}>
         <h1 className="page-title">Cleanup Scan</h1>
-        <p className="page-subtitle">Scanning media for items without a clear human subject...</p>
+        <p className="page-subtitle">Scanning media for items matching your subject...</p>
         <div className="video-progress">
           <div className="video-progress-header">
             <span className="video-progress-stage">Classifying items</span>
@@ -261,18 +294,84 @@ export default function CleanupPage() {
 
   // Idle state (no scan running, no results)
   return (
-    <div style={{ padding: '2rem', maxWidth: 600 }}>
+    <div style={{ padding: '2rem', maxWidth: 700 }}>
       <h1 className="page-title">Cleanup</h1>
-      <p className="page-subtitle">
-        Scan all imported media to identify items without a clear human subject.
-      </p>
-      <p style={{ color: '#9ca3af', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-        The scan uses CLIP text-to-image similarity and InsightFace detection to classify each item.
-        Flagged items can be reviewed before removal.
-      </p>
-      <button className="import-button" onClick={startScan}>
+      <p className="page-subtitle">Define the subject to keep, then scan.</p>
+
+      {/* Mode toggle */}
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
+        <button
+          className={`cleanup-mode-btn ${mode === 'text' ? 'cleanup-mode-active' : ''}`}
+          onClick={() => setMode('text')}
+        >
+          Describe Subject
+        </button>
+        <button
+          className={`cleanup-mode-btn ${mode === 'reference' ? 'cleanup-mode-active' : ''}`}
+          onClick={() => setMode('reference')}
+        >
+          Reference Images
+        </button>
+      </div>
+
+      {/* Text mode */}
+      {mode === 'text' && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: '#d1d5db', fontSize: '0.85rem' }}>
+            Describe the subject to keep (e.g., "woman with dark hair", "golden retriever")
+          </label>
+          <input
+            type="text"
+            value={subjectDescription}
+            onChange={(e) => setSubjectDescription(e.target.value)}
+            placeholder="woman with dark hair"
+            className="cleanup-text-input"
+            onKeyDown={(e) => { if (e.key === 'Enter' && canStart) startScan() }}
+          />
+        </div>
+      )}
+
+      {/* Reference mode */}
+      {mode === 'reference' && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: '#d1d5db', fontSize: '0.85rem' }}>
+            Pick 1-3 reference images of your target subject
+          </label>
+          {loadingGallery ? (
+            <p style={{ color: '#9ca3af' }}>Loading gallery...</p>
+          ) : galleryImages.length === 0 ? (
+            <p style={{ color: '#9ca3af' }}>No images in gallery. Import images first.</p>
+          ) : (
+            <>
+              <p style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.5rem' }}>
+                Selected: {selectedRefIds.length}/3
+              </p>
+              <div className="cleanup-ref-grid">
+                {galleryImages.map((img) => (
+                  <div
+                    key={img.id}
+                    className={`cleanup-ref-card ${selectedRefIds.includes(img.id) ? 'cleanup-ref-selected' : ''}`}
+                    onClick={() => toggleRef(img.id)}
+                    title={img.relative_path}
+                  >
+                    <img src={img.thumbnail_url} alt={img.relative_path} loading="lazy" />
+                    {selectedRefIds.includes(img.id) && (
+                      <span className="cleanup-ref-check">&#10003;</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      <button className="import-button" onClick={startScan} disabled={!canStart}>
         Start Cleanup Scan
       </button>
+      <p style={{ color: '#6b7280', fontSize: '0.75rem', marginTop: '0.5rem' }}>
+        CLIP {mode === 'reference' ? 'image-to-image' : 'text-to-image'} + InsightFace
+      </p>
     </div>
   )
 }

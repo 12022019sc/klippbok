@@ -12,3 +12,10 @@ export interface CleanupProgress {
   total: number
   message: string
 }
+
+export interface CleanupStartRequest {
+  mode: 'text' | 'reference'
+  subject_description?: string
+  reference_image_ids?: string[]
+  clip_threshold?: number
+}
