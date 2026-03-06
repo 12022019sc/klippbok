@@ -132,11 +132,16 @@ class TestClassifyItem:
                 negative_embeddings=neg_embs,
                 clip_threshold=0.25,
                 face_app=face_app,
+                project_dir=tmp_path,
             )
 
         assert result.label == "keep"
         assert result.confidence >= 0.6
         assert result.has_face is True
+        # item_id should be SHA256 of relative path ("test.jpg")
+        import hashlib
+        expected_id = hashlib.sha256("test.jpg".encode()).hexdigest()[:16]
+        assert result.item_id == expected_id
 
     def test_low_clip_skips_insightface_returns_remove(self, tmp_path: Path):
         """Low CLIP score -> skip InsightFace, label=remove."""
@@ -154,6 +159,7 @@ class TestClassifyItem:
             negative_embeddings=neg_embs,
             clip_threshold=0.25,
             face_app=face_app,
+            project_dir=tmp_path,
         )
 
         assert result.label == "remove"
@@ -180,6 +186,7 @@ class TestClassifyItem:
                 negative_embeddings=neg_embs,
                 clip_threshold=0.25,
                 face_app=face_app,
+                project_dir=tmp_path,
             )
 
         assert result.label == "review"

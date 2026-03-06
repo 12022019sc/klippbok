@@ -159,17 +159,19 @@ async def _run_cleanup_bg(
             ),
         )
 
-        # Store results for retrieval
-        _cleanup_results[op_id] = [r.model_dump() for r in results]
+        # Store results for retrieval (fallback for GET endpoint)
+        result_dicts = [r.model_dump() for r in results]
+        _cleanup_results[op_id] = result_dicts
 
         await queue.put({
-            "event": "cleanup_progress",
+            "event": "cleanup_done",
             "data": {
                 "operation_id": op_id,
                 "current": total,
                 "total": total,
                 "message": f"Cleanup complete: {len(results)} items classified.",
                 "status": "complete",
+                "results": result_dicts,
             },
         })
 

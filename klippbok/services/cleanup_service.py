@@ -139,6 +139,7 @@ def classify_item(
     negative_embeddings: list[np.ndarray],
     clip_threshold: float,
     face_app: Any | None,
+    project_dir: Path | None = None,
 ) -> CleanupClassification:
     """Classify a single image using CLIP scores and optional face detection.
 
@@ -184,8 +185,12 @@ def classify_item(
     confidence = compute_confidence(clip_score, has_face, clip_threshold)
     label = _classify_label(confidence)
 
-    # Compute item ID
-    item_id = hashlib.sha256(str(image_path).encode()).hexdigest()[:16]
+    # Compute item ID from relative path (matches images router convention)
+    if project_dir is not None:
+        relative_path = str(image_path.relative_to(project_dir))
+    else:
+        relative_path = str(image_path)
+    item_id = hashlib.sha256(relative_path.encode()).hexdigest()[:16]
 
     return CleanupClassification(
         item_path=str(image_path),
@@ -263,13 +268,13 @@ def classify_items(
             # Video: sample frames, classify each, use best score
             result = _classify_video(
                 item_path, embedder, positive_embeddings, negative_embeddings,
-                clip_threshold, face_app,
+                clip_threshold, face_app, project_dir=project_dir,
             )
         else:
             # Image: classify directly
             result = classify_item(
                 item_path, embedder, positive_embeddings, negative_embeddings,
-                clip_threshold, face_app,
+                clip_threshold, face_app, project_dir=project_dir,
             )
 
         results.append(result)
@@ -306,6 +311,7 @@ def _classify_video(
     clip_threshold: float,
     face_app: Any | None,
     num_frames: int = 3,
+    project_dir: Path | None = None,
 ) -> CleanupClassification:
     """Classify a video by sampling frames and using the best CLIP score.
 
@@ -331,7 +337,8 @@ def _classify_video(
 
     if not frame_paths:
         # No frames: treat as low-confidence remove
-        item_id = hashlib.sha256(str(video_path).encode()).hexdigest()[:16]
+        rel = str(video_path.relative_to(project_dir)) if project_dir else str(video_path)
+        item_id = hashlib.sha256(rel.encode()).hexdigest()[:16]
         return CleanupClassification(
             item_path=str(video_path),
             item_id=item_id,
@@ -358,7 +365,8 @@ def _classify_video(
         pass
 
     # Return best result but with original video path
-    item_id = hashlib.sha256(str(video_path).encode()).hexdigest()[:16]
+    rel = str(video_path.relative_to(project_dir)) if project_dir else str(video_path)
+    item_id = hashlib.sha256(rel.encode()).hexdigest()[:16]
     return CleanupClassification(
         item_path=str(video_path),
         item_id=item_id,
