@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { useImages } from '../hooks/useImages'
 import { useAppStore } from '../stores/appStore'
 import { toast } from 'sonner'
@@ -9,6 +10,7 @@ import ImageLightbox from '../components/Lightbox/ImageLightbox'
 import type { GalleryItem } from '../types/image'
 
 export default function GalleryPage() {
+  const navigate = useNavigate()
   const { data, isLoading, error } = useImages()
 
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
@@ -23,6 +25,7 @@ export default function GalleryPage() {
   const selectionMode = useAppStore((s) => s.selectionMode)
   const selectedImageIds = useAppStore((s) => s.selectedImageIds)
   const toggleImageSelection = useAppStore((s) => s.toggleImageSelection)
+  const setCleanupAutoStart = useAppStore((s) => s.setCleanupAutoStart)
 
   const isImporting = importOperationId !== null
 
@@ -139,7 +142,18 @@ export default function GalleryPage() {
     <>
       <div className="gallery-header-bar">
         <SelectionToolbar items={images} />
-        <GalleryFilter />
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <button
+            className="video-btn-secondary"
+            onClick={() => {
+              setCleanupAutoStart(true)
+              navigate('/cleanup')
+            }}
+          >
+            Cleanup
+          </button>
+          <GalleryFilter />
+        </div>
       </div>
       <MasonryGrid
         items={images}
