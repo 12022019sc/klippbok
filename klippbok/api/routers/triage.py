@@ -6,7 +6,8 @@ Endpoints:
     POST /triage/run/{op_id}/cancel            -- Cancel triage operation.
     GET  /triage/results                       -- Get persisted triage results.
     GET  /triage/concepts                      -- List all concept references.
-    POST /triage/concepts                      -- Add image as concept reference.
+    POST /triage/concepts/upload               -- Upload image file as concept reference.
+    POST /triage/concepts                      -- Add image as concept reference (path-based).
     POST /triage/face/start                    -- Start face embedding, returns operation_id.
     GET  /triage/face/{op_id}/events           -- SSE stream for face embedding progress.
     POST /triage/face/{op_id}/cancel           -- Cancel face embedding operation.
@@ -35,7 +36,9 @@ import uuid
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Request
+import tempfile
+
+from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
@@ -500,6 +503,78 @@ async def get_concepts(request: Request) -> list[dict]:
         }
         for r in refs
     ]
+
+
+@router.post("/concepts/upload")
+async def upload_concept(
+    file: UploadFile,
+    category: str = Form(...),
+    request: Request = None,
+) -> dict:
+    """Upload an image file as a concept reference.
+
+    Saves the uploaded file to concepts/{category}/ and returns the
+    newly created ConceptReference. The file is written directly to the
+    target location, then passed to add_concept_reference() for consistent
+    ConceptReference construction.
+
+    Args:
+        file: Uploaded image file.
+        category: Concept category folder (e.g. 'character', 'setting').
+        request: FastAPI request (for project_dir).
+
+    Returns:
+        ConceptResponse dict with name, concept_type, image_path, folder_name.
+
+    Raises:
+        HTTPException 409: If no project directory is selected.
+        HTTPException 422: If file or category is missing (FastAPI validation).
+    """
+    project_dir: Path | None = request.app.state.project_dir
+    if project_dir is None:
+        raise HTTPException(status_code=409, detail="No project directory selected")
+
+    concepts_dir = project_dir / "concepts"
+
+    # Save the upload to a temp file in the project dir, then pass it to
+    # add_concept_reference() which handles copying to concepts/{category}/.
+    # Using a temp file avoids writing directly to the target location, which
+    # would cause a SameFileError in shutil.copy2 (src == dst).
+    filename = file.filename or "upload"
+    suffix = Path(filename).suffix or ".bin"
+
+    content = await file.read()
+
+    with tempfile.NamedTemporaryFile(
+        dir=project_dir, delete=False, suffix=suffix, prefix="_upload_"
+    ) as tmp_file:
+        tmp_path = Path(tmp_file.name)
+        tmp_file.write(content)
+
+    # Rename temp file to match the original filename so add_concept_reference
+    # uses the correct stem + extension when constructing the ConceptReference.
+    named_tmp = tmp_path.parent / filename
+    tmp_path.replace(named_tmp)
+    tmp_path = named_tmp
+
+    try:
+        ref = add_concept_reference(
+            image_path=tmp_path,
+            concepts_dir=concepts_dir,
+            category=category,
+        )
+    finally:
+        # Clean up the temp source file — add_concept_reference has already
+        # copied it to concepts/{category}/
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+
+    return {
+        "name": ref.name,
+        "concept_type": ref.concept_type.value if ref.concept_type else None,
+        "image_path": str(ref.image_path),
+        "folder_name": ref.folder_name,
+    }
 
 
 @router.post("/concepts")
