@@ -26,6 +26,9 @@ from klippbok.services.cleanup_service import (
     classify_items,
     confirm_removal,
     DEFAULT_CLEANUP_THRESHOLD,
+    generate_prompts_from_description,
+    classify_item_by_reference,
+    DEFAULT_REFERENCE_THRESHOLD,
 )
 
 
@@ -425,3 +428,108 @@ class TestConfirmRemoval:
 
         assert result["moved"] == 1
         assert "_review" in result["review_dir"]
+
+
+# ---------------------------------------------------------------------------
+# generate_prompts_from_description tests
+# ---------------------------------------------------------------------------
+
+class TestGeneratePrompts:
+    """Test prompt generation from subject description."""
+
+    def test_generates_positive_prompts_from_description(self):
+        pos, neg = generate_prompts_from_description("woman with dark hair")
+        assert len(pos) >= 3
+        assert any("woman with dark hair" in p for p in pos)
+        # Negative prompts should be the defaults
+        assert "screenshot" in neg
+
+    def test_empty_description_raises(self):
+        with pytest.raises(ValueError, match="empty"):
+            generate_prompts_from_description("")
+
+    def test_whitespace_only_raises(self):
+        with pytest.raises(ValueError, match="empty"):
+            generate_prompts_from_description("   ")
+
+
+# ---------------------------------------------------------------------------
+# classify_item_by_reference tests
+# ---------------------------------------------------------------------------
+
+class TestClassifyItemByReference:
+    """Test single-item reference-based classification."""
+
+    def test_high_similarity_returns_keep(self, tmp_path: Path):
+        img = tmp_path / "test.jpg"
+        img.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 100)
+
+        embedder = MagicMock()
+        # Image embedding very similar to reference
+        image_emb = np.array([0.9, 0.1, 0.0], dtype=np.float32)
+        image_emb = image_emb / np.linalg.norm(image_emb)
+        embedder.encode_image.return_value = image_emb
+
+        ref_emb = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+        ref_emb = ref_emb / np.linalg.norm(ref_emb)
+
+        result = classify_item_by_reference(
+            image_path=img,
+            embedder=embedder,
+            reference_embeddings=[ref_emb],
+            clip_threshold=DEFAULT_REFERENCE_THRESHOLD,
+            face_app=None,
+            project_dir=tmp_path,
+        )
+
+        assert result.label == "keep"
+        assert result.clip_score > 0.8
+
+    def test_low_similarity_returns_remove(self, tmp_path: Path):
+        img = tmp_path / "test.jpg"
+        img.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 100)
+
+        embedder = MagicMock()
+        # Image embedding orthogonal to reference
+        image_emb = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+        embedder.encode_image.return_value = image_emb
+
+        ref_emb = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+
+        result = classify_item_by_reference(
+            image_path=img,
+            embedder=embedder,
+            reference_embeddings=[ref_emb],
+            clip_threshold=DEFAULT_REFERENCE_THRESHOLD,
+            face_app=None,
+            project_dir=tmp_path,
+        )
+
+        assert result.label == "remove"
+        assert result.clip_score < 0.2
+
+    def test_multiple_references_uses_max(self, tmp_path: Path):
+        img = tmp_path / "test.jpg"
+        img.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 100)
+
+        embedder = MagicMock()
+        image_emb = np.array([0.9, 0.1, 0.0], dtype=np.float32)
+        image_emb = image_emb / np.linalg.norm(image_emb)
+        embedder.encode_image.return_value = image_emb
+
+        # Two references: one similar, one orthogonal
+        ref1 = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+        ref1 = ref1 / np.linalg.norm(ref1)
+        ref2 = np.array([0.0, 0.0, 1.0], dtype=np.float32)
+
+        result = classify_item_by_reference(
+            image_path=img,
+            embedder=embedder,
+            reference_embeddings=[ref1, ref2],
+            clip_threshold=DEFAULT_REFERENCE_THRESHOLD,
+            face_app=None,
+            project_dir=tmp_path,
+        )
+
+        # Should use max similarity (against ref1)
+        assert result.clip_score > 0.8

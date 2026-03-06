@@ -13,8 +13,10 @@ Key design decisions:
 - Files are NEVER deleted -- always moved to _review/ with audit log
 - Separate threshold (0.25) from triage threshold (0.70) per locked decision
 
-Exports: classify_item, classify_items, compute_confidence, confirm_removal,
-         CleanupClassification, DEFAULT_CLEANUP_THRESHOLD
+Exports: classify_item, classify_items, classify_item_by_reference,
+         classify_items_by_reference, compute_confidence, confirm_removal,
+         generate_prompts_from_description,
+         CleanupClassification, DEFAULT_CLEANUP_THRESHOLD, DEFAULT_REFERENCE_THRESHOLD
 """
 
 from __future__ import annotations
@@ -58,6 +60,7 @@ DEFAULT_NEGATIVE_PROMPTS: list[str] = [
 ]
 
 DEFAULT_CLEANUP_THRESHOLD: float = 0.25
+DEFAULT_REFERENCE_THRESHOLD: float = 0.65
 
 VIDEO_EXTENSIONS: set[str] = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 
@@ -125,6 +128,37 @@ def _classify_label(confidence: float) -> Literal["keep", "review", "remove"]:
         return "review"
     else:
         return "remove"
+
+
+def generate_prompts_from_description(
+    description: str,
+) -> tuple[list[str], list[str]]:
+    """Generate CLIP text prompts from a user-provided subject description.
+
+    Creates varied positive prompts from the description and returns the
+    default negative prompts unchanged.
+
+    Args:
+        description: User's subject description (e.g., "woman with dark hair").
+
+    Returns:
+        Tuple of (positive_prompts, negative_prompts).
+
+    Raises:
+        ValueError: If description is empty or whitespace-only.
+    """
+    desc = description.strip()
+    if not desc:
+        raise ValueError("Subject description cannot be empty")
+
+    positive = [
+        f"photo of {desc}",
+        f"portrait of {desc}",
+        f"{desc} posing",
+        f"selfie of {desc}",
+        f"photo of a {desc}" if not desc.startswith("a ") else f"photo of {desc}",
+    ]
+    return positive, list(DEFAULT_NEGATIVE_PROMPTS)
 
 
 # ---------------------------------------------------------------------------
@@ -196,6 +230,68 @@ def classify_item(
         item_path=str(image_path),
         item_id=item_id,
         clip_score=clip_score,
+        has_face=has_face,
+        confidence=confidence,
+        label=label,
+    )
+
+
+def classify_item_by_reference(
+    image_path: Path,
+    embedder: Any,
+    reference_embeddings: list[np.ndarray],
+    clip_threshold: float,
+    face_app: Any | None,
+    project_dir: Path | None = None,
+) -> CleanupClassification:
+    """Classify a single image by CLIP image-to-image similarity against references.
+
+    Computes cosine similarity between the image embedding and each reference
+    embedding. Uses the max similarity as the clip_score.
+
+    Args:
+        image_path: Path to the image file.
+        embedder: CLIPEmbedder instance.
+        reference_embeddings: Pre-computed reference image embeddings.
+        clip_threshold: Similarity threshold for face detection trigger.
+        face_app: InsightFace app or None.
+        project_dir: Project root for relative path computation.
+
+    Returns:
+        CleanupClassification with similarity score and label.
+    """
+    image_emb = embedder.encode_image(image_path)
+
+    # Max cosine similarity against all reference embeddings
+    max_sim = max(
+        (float(np.dot(image_emb, ref_emb)) for ref_emb in reference_embeddings),
+        default=0.0,
+    )
+
+    # Face detection boost (same layered approach)
+    has_face = False
+    if max_sim >= clip_threshold and face_app is not None:
+        try:
+            cv2_image = cv2.imread(str(image_path))
+            if cv2_image is not None:
+                faces = face_app.get(cv2_image)
+                has_face = len(faces) > 0
+        except Exception as exc:
+            logger.warning("Face detection failed for %s: %s", image_path, exc)
+
+    confidence = compute_confidence(max_sim, has_face, clip_threshold)
+    label = _classify_label(confidence)
+
+    if project_dir is not None:
+        relative_path = str(image_path.relative_to(project_dir))
+    else:
+        relative_path = str(image_path)
+    item_id = hashlib.sha256(relative_path.encode()).hexdigest()[:16]
+
+    return CleanupClassification(
+        item_path=str(image_path),
+        item_id=item_id,
+        clip_score=max_sim,
         has_face=has_face,
         confidence=confidence,
         label=label,
@@ -274,6 +370,69 @@ def classify_items(
             # Image: classify directly
             result = classify_item(
                 item_path, embedder, positive_embeddings, negative_embeddings,
+                clip_threshold, face_app, project_dir=project_dir,
+            )
+
+        results.append(result)
+
+        if progress_callback is not None:
+            progress_callback(i, total)
+
+    return results
+
+
+def classify_items_by_reference(
+    item_paths: list[Path],
+    project_dir: Path,
+    reference_paths: list[Path],
+    clip_threshold: float = DEFAULT_REFERENCE_THRESHOLD,
+    progress_callback: Callable[[int, int], None] | None = None,
+) -> list[CleanupClassification]:
+    """Classify a batch of media items using CLIP image-to-image similarity.
+
+    Reference images are encoded ONCE before the loop. Each gallery item
+    is compared against all references; max similarity is used.
+
+    Args:
+        item_paths: List of image/video paths to classify.
+        project_dir: Project root directory.
+        reference_paths: List of reference image file paths (1-3).
+        clip_threshold: Similarity threshold. Default 0.65 for reference mode.
+        progress_callback: Optional callable(current, total) per item.
+
+    Returns:
+        List of CleanupClassification, one per input path.
+    """
+    from klippbok.services.triage_service import _get_or_create_embedder
+    from klippbok.services.face_service import check_insightface_available, _get_face_app
+
+    embedder = _get_or_create_embedder()
+
+    # Encode ALL reference images ONCE
+    reference_embeddings = embedder.encode_images(reference_paths)
+
+    face_app = None
+    if check_insightface_available():
+        try:
+            face_app = _get_face_app()
+        except Exception as exc:
+            logger.warning("Failed to initialize InsightFace: %s", exc)
+
+    total = len(item_paths)
+    results: list[CleanupClassification] = []
+
+    for i, item_path in enumerate(item_paths, 1):
+        item_path = Path(item_path)
+        suffix = item_path.suffix.lower()
+
+        if suffix in VIDEO_EXTENSIONS:
+            result = _classify_video_by_reference(
+                item_path, embedder, reference_embeddings,
+                clip_threshold, face_app, project_dir=project_dir,
+            )
+        else:
+            result = classify_item_by_reference(
+                item_path, embedder, reference_embeddings,
                 clip_threshold, face_app, project_dir=project_dir,
             )
 
@@ -374,6 +533,55 @@ def _classify_video(
         has_face=best_result.has_face,
         confidence=best_result.confidence,
         label=best_result.label,
+    )
+
+
+def _classify_video_by_reference(
+    video_path: Path,
+    embedder: Any,
+    reference_embeddings: list[np.ndarray],
+    clip_threshold: float,
+    face_app: Any | None,
+    num_frames: int = 3,
+    project_dir: Path | None = None,
+) -> CleanupClassification:
+    """Classify a video by sampling frames and comparing against reference embeddings."""
+    _ensure_sampler_imports()
+
+    try:
+        frame_paths = sample_clip_frames(video_path, count=num_frames)
+    except Exception as exc:
+        logger.warning("Frame sampling failed for %s: %s", video_path, exc)
+        frame_paths = []
+
+    if not frame_paths:
+        rel = str(video_path.relative_to(project_dir)) if project_dir else str(video_path)
+        item_id = hashlib.sha256(rel.encode()).hexdigest()[:16]
+        return CleanupClassification(
+            item_path=str(video_path), item_id=item_id,
+            clip_score=0.0, has_face=False, confidence=0.0, label="remove",
+        )
+
+    best_result: CleanupClassification | None = None
+    for frame_path in frame_paths:
+        result = classify_item_by_reference(
+            frame_path, embedder, reference_embeddings,
+            clip_threshold, face_app,
+        )
+        if best_result is None or result.clip_score > best_result.clip_score:
+            best_result = result
+
+    try:
+        cleanup_frames(frame_paths)
+    except Exception:
+        pass
+
+    rel = str(video_path.relative_to(project_dir)) if project_dir else str(video_path)
+    item_id = hashlib.sha256(rel.encode()).hexdigest()[:16]
+    return CleanupClassification(
+        item_path=str(video_path), item_id=item_id,
+        clip_score=best_result.clip_score, has_face=best_result.has_face,
+        confidence=best_result.confidence, label=best_result.label,
     )
 
 
