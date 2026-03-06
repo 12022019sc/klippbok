@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { CropState } from '../types/crop'
 import type { TriageScore } from '../types/triage'
+import type { CleanupClassification } from '../types/cleanup'
 
 interface ImportProgress {
   current: number
@@ -43,6 +44,15 @@ interface AppState {
   setTriageResults: (results: Record<string, TriageScore>) => void
   setTriageThreshold: (t: number) => void
   clearTriageResults: () => void
+
+  // --- cleanup state ---
+  cleanupResults: CleanupClassification[]
+  cleanupUnflaggedIds: Set<string>
+  cleanupAutoStart: boolean
+  setCleanupResults: (results: CleanupClassification[]) => void
+  toggleCleanupUnflag: (itemId: string) => void
+  setCleanupAutoStart: (autoStart: boolean) => void
+  clearCleanup: () => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -114,4 +124,27 @@ export const useAppStore = create<AppState>((set) => ({
   setTriageResults: (results) => set({ triageResults: results }),
   setTriageThreshold: (t) => set({ triageThreshold: t }),
   clearTriageResults: () => set({ triageResults: {} }),
+
+  // --- cleanup state ---
+  cleanupResults: [],
+  cleanupUnflaggedIds: new Set<string>(),
+  cleanupAutoStart: false,
+  setCleanupResults: (results) => set({ cleanupResults: results }),
+  toggleCleanupUnflag: (itemId) =>
+    set((state) => {
+      const next = new Set(state.cleanupUnflaggedIds)
+      if (next.has(itemId)) {
+        next.delete(itemId)
+      } else {
+        next.add(itemId)
+      }
+      return { cleanupUnflaggedIds: next }
+    }),
+  setCleanupAutoStart: (autoStart) => set({ cleanupAutoStart: autoStart }),
+  clearCleanup: () =>
+    set({
+      cleanupResults: [],
+      cleanupUnflaggedIds: new Set<string>(),
+      cleanupAutoStart: false,
+    }),
 }))
