@@ -26,6 +26,7 @@ import json as _json
 import logging
 import uuid
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -33,7 +34,10 @@ from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
 from klippbok.services.cleanup_service import (
     classify_items,
+    classify_items_by_reference,
     confirm_removal,
+    generate_prompts_from_description,
+    DEFAULT_REFERENCE_THRESHOLD,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,9 +57,10 @@ _cleanup_results: dict[str, list[dict]] = {}  # op_id -> classification results
 
 class CleanupStartRequest(BaseModel):
     """Request body for starting a cleanup scan."""
-    positive_prompts: list[str] | None = None
-    negative_prompts: list[str] | None = None
-    clip_threshold: float = 0.25
+    mode: Literal["text", "reference"] = "text"
+    subject_description: str | None = None
+    reference_image_ids: list[str] | None = None
+    clip_threshold: float | None = None  # None = use mode default
 
 
 class ConfirmRemovalRequest(BaseModel):
@@ -94,6 +99,55 @@ def _resolve_item_paths(project_dir: Path) -> list[Path]:
     return paths
 
 
+def _resolve_image_ids_to_paths(
+    project_dir: Path, image_ids: list[str],
+) -> list[Path]:
+    """Resolve gallery image IDs to file paths via the manifest.
+
+    Args:
+        project_dir: Project root directory.
+        image_ids: List of SHA256[:16] image IDs.
+
+    Returns:
+        List of resolved Path objects.
+
+    Raises:
+        HTTPException 400: If any image ID cannot be resolved.
+    """
+    import hashlib
+
+    manifest_path = project_dir / ".klippbok" / "manifest.json"
+    if not manifest_path.exists():
+        raise HTTPException(status_code=400, detail="No manifest found")
+
+    manifest = _json.loads(manifest_path.read_text(encoding="utf-8"))
+    images = manifest.get("images", [])
+
+    # Build id -> path lookup
+    id_to_path: dict[str, Path] = {}
+    for entry in images:
+        rel = entry.get("path", "")
+        img_id = hashlib.sha256(rel.encode()).hexdigest()[:16]
+        id_to_path[img_id] = project_dir / rel
+
+    paths = []
+    for img_id in image_ids:
+        if img_id not in id_to_path:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Image ID {img_id} not found in manifest",
+            )
+        path = id_to_path[img_id]
+        if not path.exists():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Image file not found for ID {img_id}",
+            )
+        paths.append(path)
+
+    return paths
+
+
 # ---------------------------------------------------------------------------
 # Background task
 # ---------------------------------------------------------------------------
@@ -102,15 +156,15 @@ def _resolve_item_paths(project_dir: Path) -> list[Path]:
 async def _run_cleanup_bg(
     op_id: str,
     project_dir: Path,
+    mode: str,
     positive_prompts: list[str] | None,
     negative_prompts: list[str] | None,
     clip_threshold: float,
+    reference_paths: list[Path] | None,
 ) -> None:
     """Background coroutine that runs the cleanup classification pipeline.
 
-    Runs classify_items in a thread executor (CPU-bound CLIP work).
-    Progress callback enqueues events for the SSE generator.
-    None sentinel signals end of stream.
+    Routes to text-based or reference-based classification depending on mode.
     """
     loop = asyncio.get_running_loop()
     queue = _cleanup_queues[op_id]
@@ -123,13 +177,14 @@ async def _run_cleanup_bg(
 
         total = len(item_paths)
 
+        mode_label = "by reference images" if mode == "reference" else "by text description"
         await queue.put({
             "event": "cleanup_progress",
             "data": {
                 "operation_id": op_id,
                 "current": 0,
                 "total": total,
-                "message": f"Starting cleanup scan on {total} items...",
+                "message": f"Starting cleanup scan {mode_label} on {total} items...",
             },
         })
 
@@ -147,19 +202,30 @@ async def _run_cleanup_bg(
                 },
             )
 
-        results = await loop.run_in_executor(
-            None,
-            lambda: classify_items(
-                item_paths=item_paths,
-                project_dir=project_dir,
-                positive_prompts=positive_prompts,
-                negative_prompts=negative_prompts,
-                clip_threshold=clip_threshold,
-                progress_callback=progress_callback,
-            ),
-        )
+        if mode == "reference" and reference_paths:
+            results = await loop.run_in_executor(
+                None,
+                lambda: classify_items_by_reference(
+                    item_paths=item_paths,
+                    project_dir=project_dir,
+                    reference_paths=reference_paths,
+                    clip_threshold=clip_threshold,
+                    progress_callback=progress_callback,
+                ),
+            )
+        else:
+            results = await loop.run_in_executor(
+                None,
+                lambda: classify_items(
+                    item_paths=item_paths,
+                    project_dir=project_dir,
+                    positive_prompts=positive_prompts,
+                    negative_prompts=negative_prompts,
+                    clip_threshold=clip_threshold,
+                    progress_callback=progress_callback,
+                ),
+            )
 
-        # Store results for retrieval (fallback for GET endpoint)
         result_dicts = [r.model_dump() for r in results]
         _cleanup_results[op_id] = result_dicts
 
@@ -186,7 +252,7 @@ async def _run_cleanup_bg(
         })
 
     finally:
-        await queue.put(None)  # Sentinel
+        await queue.put(None)
 
 
 # ---------------------------------------------------------------------------
@@ -244,19 +310,46 @@ async def _sse_generator(
 async def start_cleanup(body: CleanupStartRequest, request: Request) -> dict:
     """Start a cleanup classification scan in the background.
 
-    Args:
-        body: Cleanup parameters (prompts, threshold).
-        request: FastAPI request (for project_dir).
-
-    Returns:
-        {"operation_id": str} for SSE subscription.
-
-    Raises:
-        HTTPException 409: If no project directory is selected.
+    Supports two modes:
+    - "text": User provides a subject description, CLIP text-to-image matching.
+    - "reference": User provides gallery image IDs, CLIP image-to-image matching.
     """
     project_dir: Path | None = request.app.state.project_dir
     if project_dir is None:
         raise HTTPException(status_code=409, detail="No project directory selected")
+
+    # Validate mode-specific fields
+    positive_prompts = None
+    negative_prompts = None
+    reference_paths = None
+
+    if body.mode == "text":
+        if not body.subject_description:
+            raise HTTPException(
+                status_code=400,
+                detail="subject_description is required for text mode",
+            )
+        positive_prompts, negative_prompts = generate_prompts_from_description(
+            body.subject_description,
+        )
+        threshold = body.clip_threshold if body.clip_threshold is not None else 0.25
+    elif body.mode == "reference":
+        if not body.reference_image_ids or len(body.reference_image_ids) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="reference_image_ids is required for reference mode (1-3 images)",
+            )
+        if len(body.reference_image_ids) > 3:
+            raise HTTPException(
+                status_code=400,
+                detail="Maximum 3 reference images allowed",
+            )
+        reference_paths = _resolve_image_ids_to_paths(
+            project_dir, body.reference_image_ids,
+        )
+        threshold = body.clip_threshold if body.clip_threshold is not None else DEFAULT_REFERENCE_THRESHOLD
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown mode: {body.mode}")
 
     op_id = str(uuid.uuid4())
     queue: asyncio.Queue = asyncio.Queue()
@@ -265,13 +358,17 @@ async def start_cleanup(body: CleanupStartRequest, request: Request) -> dict:
     task = asyncio.create_task(
         _run_cleanup_bg(
             op_id, project_dir,
-            body.positive_prompts, body.negative_prompts, body.clip_threshold,
+            mode=body.mode,
+            positive_prompts=positive_prompts,
+            negative_prompts=negative_prompts,
+            clip_threshold=threshold,
+            reference_paths=reference_paths,
         ),
         name=f"cleanup-{op_id}",
     )
     _cleanup_tasks[op_id] = task
 
-    logger.info("Started cleanup operation %s", op_id)
+    logger.info("Started cleanup operation %s (mode=%s)", op_id, body.mode)
     return {"operation_id": op_id}
 
 
