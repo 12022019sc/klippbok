@@ -36,11 +36,14 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
 from klippbok.api.thumbnail import generate_video_thumbnail
+from klippbok.services.image_service import batch_import_images
+from klippbok.services.project_service import load_manifest, remove_image_entries
 from klippbok.services.video_service import (
     extract_frames,
     ingest_video,
     scan_project_videos,
 )
+from klippbok.video.extract import extract_reference_image
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +54,9 @@ _ingest_queues: dict[str, asyncio.Queue] = {}
 _ingest_tasks: dict[str, asyncio.Task] = {}
 _extract_queues: dict[str, asyncio.Queue] = {}
 _extract_tasks: dict[str, asyncio.Task] = {}
+_process_queues: dict[str, asyncio.Queue] = {}
+_process_tasks: dict[str, asyncio.Task] = {}
+_process_results: dict[str, dict] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -107,6 +113,41 @@ class ExtractProgressEvent(BaseModel):
     total: int
     message: str = ""
     status: str = "running"
+
+
+class ProcessRequest(BaseModel):
+    """Parameters for a video process operation."""
+    video_paths: list[str] | None = None
+    """Relative paths of specific videos to process. None = all videos."""
+    frames_per_clip: int = 1
+    """Number of reference frames to extract per clip."""
+
+
+class ProcessStarted(BaseModel):
+    """Response for a started process operation."""
+    operation_id: str
+
+
+class ProcessProgressEvent(BaseModel):
+    """SSE data payload for process progress events."""
+    operation_id: str
+    stage: str
+    current: int
+    total: int
+    message: str = ""
+    status: str = "running"
+    extracted_frames: list[dict] | None = None
+    processed_video_paths: list[str] | None = None
+
+
+class ProcessConfirmRequest(BaseModel):
+    """Request body for confirming video processing (import frames + remove videos)."""
+    video_paths: list[str]
+
+
+class ProcessDiscardRequest(BaseModel):
+    """Request body for discarding extracted frames."""
+    frame_paths: list[str]
 
 
 class VideoClipItem(BaseModel):
@@ -533,6 +574,301 @@ async def cancel_extract(op_id: str) -> dict:
         logger.info("Cancelled extract operation %s", op_id)
 
     return {"cancelled": True}
+
+
+# ---------------------------------------------------------------------------
+# Process: background runner (extract frames → import → remove videos)
+# ---------------------------------------------------------------------------
+
+_VIDEO_MEDIA_TYPE = "video"
+
+
+async def _run_process(
+    request: ProcessRequest,
+    queue: asyncio.Queue,
+    op_id: str,
+    project_dir: Path,
+) -> None:
+    """Background coroutine that extracts reference frames from videos.
+
+    Phase 1 only — extracts frames to refs/ and reports results.
+    Phase 2 (confirm/discard) is handled by separate synchronous endpoints.
+    """
+    loop = asyncio.get_running_loop()
+
+    try:
+        # Step 1: Collect video entries from manifest
+        manifest = load_manifest(project_dir)
+        if not manifest or "images" not in manifest:
+            await queue.put(ProcessProgressEvent(
+                operation_id=op_id,
+                stage="Complete",
+                current=0,
+                total=0,
+                message="No images in manifest — nothing to process.",
+                status="complete",
+                extracted_frames=[],
+                processed_video_paths=[],
+            ))
+            _process_results[op_id] = {"extracted_frames": [], "processed_video_paths": []}
+            return
+
+        all_images: list[dict] = manifest["images"]
+        video_entries = [
+            e for e in all_images
+            if e.get("type") == _VIDEO_MEDIA_TYPE
+        ]
+
+        # Filter to specific paths if requested
+        if request.video_paths is not None:
+            filter_set = set(request.video_paths)
+            video_entries = [e for e in video_entries if e.get("path") in filter_set]
+
+        if not video_entries:
+            await queue.put(ProcessProgressEvent(
+                operation_id=op_id,
+                stage="Complete",
+                current=0,
+                total=0,
+                message="No video entries found to process.",
+                status="complete",
+                extracted_frames=[],
+                processed_video_paths=[],
+            ))
+            _process_results[op_id] = {"extracted_frames": [], "processed_video_paths": []}
+            return
+
+        total = len(video_entries)
+        refs_dir = project_dir / "refs"
+        refs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Step 2: Extract reference frames one by one
+        extracted_frames: list[dict] = []
+        processed_video_paths: list[str] = []
+
+        for idx, entry in enumerate(video_entries):
+            rel_path = entry.get("path", "")
+            abs_path = project_dir / rel_path
+            stem = Path(rel_path).stem
+            output_path = refs_dir / f"{stem}.png"
+
+            await queue.put(ProcessProgressEvent(
+                operation_id=op_id,
+                stage="Extracting frames",
+                current=idx,
+                total=total,
+                message=f"Extracting: {Path(rel_path).name}",
+                status="running",
+            ))
+
+            try:
+                result = await loop.run_in_executor(
+                    None,
+                    lambda sp=abs_path, op=output_path: extract_reference_image(sp, op),
+                )
+                if result.success or result.skipped:
+                    frame_rel = f"refs/{stem}.png"
+                    extracted_frames.append({
+                        "video_path": rel_path,
+                        "frame_path": frame_rel,
+                    })
+                    processed_video_paths.append(rel_path)
+                else:
+                    logger.warning(
+                        "Frame extraction failed for %s: %s", rel_path, result.error
+                    )
+            except Exception as exc:
+                logger.error("Frame extraction error for %s: %s", rel_path, exc)
+
+        # Store results for retrieval via GET endpoint
+        _process_results[op_id] = {
+            "extracted_frames": extracted_frames,
+            "processed_video_paths": processed_video_paths,
+        }
+
+        await queue.put(ProcessProgressEvent(
+            operation_id=op_id,
+            stage="Complete",
+            current=total,
+            total=total,
+            message=(
+                f"Extraction complete: {len(extracted_frames)} frames extracted "
+                f"from {total} videos."
+            ),
+            status="complete",
+            extracted_frames=extracted_frames,
+            processed_video_paths=processed_video_paths,
+        ))
+
+    except Exception as exc:
+        logger.error("Process operation %s failed: %s", op_id, exc)
+        await queue.put(ProcessProgressEvent(
+            operation_id=op_id,
+            stage="Error",
+            current=0,
+            total=0,
+            message=f"Processing failed: {exc}",
+            status="error",
+        ))
+
+    finally:
+        await queue.put(None)
+
+
+# ---------------------------------------------------------------------------
+# Process endpoints
+# ---------------------------------------------------------------------------
+
+@router.post("/process/start", response_model=ProcessStarted, status_code=200)
+async def start_process(body: ProcessRequest, request: Request) -> ProcessStarted:
+    """Start a video processing operation (extract + import + remove)."""
+    project_dir: Path | None = request.app.state.project_dir
+    if project_dir is None:
+        raise HTTPException(status_code=409, detail="No project directory selected")
+
+    op_id = str(uuid.uuid4())
+    queue: asyncio.Queue = asyncio.Queue()
+    _process_queues[op_id] = queue
+
+    task = asyncio.create_task(
+        _run_process(body, queue, op_id, project_dir),
+        name=f"process-{op_id}",
+    )
+    _process_tasks[op_id] = task
+
+    logger.info("Started process operation %s", op_id)
+    return ProcessStarted(operation_id=op_id)
+
+
+@router.get("/process/{op_id}/events")
+async def process_events(op_id: str) -> EventSourceResponse:
+    """Stream SSE progress events for a video process operation."""
+    if op_id not in _process_queues:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Process operation '{op_id}' not found.",
+        )
+
+    queue = _process_queues[op_id]
+
+    async def event_generator():
+        try:
+            while True:
+                event = await queue.get()
+
+                if event is None:
+                    break
+
+                progress: ProcessProgressEvent = event
+                data = progress.model_dump_json()
+
+                if progress.status == "complete":
+                    yield ServerSentEvent(data=data, event="process_done")
+                    break
+                elif progress.status == "error":
+                    yield ServerSentEvent(data=data, event="process_error")
+                    break
+                else:
+                    yield ServerSentEvent(data=data, event="process_progress")
+
+        finally:
+            _process_queues.pop(op_id, None)
+            task = _process_tasks.pop(op_id, None)
+            if task and not task.done():
+                task.cancel()
+                logger.debug("Cancelled process task for operation %s", op_id)
+
+    return EventSourceResponse(event_generator())
+
+
+@router.post("/process/{op_id}/cancel")
+async def cancel_process(op_id: str) -> dict:
+    """Cancel a running process operation."""
+    task = _process_tasks.pop(op_id, None)
+    _process_queues.pop(op_id, None)
+
+    if task is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Process operation '{op_id}' not found.",
+        )
+
+    if not task.done():
+        task.cancel()
+        logger.info("Cancelled process operation %s", op_id)
+
+    return {"cancelled": True}
+
+
+@router.post("/process/confirm")
+async def confirm_process(body: ProcessConfirmRequest, request: Request) -> dict:
+    """Confirm video processing: import extracted frames and remove video entries."""
+    project_dir: Path | None = request.app.state.project_dir
+    if project_dir is None:
+        raise HTTPException(status_code=409, detail="No project directory selected")
+
+    refs_dir = project_dir / "refs"
+    if not refs_dir.exists():
+        raise HTTPException(status_code=404, detail="No refs/ directory found")
+
+    loop = asyncio.get_running_loop()
+
+    report = await loop.run_in_executor(
+        None,
+        lambda: batch_import_images(refs_dir, project_dir),
+    )
+
+    removed = 0
+    if body.video_paths:
+        removed = await loop.run_in_executor(
+            None,
+            lambda: remove_image_entries(project_dir, set(body.video_paths)),
+        )
+
+    return {"imported": report.imported, "removed": removed}
+
+
+@router.post("/process/discard")
+async def discard_process(body: ProcessDiscardRequest, request: Request) -> dict:
+    """Discard extracted frames by deleting specific files from refs/."""
+    project_dir: Path | None = request.app.state.project_dir
+    if project_dir is None:
+        raise HTTPException(status_code=409, detail="No project directory selected")
+
+    deleted = 0
+    for frame_path in body.frame_paths:
+        abs_path = project_dir / frame_path
+        if abs_path.exists() and abs_path.is_file():
+            abs_path.unlink()
+            deleted += 1
+
+    return {"deleted": deleted}
+
+
+@router.get("/process/results/{op_id}")
+async def get_process_results(op_id: str) -> dict:
+    """Retrieve stored extraction results for a completed process operation."""
+    results = _process_results.get(op_id)
+    if results is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Process results for '{op_id}' not found.",
+        )
+    return results
+
+
+@router.get("/process/frame")
+async def serve_process_frame(path: str, request: Request) -> FileResponse:
+    """Serve an extracted frame file for review thumbnails."""
+    project_dir: Path | None = request.app.state.project_dir
+    if project_dir is None:
+        raise HTTPException(status_code=409, detail="No project directory selected")
+
+    abs_path = project_dir / path
+    if not abs_path.exists() or not abs_path.is_file():
+        raise HTTPException(status_code=404, detail=f"Frame not found: {path}")
+
+    return FileResponse(str(abs_path), media_type="image/png")
 
 
 # ---------------------------------------------------------------------------

@@ -31,6 +31,19 @@ export default function SelectionToolbar({ items }: SelectionToolbarProps) {
     navigate('/process')
   }
 
+  // Detect selected videos for "Process Videos" action
+  const selectedVideos = items.filter(
+    (item) => selectedImageIds.has(item.id) && item.media_type === 'video'
+  )
+
+  function handleProcessSelectedVideos() {
+    if (selectedVideos.length === 0) return
+    navigate('/process-videos', {
+      state: { videoPaths: selectedVideos.map((v) => v.relative_path) },
+    })
+    toggleSelectionMode()
+  }
+
   const selectedCount = selectedImageIds.size
 
   return (
@@ -68,6 +81,12 @@ export default function SelectionToolbar({ items }: SelectionToolbarProps) {
             {selectedCount >= 1 && (
               <button className="selection-process-btn" onClick={handleProcess}>
                 Process ({selectedCount})
+              </button>
+            )}
+
+            {selectedVideos.length > 0 && (
+              <button className="selection-process-btn" onClick={handleProcessSelectedVideos}>
+                Process Videos ({selectedVideos.length})
               </button>
             )}
           </>

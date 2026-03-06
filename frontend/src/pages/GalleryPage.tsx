@@ -11,7 +11,7 @@ import type { GalleryItem } from '../types/image'
 
 export default function GalleryPage() {
   const navigate = useNavigate()
-  const { data, isLoading, error } = useImages()
+  const { data, isLoading, error, refetch } = useImages()
 
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
 
@@ -56,6 +56,7 @@ export default function GalleryPage() {
   }
 
   const images = data?.images ?? []
+  const hasVideos = images.some((i) => i.media_type === 'video')
 
   // Auto-import when gallery is empty and a project is selected
   // Must be above early returns to satisfy React's rules of hooks
@@ -143,6 +144,14 @@ export default function GalleryPage() {
       <div className="gallery-header-bar">
         <SelectionToolbar items={images} />
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {hasVideos && (
+            <button
+              className="video-btn-secondary"
+              onClick={() => navigate('/process-videos')}
+            >
+              Process Videos
+            </button>
+          )}
           <button
             className="video-btn-secondary"
             onClick={() => {
