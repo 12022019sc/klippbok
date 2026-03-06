@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 07-04-PLAN.md (TriagePage, GalleryFilter, triage SSE hooks, video overlays, triage score overlays)
-last_updated: "2026-03-05T23:48:28.138Z"
+stopped_at: Completed 07-05-PLAN.md (POST /triage/concepts/upload endpoint, 6 integration tests)
+last_updated: "2026-03-06T00:13:19.818Z"
 last_activity: 2026-03-03 -- Completed 05-04-PLAN.md (ProcessPage wizard, UpscaleStep, useUpscaleEvents, Proceed to Captioning save, source_path fix)
 progress:
   total_phases: 10
   completed_phases: 8
-  total_plans: 31
-  completed_plans: 30
+  total_plans: 32
+  completed_plans: 31
 ---
 
 ---
@@ -115,6 +115,7 @@ Progress: [████████████░] ~85% (15 of ~20 estimated pl
 | Phase 07 P01 | 473 | 2 tasks | 6 files |
 | Phase 07 P03 | 258 | 2 tasks | 8 files |
 | Phase 07 P04 | 351 | 2 tasks | 9 files |
+| Phase 07 P05 | 5 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -239,6 +240,9 @@ Recent decisions affecting current work:
 - [Phase 07-04]: STORE-01: triageResults as Record<string, TriageScore> not Map — Zustand serializes plain objects cleanly
 - [Phase 07-04]: FILTER-01: galleryFilter applied client-side in useImages after fetch — avoids cache key complexity for small datasets
 - [Phase 07-04]: CSS-01: All new CSS appended to App.css — consistent with project pattern of single CSS file
+- [Phase 07-05]: UPLOAD-01: Write upload to temp file in project root then use add_concept_reference() for copy — avoids shutil.SameFileError
+- [Phase 07-05]: UPLOAD-02: Register /concepts/upload BEFORE /concepts to prevent FastAPI path-param capture
+- [Phase 07-05]: UPLOAD-03: Rename temp file to original filename before passing to add_concept_reference() for correct ConceptReference name/extension
 
 ### Roadmap Evolution
 
@@ -257,6 +261,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-05T23:48:28.136Z
-Stopped at: Completed 07-04-PLAN.md (TriagePage, GalleryFilter, triage SSE hooks, video overlays, triage score overlays)
+Last session: 2026-03-06T00:13:19.815Z
+Stopped at: Completed 07-05-PLAN.md (POST /triage/concepts/upload endpoint, 6 integration tests)
 Resume file: None
