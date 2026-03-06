@@ -178,8 +178,10 @@ async def _run_triage_bg(
     Progress callback enqueues events for the SSE generator.
     None sentinel signals end of stream.
     """
+    loop = asyncio.get_running_loop()
+
     try:
-        item_paths = await asyncio.get_event_loop().run_in_executor(
+        item_paths = await loop.run_in_executor(
             None,
             lambda: _resolve_item_paths(project_dir, request.item_ids),
         )
@@ -197,7 +199,7 @@ async def _run_triage_bg(
 
         def progress_callback(current: int, total: int) -> None:
             progress_sent["count"] += 1
-            asyncio.get_event_loop().call_soon_threadsafe(
+            loop.call_soon_threadsafe(
                 queue.put_nowait,
                 {
                     "event": "triage_progress",
@@ -220,7 +222,7 @@ async def _run_triage_bg(
             },
         })
 
-        results = await asyncio.get_event_loop().run_in_executor(
+        results = await loop.run_in_executor(
             None,
             lambda: run_triage(
                 item_paths=item_paths,
@@ -228,6 +230,7 @@ async def _run_triage_bg(
                 threshold=request.threshold,
                 output_path=output_path,
                 progress_callback=progress_callback,
+                project_dir=project_dir,
             ),
         )
 
@@ -270,8 +273,10 @@ async def _run_face_bg(
 
     Two-stage progress: embedding phase then clustering phase.
     """
+    loop = asyncio.get_running_loop()
+
     try:
-        item_paths = await asyncio.get_event_loop().run_in_executor(
+        item_paths = await loop.run_in_executor(
             None,
             lambda: _resolve_item_paths(project_dir, request.item_ids),
         )
@@ -293,7 +298,7 @@ async def _run_face_bg(
         def progress_callback(current: int, total: int) -> None:
             elapsed = time.monotonic() - start_time
             eta = (elapsed / current) * (total - current) if current > 0 else None
-            asyncio.get_event_loop().call_soon_threadsafe(
+            loop.call_soon_threadsafe(
                 queue.put_nowait,
                 {
                     "event": "face_progress",
@@ -307,7 +312,7 @@ async def _run_face_bg(
                 },
             )
 
-        embeddings = await asyncio.get_event_loop().run_in_executor(
+        embeddings = await loop.run_in_executor(
             None,
             lambda: compute_face_embeddings(item_paths, progress_callback=progress_callback),
         )
@@ -323,7 +328,7 @@ async def _run_face_bg(
             },
         })
 
-        clusters = await asyncio.get_event_loop().run_in_executor(
+        clusters = await loop.run_in_executor(
             None,
             lambda: cluster_face_embeddings(embeddings),
         )
@@ -361,21 +366,47 @@ async def _run_face_bg(
 # SSE generator helper
 # ---------------------------------------------------------------------------
 
-async def _sse_generator(queue: asyncio.Queue):
+async def _sse_generator(queue: asyncio.Queue, op_id: str, task_dict: dict, queue_dict: dict):
     """Consume events from queue and yield as ServerSentEvents.
 
-    Stops when None sentinel is received.
+    Emits "triage_done"/"face_done" when status is "complete" (the background
+    coroutines send this as part of triage_progress/face_progress data).
+
+    Stops when None sentinel is received. Cleans up task/queue dicts on exit.
     """
     import json as _json
 
-    while True:
-        event = await queue.get()
-        if event is None:
-            break
-        yield ServerSentEvent(
-            event=event["event"],
-            data=_json.dumps(event["data"]),
-        )
+    try:
+        while True:
+            event = await queue.get()
+            if event is None:
+                break
+
+            event_name = event["event"]
+            data = event["data"]
+
+            # When the background task signals completion, emit the
+            # correct "done" event that the frontend listens for.
+            if data.get("status") == "complete":
+                # Derive done event name: triage_progress -> triage_done,
+                # face_progress -> face_done
+                done_event = event_name.replace("_progress", "_done")
+                yield ServerSentEvent(
+                    event=done_event,
+                    data=_json.dumps(data),
+                )
+                break
+
+            yield ServerSentEvent(
+                event=event_name,
+                data=_json.dumps(data),
+            )
+    finally:
+        # Clean up module-level state
+        queue_dict.pop(op_id, None)
+        task = task_dict.pop(op_id, None)
+        if task and not task.done():
+            task.cancel()
 
 
 # ---------------------------------------------------------------------------
@@ -431,7 +462,9 @@ async def triage_events(op_id: str) -> EventSourceResponse:
         raise HTTPException(status_code=404, detail=f"Triage operation {op_id} not found")
 
     queue = _triage_queues[op_id]
-    return EventSourceResponse(_sse_generator(queue))
+    return EventSourceResponse(
+        _sse_generator(queue, op_id, _triage_tasks, _triage_queues)
+    )
 
 
 @router.post("/run/{op_id}/cancel")
@@ -447,10 +480,12 @@ async def cancel_triage_run(op_id: str) -> dict:
     Raises:
         HTTPException 404: If op_id is not found.
     """
-    if op_id not in _triage_tasks:
+    task = _triage_tasks.pop(op_id, None)
+    _triage_queues.pop(op_id, None)
+
+    if task is None:
         raise HTTPException(status_code=404, detail=f"Triage operation {op_id} not found")
 
-    task = _triage_tasks[op_id]
     if not task.done():
         task.cancel()
         logger.info("Cancelled triage operation %s", op_id)
@@ -508,8 +543,8 @@ async def get_concepts(request: Request) -> list[dict]:
 @router.post("/concepts/upload")
 async def upload_concept(
     file: UploadFile,
+    request: Request,
     category: str = Form(...),
-    request: Request = None,
 ) -> dict:
     """Upload an image file as a concept reference.
 
@@ -568,6 +603,74 @@ async def upload_concept(
         # copied it to concepts/{category}/
         if tmp_path.exists():
             tmp_path.unlink(missing_ok=True)
+
+    return {
+        "name": ref.name,
+        "concept_type": ref.concept_type.value if ref.concept_type else None,
+        "image_path": str(ref.image_path),
+        "folder_name": ref.folder_name,
+    }
+
+
+class AddFromGalleryRequest(BaseModel):
+    """Request body for adding a gallery image as a concept reference."""
+    image_id: str
+    """SHA256[:16] image ID from the gallery."""
+    category: str = "character"
+    """Concept category folder (e.g. 'character', 'setting')."""
+
+
+@router.post("/concepts/add-from-gallery")
+async def add_concept_from_gallery(body: AddFromGalleryRequest, request: Request) -> dict:
+    """Add a gallery image as a concept reference.
+
+    Looks up the image's absolute path from the manifest, then copies it
+    into concepts/{category}/.
+
+    Args:
+        body: AddFromGalleryRequest with image_id and category.
+        request: FastAPI request (for project_dir).
+
+    Returns:
+        ConceptResponse dict.
+
+    Raises:
+        HTTPException 404: If image_id not found in manifest.
+        HTTPException 409: If no project directory is selected.
+    """
+    project_dir: Path | None = request.app.state.project_dir
+    if project_dir is None:
+        raise HTTPException(status_code=409, detail="No project directory selected")
+
+    # Look up image path from manifest
+    from klippbok.services.project_service import load_manifest
+    import hashlib as _hashlib
+
+    manifest = load_manifest(project_dir)
+    if not manifest or "images" not in manifest:
+        raise HTTPException(status_code=404, detail="No images in manifest")
+
+    target_entry = None
+    for entry in manifest["images"]:
+        rel_path = entry.get("path", "")
+        entry_id = _hashlib.sha256(rel_path.encode()).hexdigest()[:16]
+        if entry_id == body.image_id:
+            target_entry = entry
+            break
+
+    if target_entry is None:
+        raise HTTPException(status_code=404, detail=f"Image '{body.image_id}' not found")
+
+    abs_path = project_dir / target_entry["path"]
+    if not abs_path.exists():
+        raise HTTPException(status_code=404, detail="Image file not found on disk")
+
+    concepts_dir = project_dir / "concepts"
+    ref = add_concept_reference(
+        image_path=abs_path,
+        concepts_dir=concepts_dir,
+        category=body.category,
+    )
 
     return {
         "name": ref.name,
@@ -674,7 +777,9 @@ async def face_events(op_id: str) -> EventSourceResponse:
         raise HTTPException(status_code=404, detail=f"Face operation {op_id} not found")
 
     queue = _face_queues[op_id]
-    return EventSourceResponse(_sse_generator(queue))
+    return EventSourceResponse(
+        _sse_generator(queue, op_id, _face_tasks, _face_queues)
+    )
 
 
 @router.post("/face/{op_id}/cancel")
@@ -690,10 +795,12 @@ async def cancel_face_embedding(op_id: str) -> dict:
     Raises:
         HTTPException 404: If op_id not found.
     """
-    if op_id not in _face_tasks:
+    task = _face_tasks.pop(op_id, None)
+    _face_queues.pop(op_id, None)
+
+    if task is None:
         raise HTTPException(status_code=404, detail=f"Face operation {op_id} not found")
 
-    task = _face_tasks[op_id]
     if not task.done():
         task.cancel()
         logger.info("Cancelled face operation %s", op_id)

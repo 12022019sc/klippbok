@@ -38,11 +38,13 @@ Built by [Minta](https://github.com/aramintak) and [Timothy](https://github.com/
 | **Extract** | `extract` | Reference frame extraction (first frame, best frame) for I2V training |
 | **Validate** | `validate`, `organize` | Dataset completeness checks, trainer-specific output formatting |
 
-### Image pipeline (Web GUI)
+### Image + video pipeline (Web GUI)
 
 | Stage | Tool | What happens |
 |-------|------|-------------|
 | **Import** | Project picker + import | Batch import with metadata probing, blur detection, duplicate detection |
+| **Video** | Video ingest/scan/extract | Scene-split video ingest, clip scanning, reference frame extraction |
+| **Triage** | CLIP triage + face clustering | Visual similarity scoring against concept references, automatic subject discovery via InsightFace |
 | **Crop** | Interactive crop editor | Per-image crop with auto-crop (MediaPipe pose detection), rotation, flip, bucket snapping |
 | **Upscale** | Upscale step | AI upscaling via SeedVR2 or NMKD-Siax with real-time progress |
 | **Caption** | Caption editor | Multi-provider captioning, batch tag operations, inline editing, quality scoring |
@@ -147,8 +149,10 @@ The web GUI is a FastAPI + React application for interactive image dataset prepa
 | Page | Description |
 |------|-------------|
 | **Project Picker** | Browse filesystem, select or create a project directory |
-| **Gallery** | Masonry grid of imported images with metadata, selection toolbar |
+| **Gallery** | Masonry grid with media type filtering, triage score badges, duration badges, selection toolbar, lightbox with video playback |
 | **Import** | Batch import with real-time SSE progress (probing, blur detection, dedup) |
+| **Video** | Three-tab workflow: Ingest (scene splitting), Scan (clip metadata), Extract (reference frames) |
+| **Triage** | CLIP-based similarity scoring, concept reference management, InsightFace face clustering with named cluster confirmation |
 | **Crop** | Interactive per-image crop editor with auto-crop, rotation, flip, zoom |
 | **Upscale** | AI upscaling with SeedVR2 or NMKD-Siax, progress streaming, cancel support |
 | **Caption** | Multi-provider captioning, batch tag ops, inline editing, quality scores |
@@ -254,6 +258,8 @@ All endpoints use the `/api/v1/` prefix. The server runs on port 9000 by default
 | **Browse** | `GET /browse/roots`, `GET /browse/list`, `POST /browse/mkdir` | Filesystem navigation for project picker |
 | **Import** | `POST /import/`, `GET /import/{op_id}/events` | Batch image import with SSE progress |
 | **Images** | `GET /images/`, `GET /images/{id}/thumbnail`, `GET /images/{id}/full` | Gallery data and image serving |
+| **Video** | `POST /video/ingest/start`, `GET /video/ingest/{op_id}/events`, `GET /video/scan`, `POST /video/extract/start`, `GET /video/extract/{op_id}/events` | Video ingest (scene split), scan, frame extraction with SSE progress |
+| **Triage** | `POST /triage/run`, `GET /triage/run/{op_id}/events`, `GET /triage/results`, `GET /triage/concepts`, `POST /triage/concepts/upload`, `POST /triage/faces/compute`, `GET /triage/faces/{op_id}/events`, `POST /triage/faces/confirm` | CLIP triage, concept management, face clustering |
 | **Crop** | `POST /crop/`, `POST /crop/auto` | Batch crop/rotate/flip and auto-crop with pose detection |
 | **Upscale** | `POST /upscale/start`, `GET /upscale/status`, `POST /upscale/{op_id}/cancel`, `GET /upscale/{op_id}/events` | AI upscaling with progress streaming and cancellation |
 | **Captions** | `POST /captions/generate`, `GET /captions/{op_id}/events`, `GET /captions/config`, `PUT /captions/config`, `GET /captions/models`, `POST /captions/batch`, `PATCH /captions/{id}` | Caption generation, provider config, batch ops, inline edit |
@@ -289,6 +295,8 @@ That's it. Klippbok probes every video, detects scenes, samples frames from each
 
 **Reliability:** Character triage is production-ready — CLIP recognizes human identity across angles, lighting, and distance. Object and setting triage is experimental and benefits from manual manifest review.
 
+**Web GUI triage:** The Triage page provides the same CLIP matching interactively — upload concept references, run triage with adjustable thresholds, and review results with thumbnails and scores. Additionally, the GUI offers **InsightFace face clustering** to automatically discover subjects in your dataset without any reference images. Discovered clusters can be named and confirmed as concept references for subsequent triage runs.
+
 ---
 
 ## Architecture
@@ -296,7 +304,7 @@ That's it. Klippbok probes every video, detects scenes, samples frames from each
 ```
 klippbok/
 ├── api/              # FastAPI web server + React SPA
-│   ├── routers/      # REST endpoints (browse, import, images, crop, upscale, captions, settings)
+│   ├── routers/      # REST endpoints (browse, import, images, crop, upscale, captions, settings, video, triage)
 │   ├── models.py     # Request/response Pydantic schemas
 │   ├── thumbnail.py  # Thumbnail generation and caching
 │   └── static/       # Built React app (served as SPA)
@@ -330,6 +338,11 @@ klippbok/
 │   ├── caption_service.py  # Caption generation + batch ops
 │   ├── crop_service.py     # Crop application
 │   ├── upscale_service.py  # Upscaler detection + subprocess management
+│   ├── video_service.py    # Video ingest, scan, frame extraction
+│   ├── triage_service.py   # CLIP triage orchestration
+│   ├── face_service.py     # InsightFace embedding + clustering
+│   ├── project_service.py  # Project directory management
+│   ├── dataset_service.py  # Dataset validation + organization
 │   └── global_config_service.py  # Provider config persistence
 │
 ├── triage/           # CLIP-based visual matching
@@ -350,8 +363,11 @@ klippbok/
 frontend/src/
 ├── pages/            # Route-level components
 │   ├── ProjectPickerPage.tsx   # Directory browser + project selection
-│   ├── GalleryPage.tsx         # Masonry image grid with selection
+│   ├── GalleryPage.tsx         # Masonry grid with filtering, selection, lightbox
 │   ├── ImportPage.tsx          # Import with SSE progress
+│   ├── VideoPage.tsx           # Video ingest, scan, extract (3-tab workflow)
+│   ├── TriagePage.tsx          # CLIP triage, concept management, face clustering
+│   ├── ProcessPage.tsx         # Multi-step processing wizard (upscale → crop → caption)
 │   ├── CropPage.tsx            # Interactive crop editor
 │   ├── CaptionPage.tsx         # Caption editor + batch ops
 │   └── SettingsPage.tsx        # Model profiles + provider config
@@ -359,8 +375,10 @@ frontend/src/
 ├── components/       # Reusable UI components
 │   ├── Crop/         # CropCard, BucketSelector, UpscaleStep
 │   ├── Caption/      # CaptionPanel, ProviderConfigSection, BatchTagBar
-│   ├── Gallery/      # MasonryGrid, ThumbnailCard, SelectionToolbar
-│   └── Layout/       # NavBar, AppLayout, ToastProvider
+│   ├── Gallery/      # MasonryGrid, ThumbnailCard, SelectionToolbar, GalleryFilter, StatusStrip
+│   ├── Lightbox/     # ImageLightbox (image preview + video playback)
+│   ├── Layout/       # NavBar, AppLayout, ToastProvider
+│   └── DirectoryBrowser/  # Filesystem browser component
 │
 ├── hooks/            # Custom React hooks (useImages, useImportEvents, useCaptionEvents)
 └── store/            # Zustand state (project_dir, selections)
@@ -370,10 +388,12 @@ frontend/src/
 
 ### Key patterns
 
-- **Manifest-driven state** — single `.klippbok/manifest.json` per project tracks all image entries, metadata, captions, and validation issues
+- **Manifest-driven state** — single `.klippbok/manifest.json` per project tracks all image/video entries, metadata, captions, triage scores, and validation issues
 - **Pydantic v2 models** for all data validation (backend schemas and API contracts)
-- **SSE streaming** for long operations (import, upscale, caption) — real-time progress to the frontend
+- **SSE streaming** for long operations (import, upscale, caption, triage, face clustering, video ingest) — real-time progress to the frontend
 - **Service layer** separates business logic from API routing — same services used by both CLI and web GUI
+- **CLIP embeddings** for visual similarity matching — concept references scored against dataset items
+- **InsightFace clustering** for automatic subject discovery — face embeddings grouped into named clusters that become concept references
 - **Accumulative validation** — never fails fast, collects all issues per image/video
 
 ---

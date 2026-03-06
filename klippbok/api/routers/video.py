@@ -59,7 +59,7 @@ _extract_tasks: dict[str, asyncio.Task] = {}
 
 class IngestRequest(BaseModel):
     """Parameters for a video ingest operation."""
-    video_path: str
+    video_path: str | None = None
     """Path to the video file (or directory) to ingest."""
     directory_path: str | None = None
     """Alternative: scan a directory of videos (mutually exclusive with video_path)."""
@@ -105,6 +105,7 @@ class ExtractProgressEvent(BaseModel):
     stage: str
     current: int
     total: int
+    message: str = ""
     status: str = "running"
 
 
@@ -139,6 +140,9 @@ class ScanResultItem(BaseModel):
 # Ingest: background runner
 # ---------------------------------------------------------------------------
 
+_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
+
+
 async def _run_ingest(
     request: IngestRequest,
     queue: asyncio.Queue,
@@ -150,6 +154,10 @@ async def _run_ingest(
     Runs ingest_video in a thread executor so the async event loop stays
     responsive. Progress events are pushed onto the queue.
 
+    Supports two modes:
+    - video_path: Ingest a single video file.
+    - directory_path: Glob a directory for video files and ingest each.
+
     Args:
         request: Ingest parameters.
         queue: asyncio.Queue to push progress events onto.
@@ -158,9 +166,10 @@ async def _run_ingest(
     """
     from klippbok.config.data_schema import VideoConfig
 
-    try:
-        video_path = Path(request.video_path)
+    # Capture the running loop before entering executor threads
+    loop = asyncio.get_running_loop()
 
+    try:
         # Build VideoConfig from request params
         config = VideoConfig(
             fps=request.fps,
@@ -169,49 +178,68 @@ async def _run_ingest(
             max_frames=request.max_frames,
         )
 
-        # Emit initial progress
-        await queue.put(IngestProgressEvent(
-            operation_id=op_id,
-            stage="Starting ingest",
-            current=0,
-            total=1,
-            message=f"Ingesting: {video_path.name}",
-            status="running",
-        ))
-
-        def progress_callback(stage: str, current: int, total: int) -> None:
-            """Bridge sync progress callback to async queue."""
-            event = IngestProgressEvent(
-                operation_id=op_id,
-                stage=stage,
-                current=current,
-                total=total,
-                message=stage,
-                status="running",
+        # Resolve video file(s) to ingest
+        if request.video_path:
+            video_files = [Path(request.video_path)]
+        elif request.directory_path:
+            dir_path = Path(request.directory_path)
+            if not dir_path.is_dir():
+                raise FileNotFoundError(f"Directory not found: {dir_path}")
+            video_files = sorted(
+                p for p in dir_path.iterdir()
+                if p.is_file() and p.suffix.lower() in _VIDEO_EXTENSIONS
             )
-            # Schedule the put coroutine on the running event loop
-            loop = asyncio.get_event_loop()
-            asyncio.run_coroutine_threadsafe(queue.put(event), loop)
+            if not video_files:
+                raise FileNotFoundError(f"No video files found in: {dir_path}")
+        else:
+            raise ValueError("Either video_path or directory_path is required")
 
-        # Run ingest in thread (CPU-bound + subprocess calls)
-        clips = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: ingest_video(
-                video_path=video_path,
-                output_dir=project_dir,
-                config=config,
-                threshold=request.threshold,
-                progress_callback=progress_callback,
-            ),
-        )
+        total_files = len(video_files)
+        all_clips = []
+
+        for file_idx, video_path in enumerate(video_files):
+            # Emit per-file progress
+            await queue.put(IngestProgressEvent(
+                operation_id=op_id,
+                stage=f"Ingesting file {file_idx + 1}/{total_files}",
+                current=file_idx,
+                total=total_files,
+                message=f"Ingesting: {video_path.name}",
+                status="running",
+            ))
+
+            def progress_callback(stage: str, current: int, total: int) -> None:
+                """Bridge sync progress callback to async queue."""
+                event = IngestProgressEvent(
+                    operation_id=op_id,
+                    stage=stage,
+                    current=current,
+                    total=total,
+                    message=stage,
+                    status="running",
+                )
+                asyncio.run_coroutine_threadsafe(queue.put(event), loop)
+
+            # Run ingest in thread (CPU-bound + subprocess calls)
+            clips = await loop.run_in_executor(
+                None,
+                lambda vp=video_path: ingest_video(
+                    video_path=vp,
+                    output_dir=project_dir,
+                    config=config,
+                    threshold=request.threshold,
+                    progress_callback=progress_callback,
+                ),
+            )
+            all_clips.extend(clips)
 
         # Emit completion event
         await queue.put(IngestProgressEvent(
             operation_id=op_id,
             stage="Complete",
-            current=len(clips),
-            total=len(clips),
-            message=f"Ingest complete: {len(clips)} clips produced",
+            current=len(all_clips),
+            total=len(all_clips),
+            message=f"Ingest complete: {len(all_clips)} clips from {total_files} file(s)",
             status="complete",
         ))
 
@@ -242,8 +270,10 @@ async def _run_extract(
     project_dir: Path,
 ) -> None:
     """Background coroutine that runs the frame extraction pipeline."""
+    loop = asyncio.get_running_loop()
+
     try:
-        clips_dir = project_dir / "clips"
+        clips_dir = project_dir
         output_dir = project_dir / "refs"
 
         await queue.put(ExtractProgressEvent(
@@ -251,10 +281,11 @@ async def _run_extract(
             stage="Starting extraction",
             current=0,
             total=1,
+            message="Scanning clips directory...",
             status="running",
         ))
 
-        extracted = await asyncio.get_event_loop().run_in_executor(
+        extracted = await loop.run_in_executor(
             None,
             lambda: extract_frames(
                 clips_dir=clips_dir,
@@ -268,6 +299,7 @@ async def _run_extract(
             stage="Complete",
             current=len(extracted),
             total=len(extracted),
+            message=f"Extraction complete: {len(extracted)} reference frames",
             status="complete",
         ))
 
@@ -278,6 +310,7 @@ async def _run_extract(
             stage="Error",
             current=0,
             total=0,
+            message=f"Extraction failed: {exc}",
             status="error",
         ))
 
@@ -298,6 +331,8 @@ async def start_ingest(body: IngestRequest, request: Request) -> IngestStarted:
     project_dir: Path | None = request.app.state.project_dir
     if project_dir is None:
         raise HTTPException(status_code=409, detail="No project directory selected")
+    if not body.video_path and not body.directory_path:
+        raise HTTPException(status_code=422, detail="Either video_path or directory_path is required")
 
     op_id = str(uuid.uuid4())
     queue: asyncio.Queue = asyncio.Queue()
@@ -389,7 +424,7 @@ async def scan_clips(request: Request) -> list[ScanResultItem]:
         raise HTTPException(status_code=409, detail="No project directory selected")
 
     try:
-        report = await asyncio.get_event_loop().run_in_executor(
+        report = await asyncio.get_running_loop().run_in_executor(
             None,
             lambda: scan_project_videos(project_dir),
         )
@@ -509,6 +544,10 @@ def _clip_id_from_relative(relative_path: str) -> str:
     return hashlib.sha256(relative_path.encode()).hexdigest()[:16]
 
 
+# Module-level cache: clip_id -> absolute Path, populated by list_clips/scan
+_clip_path_cache: dict[str, Path] = {}
+
+
 @router.get("/clips", response_model=list[VideoClipItem])
 async def list_clips(request: Request) -> list[VideoClipItem]:
     """List video clips in the project with metadata and thumbnail URLs.
@@ -521,7 +560,7 @@ async def list_clips(request: Request) -> list[VideoClipItem]:
         raise HTTPException(status_code=409, detail="No project directory selected")
 
     try:
-        report = await asyncio.get_event_loop().run_in_executor(
+        report = await asyncio.get_running_loop().run_in_executor(
             None,
             lambda: scan_project_videos(project_dir),
         )
@@ -543,7 +582,7 @@ async def list_clips(request: Request) -> list[VideoClipItem]:
 
         # Generate/cache thumbnail (non-blocking wrapper)
         try:
-            thumb_path = await asyncio.get_event_loop().run_in_executor(
+            thumb_path = await asyncio.get_running_loop().run_in_executor(
                 None,
                 lambda p=meta.path: generate_video_thumbnail(p, cache_dir),
             )
@@ -551,6 +590,9 @@ async def list_clips(request: Request) -> list[VideoClipItem]:
         except Exception as exc:
             logger.warning("Failed to generate thumbnail for %s: %s", meta.path.name, exc)
             thumbnail_url = ""
+
+        # Populate clip path cache for thumbnail lookups
+        _clip_path_cache[clip_id] = meta.path
 
         items.append(VideoClipItem(
             id=clip_id,
@@ -579,35 +621,38 @@ async def get_clip_thumbnail(clip_id: str, request: Request) -> FileResponse:
 
     cache_dir = project_dir / ".klippbok" / "thumbnails"
 
-    # Resolve clip from project scan
-    try:
-        report = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: scan_project_videos(project_dir),
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Scan failed: {exc}")
+    # Look up clip path from cache (populated by list_clips)
+    clip_path = _clip_path_cache.get(clip_id)
 
-    # Find the clip with matching ID
-    target_meta = None
-    for clip_validation in report.clips:
-        meta = clip_validation.metadata
+    if clip_path is None:
+        # Cache miss — do a full scan to populate
         try:
-            relative_path = str(meta.path.relative_to(project_dir))
-        except ValueError:
-            relative_path = meta.path.name
-        if _clip_id_from_relative(relative_path) == clip_id:
-            target_meta = meta
-            break
+            report = await asyncio.get_running_loop().run_in_executor(
+                None,
+                lambda: scan_project_videos(project_dir),
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Scan failed: {exc}")
 
-    if target_meta is None:
+        for clip_validation in report.clips:
+            meta = clip_validation.metadata
+            try:
+                relative_path = str(meta.path.relative_to(project_dir))
+            except ValueError:
+                relative_path = meta.path.name
+            cid = _clip_id_from_relative(relative_path)
+            _clip_path_cache[cid] = meta.path
+            if cid == clip_id:
+                clip_path = meta.path
+
+    if clip_path is None:
         raise HTTPException(status_code=404, detail=f"Clip '{clip_id}' not found")
 
     # Generate/return thumbnail
     try:
-        thumb_path = await asyncio.get_event_loop().run_in_executor(
+        thumb_path = await asyncio.get_running_loop().run_in_executor(
             None,
-            lambda: generate_video_thumbnail(target_meta.path, cache_dir),
+            lambda: generate_video_thumbnail(clip_path, cache_dir),
         )
     except Exception as exc:
         logger.error("Thumbnail generation failed for clip %s: %s", clip_id, exc)

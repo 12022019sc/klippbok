@@ -75,12 +75,20 @@ class TriageResult(BaseModel):
 # Core functions
 # ---------------------------------------------------------------------------
 
-def _compute_item_id(path: str | Path) -> str:
+def _compute_item_id(path: str | Path, project_dir: Path | None = None) -> str:
     """Compute a stable, URL-safe item ID from a path.
 
-    Uses SHA256[:16] of the path string, matching the pattern from
-    04-01 API-01 decision.
+    Uses SHA256[:16] of the *relative* path string (when project_dir is
+    provided), matching the ID scheme used by the images API.  Falls back
+    to the full path string when project_dir is not available.
     """
+    p = Path(path)
+    if project_dir is not None:
+        try:
+            rel = p.relative_to(project_dir)
+            return hashlib.sha256(str(rel).encode()).hexdigest()[:16]
+        except ValueError:
+            pass  # Not relative to project_dir — fall through
     return hashlib.sha256(str(path).encode()).hexdigest()[:16]
 
 
@@ -112,6 +120,7 @@ def run_triage(
     output_path: Path | None = None,
     progress_callback: Callable[[int, int], None] | None = None,
     model_name: str = "openai/clip-vit-base-patch32",
+    project_dir: Path | None = None,
 ) -> list[TriageResult]:
     """Run CLIP triage on a list of item paths (images or video clips).
 
@@ -194,7 +203,7 @@ def run_triage(
 
         result = TriageResult(
             item_path=str(item_path),
-            item_id=_compute_item_id(item_path),
+            item_id=_compute_item_id(item_path, project_dir),
             best_score=best_score,
             matches=matches,
             classification=_classify(best_score, threshold),
