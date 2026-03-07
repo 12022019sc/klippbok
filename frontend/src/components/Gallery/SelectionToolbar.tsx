@@ -38,7 +38,7 @@ export default function SelectionToolbar({ items }: SelectionToolbarProps) {
 
   function handleProcessSelectedVideos() {
     if (selectedVideos.length === 0) return
-    navigate('/process-videos', {
+    navigate('/video', {
       state: { videoPaths: selectedVideos.map((v) => v.relative_path) },
     })
     toggleSelectionMode()

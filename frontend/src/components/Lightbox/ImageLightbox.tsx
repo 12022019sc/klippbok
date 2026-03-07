@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import Lightbox from 'yet-another-react-lightbox'
 import 'yet-another-react-lightbox/styles.css'
@@ -29,6 +30,23 @@ export default function ImageLightbox({
   onCaptionSaved,
 }: ImageLightboxProps) {
   const queryClient = useQueryClient()
+  const controllerRef = useRef<any>(null)
+  const [videoMuted, setVideoMuted] = useState(true)
+
+  useEffect(() => {
+    if (!open) return
+    function handleWheel(e: WheelEvent) {
+      e.preventDefault()
+      if (e.deltaY > 0) {
+        controllerRef.current?.next()
+      } else {
+        controllerRef.current?.prev()
+      }
+    }
+    window.addEventListener('wheel', handleWheel, { passive: false })
+    return () => window.removeEventListener('wheel', handleWheel)
+  }, [open])
+
   const slides = items.map((item) => ({
     src: item.full_url,
     alt: item.relative_path,
@@ -50,24 +68,47 @@ export default function ImageLightbox({
       close={onClose}
       slides={slides}
       index={currentIndex}
+      controller={{ ref: controllerRef }}
       render={{
         slide: ({ slide }) => {
           const idx = slides.findIndex((s) => s.src === slide.src)
           const item = idx >= 0 ? items[idx] : null
           if (item?.media_type === 'video' && item.video_url) {
             return (
-              <video
-                src={item.video_url}
-                controls
-                autoPlay
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: '80vh',
-                  objectFit: 'contain',
-                  display: 'block',
-                  margin: '0 auto',
-                }}
-              />
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <video
+                  src={item.video_url}
+                  controls
+                  autoPlay
+                  muted={videoMuted}
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '80vh',
+                    objectFit: 'contain',
+                    display: 'block',
+                    margin: '0 auto',
+                  }}
+                />
+                <button
+                  onClick={() => setVideoMuted(!videoMuted)}
+                  style={{
+                    position: 'absolute',
+                    bottom: 50,
+                    right: 10,
+                    background: 'rgba(0, 0, 0, 0.6)',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '4px',
+                    color: '#fff',
+                    fontSize: '1.2rem',
+                    padding: '4px 8px',
+                    cursor: 'pointer',
+                    zIndex: 10,
+                  }}
+                  title={videoMuted ? 'Unmute' : 'Mute'}
+                >
+                  {videoMuted ? '\u{1F507}' : '\u{1F50A}'}
+                </button>
+              </div>
             )
           }
           return undefined
