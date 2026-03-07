@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 07.2-03-PLAN.md (gallery nav fix, lightbox enhancements, triage guidance, route cleanup)
-last_updated: "2026-03-07T04:40:48.797Z"
-last_activity: 2026-03-06 -- Completed 07.1-01-PLAN.md (cleanup classification service, API router with SSE, 26 tests)
+stopped_at: Completed 07.2-02-PLAN.md (VideoPage Quick Process UI with FrameReviewGrid and AdvancedPanel)
+last_updated: "2026-03-07T04:42:21.000Z"
+last_activity: 2026-03-07 -- Completed 07.2-02-PLAN.md (VideoPage Quick Process UI)
 progress:
   total_phases: 12
   completed_phases: 9
   total_plans: 38
-  completed_plans: 36
+  completed_plans: 37
 ---
 
 ---
@@ -112,16 +112,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** Take raw images/video of any size and produce correctly bucketed, captioned, training-ready datasets for any supported diffusion model through an intuitive web interface.
-**Current focus:** Phase 07.1 - Gallery Cleanup Tool
+**Current focus:** Phase 07.2 - Video-Gallery Integration (Process Videos Feature)
 
 ## Current Position
 
-Phase: 07.1-gallery-cleanup-tool
-Plan: 1 of 2 in phase 07.1 (complete)
+Phase: 07.2-video-gallery-integration-process-videos-feature
+Plan: 2 of 3 in phase 07.2 (complete)
 Status: Executing
-Last activity: 2026-03-06 -- Completed 07.1-01-PLAN.md (cleanup classification service, API router with SSE, 26 tests)
+Last activity: 2026-03-07 -- Completed 07.2-02-PLAN.md (VideoPage Quick Process UI)
 
-Progress: [█████████████░] ~90% (32 of ~34 estimated plans)
+Progress: [█████████████░] ~97% (37 of ~38 estimated plans)
 
 ## Performance Metrics
 
@@ -166,6 +166,7 @@ Progress: [█████████████░] ~90% (32 of ~34 estimated
 | Phase 07.1 P02 | 240 | 2 tasks | 8 files |
 | Phase 07.1 P03 | 4 | 2 tasks | 5 files |
 | Phase 07.2 P01 | 393 | 1 tasks | 2 files |
+| Phase 07.2 P02 | 382 | 2 tasks | 7 files |
 | Phase 07.2 P03 | 218 | 2 tasks | 6 files |
 
 ## Accumulated Context
@@ -304,6 +305,9 @@ Recent decisions affecting current work:
 - [Phase 07.2]: PROC-02: Temp processing dir refs/.processing-{op_id}/ for clean cancel support
 - [Phase 07.2]: PROC-03: Selective confirm copies chosen frames to temp dir before batch_import_images
 - [Phase 07.2]: PROC-04: Failed videos auto-skipped at probe stage with error preserved in skipped_videos
+- [Phase 07.2]: QP-01: QuickProcess uses useQueryClient to invalidate images cache on confirm
+- [Phase 07.2]: QP-02: FrameReviewGrid uses deselected Set (not selected Set) -- all frames selected by default
+- [Phase 07.2]: QP-03: Discard prompts about video removal via inline prompt (not browser confirm())
 - [Phase 07.2]: Controller ref approach for lightbox wheel navigation
 
 ### Roadmap Evolution
@@ -325,6 +329,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-07T04:40:48.794Z
-Stopped at: Completed 07.2-03-PLAN.md (gallery nav fix, lightbox enhancements, triage guidance, route cleanup)
+Last session: 2026-03-07T04:42:21.000Z
+Stopped at: Completed 07.2-02-PLAN.md (VideoPage Quick Process UI with FrameReviewGrid and AdvancedPanel)
 Resume file: None
