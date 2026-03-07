@@ -198,7 +198,7 @@ Plans:
   6. Gallery "Process Videos" button navigates to /video with queued paths
   7. Lightbox supports scroll wheel navigation and videos are muted by default with working toggle
   8. Triage page has workflow guidance explaining when and why to use CLIP Triage and Face Clustering
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [ ] 07.2-01-PLAN.md -- Backend: enhanced process pipeline with scene detection + split, selective confirm/discard
