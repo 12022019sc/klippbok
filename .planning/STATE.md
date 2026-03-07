@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 07.2 context gathered
-last_updated: "2026-03-07T04:00:34.821Z"
+stopped_at: Completed 07.2-01-PLAN.md (enhanced video process pipeline with scene detect + split)
+last_updated: "2026-03-07T04:33:54.122Z"
 last_activity: 2026-03-06 -- Completed 07.1-01-PLAN.md (cleanup classification service, API router with SSE, 26 tests)
 progress:
   total_phases: 12
   completed_phases: 9
-  total_plans: 35
-  completed_plans: 34
+  total_plans: 38
+  completed_plans: 35
 ---
 
 ---
@@ -165,6 +165,7 @@ Progress: [█████████████░] ~90% (32 of ~34 estimated
 | Phase 07.1 P01 | 424 | 2 tasks | 5 files |
 | Phase 07.1 P02 | 240 | 2 tasks | 8 files |
 | Phase 07.1 P03 | 4 | 2 tasks | 5 files |
+| Phase 07.2 P01 | 393 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -298,6 +299,10 @@ Recent decisions affecting current work:
 - [Phase 07.1]: CLEAN-UI-01: Auto-start uses appStore flag + URL param with hasAutoStarted ref guard
 - [Phase 07.1]: CLEAN-PATH-01: classify_item project_dir param is optional (None) for backward compatibility
 - [Phase 07.1]: CLEAN-SSE-01: cleanup_done event carries full results array inline; GET endpoint kept as fallback
+- [Phase 07.2]: PROC-01: Long video threshold 30s as configurable ProcessRequest field
+- [Phase 07.2]: PROC-02: Temp processing dir refs/.processing-{op_id}/ for clean cancel support
+- [Phase 07.2]: PROC-03: Selective confirm copies chosen frames to temp dir before batch_import_images
+- [Phase 07.2]: PROC-04: Failed videos auto-skipped at probe stage with error preserved in skipped_videos
 
 ### Roadmap Evolution
 
@@ -318,6 +323,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-07T04:00:34.818Z
-Stopped at: Phase 07.2 context gathered
-Resume file: .planning/phases/07.2-video-gallery-integration-process-videos-feature/07.2-CONTEXT.md
+Last session: 2026-03-07T04:33:54.119Z
+Stopped at: Completed 07.2-01-PLAN.md (enhanced video process pipeline with scene detect + split)
+Resume file: None
