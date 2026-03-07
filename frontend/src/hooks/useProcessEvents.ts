@@ -14,6 +14,7 @@ export interface ProcessState {
   isComplete: boolean
   extractedFrames: ExtractedFrame[]
   processedVideoPaths: string[]
+  skippedVideos: Array<{ path: string; reason: string }>
 }
 
 const INITIAL_STATE: ProcessState = {
@@ -25,6 +26,7 @@ const INITIAL_STATE: ProcessState = {
   isComplete: false,
   extractedFrames: [],
   processedVideoPaths: [],
+  skippedVideos: [],
 }
 
 /**
@@ -73,6 +75,7 @@ export function useProcessEvents(operationId: string | null): ProcessState {
           current?: number; total?: number; message?: string
           extracted_frames?: ExtractedFrame[]
           processed_video_paths?: string[]
+          skipped_videos?: Array<{ path: string; reason: string }>
         }
         setState((prev) => ({
           ...prev,
@@ -83,6 +86,7 @@ export function useProcessEvents(operationId: string | null): ProcessState {
           error: null,
           extractedFrames: data.extracted_frames ?? [],
           processedVideoPaths: data.processed_video_paths ?? [],
+          skippedVideos: data.skipped_videos ?? [],
         }))
       } catch {
         setState((prev) => ({
