@@ -1997,3 +1997,94 @@
   cursor: pointer;
 }
 
+/* Triage workflow guidance */
+.triage-intro {
+  color: #9ca3af;
+  font-size: 0.9rem;
+  max-width: 700px;
+  line-height: 1.5;
+  margin: 0 0 1rem 0;
+}
+
+.workflow-pipeline {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  background: #1e1e2e;
+  border: 1px solid #2d2d3e;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.workflow-step {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: #9ca3af;
+  background: #0f0f1a;
+}
+
+.workflow-step--current {
+  background: #3b82f6;
+  color: #fff;
+  font-weight: 600;
+}
+
+.workflow-arrow {
+  color: #4b5563;
+  font-size: 0.85rem;
+}
+
+.triage-section-desc {
+  font-size: 0.85rem;
+  color: #9ca3af;
+  line-height: 1.5;
+  background: #1a2332;
+  border: 1px solid #2d4a5e;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.triage-guidance {
+  font-size: 0.85rem;
+  margin: 0 0 0.5rem 0;
+}
+
+.triage-guidance--match {
+  color: #22c55e;
+}
+
+.triage-guidance--borderline {
+  color: #eab308;
+}
+
+.triage-guidance--no-match {
+  color: #ef4444;
+}
+
+.triage-empty-state {
+  background: #1e1e2e;
+  border: 1px solid #2d2d3e;
+  border-radius: 8px;
+  padding: 1.5rem 2rem;
+  color: #9ca3af;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.triage-empty-state p {
+  margin: 0 0 0.75rem 0;
+  color: #d1d5db;
+}
+
+.triage-empty-state ol {
+  text-align: left;
+  margin: 0;
+  padding-left: 1.25rem;
+  line-height: 1.8;
+}
+

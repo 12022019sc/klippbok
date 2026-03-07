@@ -346,10 +346,40 @@ export default function TriagePage() {
       {/* Right: Main Content */}
       <main className="triage-main">
         <h1 className="page-title">Triage</h1>
+        <p className="triage-intro">
+          Triage helps identify which images in your dataset match your training subject.
+          Use CLIP Triage to score images against reference photos, and Face Clustering
+          to identify distinct people in the dataset.
+        </p>
+
+        {/* Workflow pipeline */}
+        <div className="workflow-pipeline">
+          <span className="workflow-step">Import</span>
+          <span className="workflow-arrow">{'\u2192'}</span>
+          <span className="workflow-step">Cleanup</span>
+          <span className="workflow-arrow">{'\u2192'}</span>
+          <span className="workflow-step workflow-step--current">Face Clustering</span>
+          <span className="workflow-arrow">{'\u2192'}</span>
+          <span className="workflow-step workflow-step--current">CLIP Triage</span>
+          <span className="workflow-arrow">{'\u2192'}</span>
+          <span className="workflow-step">Gallery filter</span>
+          <span className="workflow-arrow">{'\u2192'}</span>
+          <span className="workflow-step">Crop</span>
+          <span className="workflow-arrow">{'\u2192'}</span>
+          <span className="workflow-step">Caption</span>
+          <span className="workflow-arrow">{'\u2192'}</span>
+          <span className="workflow-step">Export</span>
+        </div>
 
         {/* Section 1: CLIP Triage Controls */}
         <section className="triage-section">
           <h2 className="triage-section-title">CLIP Triage</h2>
+          <p className="triage-section-desc">
+            CLIP Triage compares each image in your gallery against your concept reference photos
+            using CLIP embeddings. Images are scored as Match (high similarity to your subject),
+            Borderline (moderate similarity -- review manually), or No Match (low similarity --
+            consider removing). Add reference photos of your subject first, then run triage.
+          </p>
 
           {health && !health.clip_available && (
             <div className="triage-warning-banner">
@@ -451,8 +481,8 @@ export default function TriagePage() {
 
             {matchItems.length > 0 && (
               <div style={{ marginBottom: '1rem' }}>
-                <h3 style={{ color: '#22c55e', fontSize: '0.85rem', margin: '0 0 0.5rem 0' }}>
-                  Matches
+                <h3 className="triage-guidance triage-guidance--match">
+                  Match -- Keep these images (high confidence subject match)
                 </h3>
                 <div className="triage-result-list">
                   {matchItems.map((r) => (
@@ -480,8 +510,8 @@ export default function TriagePage() {
 
             {borderlineItems.length > 0 && (
               <div>
-                <h3 style={{ color: '#eab308', fontSize: '0.85rem', margin: '0 0 0.5rem 0' }}>
-                  Borderline
+                <h3 className="triage-guidance triage-guidance--borderline">
+                  Borderline -- Review manually (moderate confidence)
                 </h3>
                 <div className="triage-result-list">
                   {borderlineItems.map((r) => (
@@ -509,9 +539,24 @@ export default function TriagePage() {
           </section>
         )}
 
+        {resultsList.length === 0 && concepts.length === 0 && !isTriageRunning && (
+          <div className="triage-empty-state">
+            <p><strong>Get started with triage:</strong></p>
+            <ol>
+              <li>Add reference photos of your subject in the Concepts section to the left.</li>
+              <li>Click "Run Triage" to score all gallery images against your references.</li>
+            </ol>
+          </div>
+        )}
+
         {/* Section 3: Face Clustering */}
         <section className="triage-section">
           <h2 className="triage-section-title">Face Clustering</h2>
+          <p className="triage-section-desc">
+            Face Clustering uses InsightFace to detect and group faces in your dataset.
+            This helps identify who appears in each image -- useful for ensuring your dataset
+            contains the right subject and for removing images of the wrong person.
+          </p>
 
           {health && !health.insightface_available && (
             <div className="triage-info-banner">
