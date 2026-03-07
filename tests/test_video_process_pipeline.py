@@ -37,7 +37,7 @@ def _make_manifest(project_dir: Path, entries: list[dict]) -> None:
     manifest_dir = project_dir / ".klippbok"
     manifest_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = manifest_dir / "manifest.json"
-    manifest_path.write_text(json.dumps({"images": entries}))
+    manifest_path.write_text(json.dumps({"version": "1", "images": entries}))
 
 
 def _drain_queue(queue: asyncio.Queue) -> list[ProcessProgressEvent]:

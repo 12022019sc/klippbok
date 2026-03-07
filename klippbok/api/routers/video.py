@@ -27,6 +27,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import shutil
 import uuid
 from pathlib import Path
 
@@ -44,6 +45,10 @@ from klippbok.services.video_service import (
     scan_project_videos,
 )
 from klippbok.video.extract import extract_reference_image
+from klippbok.video.probe import probe_video
+from klippbok.video.scene import detect_scenes
+from klippbok.video.split import split_video_at_scenes
+from klippbok.config.data_schema import VideoConfig
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +126,10 @@ class ProcessRequest(BaseModel):
     """Relative paths of specific videos to process. None = all videos."""
     frames_per_clip: int = 1
     """Number of reference frames to extract per clip."""
+    scene_threshold: float = 27.0
+    """Scene detection threshold for long videos."""
+    long_video_threshold: float = 30.0
+    """Duration threshold in seconds -- videos >= this get scene detection."""
 
 
 class ProcessStarted(BaseModel):
@@ -131,23 +140,30 @@ class ProcessStarted(BaseModel):
 class ProcessProgressEvent(BaseModel):
     """SSE data payload for process progress events."""
     operation_id: str
-    stage: str
+    stage: str  # "Probing videos", "Scene detection", "Splitting clips", "Extracting frames", "Complete"
     current: int
     total: int
     message: str = ""
     status: str = "running"
     extracted_frames: list[dict] | None = None
     processed_video_paths: list[str] | None = None
+    skipped_videos: list[dict] | None = None  # [{path, reason}]
 
 
 class ProcessConfirmRequest(BaseModel):
     """Request body for confirming video processing (import frames + remove videos)."""
     video_paths: list[str]
+    frame_paths: list[str] | None = None
+    """If provided, only import these specific frames. None = import all from refs/."""
 
 
 class ProcessDiscardRequest(BaseModel):
     """Request body for discarding extracted frames."""
     frame_paths: list[str]
+    remove_videos: bool = False
+    """If true, also remove video entries from manifest."""
+    video_paths: list[str] | None = None
+    """Video paths to remove (required if remove_videos=True)."""
 
 
 class VideoClipItem(BaseModel):
@@ -589,10 +605,17 @@ async def _run_process(
     op_id: str,
     project_dir: Path,
 ) -> None:
-    """Background coroutine that extracts reference frames from videos.
+    """Background coroutine: multi-stage video process pipeline.
 
-    Phase 1 only — extracts frames to refs/ and reports results.
-    Phase 2 (confirm/discard) is handled by separate synchronous endpoints.
+    Pipeline stages:
+    1. Probing videos -- get duration to decide routing
+    2. Scene detection -- for long videos (>= long_video_threshold)
+    3. Splitting clips -- split long videos at scene boundaries
+    4. Extracting frames -- extract reference image per clip/video
+    5. Complete -- report results
+
+    Short videos (<threshold) skip stages 2-3 and extract directly.
+    Failed videos are auto-skipped with error details preserved.
     """
     loop = asyncio.get_running_loop()
 
@@ -605,7 +628,7 @@ async def _run_process(
                 stage="Complete",
                 current=0,
                 total=0,
-                message="No images in manifest — nothing to process.",
+                message="No images in manifest -- nothing to process.",
                 status="complete",
                 extracted_frames=[],
                 processed_video_paths=[],
@@ -642,48 +665,140 @@ async def _run_process(
         refs_dir = project_dir / "refs"
         refs_dir.mkdir(parents=True, exist_ok=True)
 
-        # Step 2: Extract reference frames one by one
+        # Temp processing dir for clean cancel support
+        temp_dir = refs_dir / f".processing-{op_id}"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+
         extracted_frames: list[dict] = []
         processed_video_paths: list[str] = []
+        skipped_videos: list[dict] = []
+
+        # Store temp_dir early so cancel can clean up
+        _process_results[op_id] = {"temp_dir": str(temp_dir)}
+
+        threshold = request.long_video_threshold
 
         for idx, entry in enumerate(video_entries):
             rel_path = entry.get("path", "")
             abs_path = project_dir / rel_path
-            stem = Path(rel_path).stem
-            output_path = refs_dir / f"{stem}.png"
-
-            await queue.put(ProcessProgressEvent(
-                operation_id=op_id,
-                stage="Extracting frames",
-                current=idx,
-                total=total,
-                message=f"Extracting: {Path(rel_path).name}",
-                status="running",
-            ))
 
             try:
-                result = await loop.run_in_executor(
+                # Stage 1: Probing videos
+                await queue.put(ProcessProgressEvent(
+                    operation_id=op_id,
+                    stage="Probing videos",
+                    current=idx,
+                    total=total,
+                    message=f"Probing: {Path(rel_path).name}",
+                    status="running",
+                ))
+
+                metadata = await loop.run_in_executor(
                     None,
-                    lambda sp=abs_path, op=output_path: extract_reference_image(sp, op),
+                    lambda p=abs_path: probe_video(p),
                 )
-                if result.success or result.skipped:
-                    frame_rel = f"refs/{stem}.png"
-                    extracted_frames.append({
-                        "video_path": rel_path,
-                        "frame_path": frame_rel,
-                    })
-                    processed_video_paths.append(rel_path)
-                else:
-                    logger.warning(
-                        "Frame extraction failed for %s: %s", rel_path, result.error
+                duration = metadata.duration
+
+                # Determine extraction targets (clips to extract frames from)
+                extraction_targets: list[tuple[Path, str]] = []  # (abs_path, stem)
+
+                if duration >= threshold:
+                    # Long video: scene detect + split
+                    await queue.put(ProcessProgressEvent(
+                        operation_id=op_id,
+                        stage="Scene detection",
+                        current=idx,
+                        total=total,
+                        message=f"Detecting scenes: {Path(rel_path).name}",
+                        status="running",
+                    ))
+
+                    scenes = await loop.run_in_executor(
+                        None,
+                        lambda p=abs_path, t=request.scene_threshold: detect_scenes(p, threshold=t),
                     )
+
+                    if scenes:
+                        await queue.put(ProcessProgressEvent(
+                            operation_id=op_id,
+                            stage="Splitting clips",
+                            current=idx,
+                            total=total,
+                            message=f"Splitting: {Path(rel_path).name} ({len(scenes)} scenes)",
+                            status="running",
+                        ))
+
+                        config = VideoConfig()
+                        clips = await loop.run_in_executor(
+                            None,
+                            lambda p=abs_path, s=scenes, d=temp_dir, c=config: split_video_at_scenes(p, s, d, c),
+                        )
+
+                        for clip in clips:
+                            clip_stem = Path(clip.output).stem
+                            extraction_targets.append((Path(clip.output), clip_stem))
+                    else:
+                        # No scenes found in long video -- treat as single clip
+                        stem = Path(rel_path).stem
+                        extraction_targets.append((abs_path, stem))
+                else:
+                    # Short video: extract directly
+                    stem = Path(rel_path).stem
+                    extraction_targets.append((abs_path, stem))
+
+                # Stage 4: Extract frames
+                await queue.put(ProcessProgressEvent(
+                    operation_id=op_id,
+                    stage="Extracting frames",
+                    current=idx,
+                    total=total,
+                    message=f"Extracting frames: {Path(rel_path).name}",
+                    status="running",
+                ))
+
+                for source_path, stem in extraction_targets:
+                    output_path = temp_dir / f"{stem}.png"
+                    try:
+                        result = await loop.run_in_executor(
+                            None,
+                            lambda sp=source_path, op=output_path: extract_reference_image(sp, op),
+                        )
+                        if result.success or result.skipped:
+                            # Move frame from temp to refs/
+                            final_path = refs_dir / f"{stem}.png"
+                            if output_path.exists():
+                                shutil.move(str(output_path), str(final_path))
+                            frame_rel = f"refs/{stem}.png"
+                            extracted_frames.append({
+                                "video_path": rel_path,
+                                "frame_path": frame_rel,
+                            })
+                        else:
+                            logger.warning(
+                                "Frame extraction failed for %s: %s", stem, result.error
+                            )
+                    except Exception as exc:
+                        logger.error("Frame extraction error for %s: %s", stem, exc)
+
+                processed_video_paths.append(rel_path)
+
             except Exception as exc:
-                logger.error("Frame extraction error for %s: %s", rel_path, exc)
+                logger.error("Processing failed for %s: %s", rel_path, exc)
+                skipped_videos.append({
+                    "path": rel_path,
+                    "reason": str(exc),
+                })
+                continue
+
+        # Clean up temp dir (clips and any remaining temp frames)
+        if temp_dir.exists():
+            shutil.rmtree(str(temp_dir), ignore_errors=True)
 
         # Store results for retrieval via GET endpoint
         _process_results[op_id] = {
             "extracted_frames": extracted_frames,
             "processed_video_paths": processed_video_paths,
+            "skipped_videos": skipped_videos,
         }
 
         await queue.put(ProcessProgressEvent(
@@ -693,11 +808,13 @@ async def _run_process(
             total=total,
             message=(
                 f"Extraction complete: {len(extracted_frames)} frames extracted "
-                f"from {total} videos."
+                f"from {len(processed_video_paths)} videos."
+                + (f" {len(skipped_videos)} skipped." if skipped_videos else "")
             ),
             status="complete",
             extracted_frames=extracted_frames,
             processed_video_paths=processed_video_paths,
+            skipped_videos=skipped_videos if skipped_videos else None,
         ))
 
     except Exception as exc:
@@ -783,7 +900,7 @@ async def process_events(op_id: str) -> EventSourceResponse:
 
 @router.post("/process/{op_id}/cancel")
 async def cancel_process(op_id: str) -> dict:
-    """Cancel a running process operation."""
+    """Cancel a running process operation and clean up temp files."""
     task = _process_tasks.pop(op_id, None)
     _process_queues.pop(op_id, None)
 
@@ -797,12 +914,26 @@ async def cancel_process(op_id: str) -> dict:
         task.cancel()
         logger.info("Cancelled process operation %s", op_id)
 
+    # Clean up temp processing directory if it exists
+    results = _process_results.get(op_id)
+    if results and "temp_dir" in results:
+        temp_dir = Path(results["temp_dir"])
+        if temp_dir.exists():
+            shutil.rmtree(str(temp_dir), ignore_errors=True)
+            logger.info("Cleaned up temp dir for operation %s: %s", op_id, temp_dir)
+    _process_results.pop(op_id, None)
+
     return {"cancelled": True}
 
 
 @router.post("/process/confirm")
 async def confirm_process(body: ProcessConfirmRequest, request: Request) -> dict:
-    """Confirm video processing: import extracted frames and remove video entries."""
+    """Confirm video processing: import extracted frames and remove video entries.
+
+    If body.frame_paths is provided, only those specific frames are imported
+    (copied to a temp dir, then batch_import_images runs on that dir).
+    If frame_paths is None, imports all frames from refs/.
+    """
     project_dir: Path | None = request.app.state.project_dir
     if project_dir is None:
         raise HTTPException(status_code=409, detail="No project directory selected")
@@ -813,10 +944,27 @@ async def confirm_process(body: ProcessConfirmRequest, request: Request) -> dict
 
     loop = asyncio.get_running_loop()
 
-    report = await loop.run_in_executor(
-        None,
-        lambda: batch_import_images(refs_dir, project_dir),
-    )
+    if body.frame_paths is not None:
+        # Selective import: copy only specified frames to a temp dir
+        import tempfile
+        temp_import_dir = Path(tempfile.mkdtemp(prefix="klippbok-confirm-"))
+        try:
+            for fp in body.frame_paths:
+                src = project_dir / fp
+                if src.exists():
+                    shutil.copy2(str(src), str(temp_import_dir / src.name))
+
+            report = await loop.run_in_executor(
+                None,
+                lambda d=temp_import_dir: batch_import_images(d, project_dir),
+            )
+        finally:
+            shutil.rmtree(str(temp_import_dir), ignore_errors=True)
+    else:
+        report = await loop.run_in_executor(
+            None,
+            lambda: batch_import_images(refs_dir, project_dir),
+        )
 
     removed = 0
     if body.video_paths:
@@ -830,7 +978,11 @@ async def confirm_process(body: ProcessConfirmRequest, request: Request) -> dict
 
 @router.post("/process/discard")
 async def discard_process(body: ProcessDiscardRequest, request: Request) -> dict:
-    """Discard extracted frames by deleting specific files from refs/."""
+    """Discard extracted frames by deleting specific files from refs/.
+
+    If remove_videos=True and video_paths provided, also removes video
+    entries from the manifest.
+    """
     project_dir: Path | None = request.app.state.project_dir
     if project_dir is None:
         raise HTTPException(status_code=409, detail="No project directory selected")
@@ -842,7 +994,15 @@ async def discard_process(body: ProcessDiscardRequest, request: Request) -> dict
             abs_path.unlink()
             deleted += 1
 
-    return {"deleted": deleted}
+    videos_removed = 0
+    if body.remove_videos and body.video_paths:
+        loop = asyncio.get_running_loop()
+        videos_removed = await loop.run_in_executor(
+            None,
+            lambda: remove_image_entries(project_dir, set(body.video_paths)),
+        )
+
+    return {"deleted": deleted, "videos_removed": videos_removed}
 
 
 @router.get("/process/results/{op_id}")
