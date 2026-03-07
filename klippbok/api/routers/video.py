@@ -45,6 +45,7 @@ from klippbok.services.video_service import (
     scan_project_videos,
 )
 from klippbok.video.extract import extract_reference_image
+from klippbok.video.extract_models import ExtractionConfig, ExtractionStrategy
 from klippbok.video.probe import probe_video
 from klippbok.video.scene import detect_scenes
 from klippbok.video.split import split_video_at_scenes
@@ -756,23 +757,57 @@ async def _run_process(
                     status="running",
                 ))
 
+                # Use best_frame strategy with top-5 candidates for user review
+                extraction_config = ExtractionConfig(
+                    strategy=ExtractionStrategy.BEST_FRAME,
+                    sample_count=10,
+                    overwrite=True,
+                    keep_top_n=7,
+                )
+
                 for source_path, stem in extraction_targets:
                     output_path = temp_dir / f"{stem}.png"
                     try:
                         result = await loop.run_in_executor(
                             None,
-                            lambda sp=source_path, op=output_path: extract_reference_image(sp, op),
+                            lambda sp=source_path, op=output_path, cfg=extraction_config: extract_reference_image(sp, op, cfg),
                         )
                         if result.success or result.skipped:
-                            # Move frame from temp to refs/
+                            # Move winner frame from temp to refs/
                             final_path = refs_dir / f"{stem}.png"
                             if output_path.exists():
                                 shutil.move(str(output_path), str(final_path))
+
+                            # Move candidates dir from temp to refs/
+                            frame_candidates: list[dict] | None = None
+                            temp_cand_dir = temp_dir / f"{stem}_candidates"
+                            if temp_cand_dir.exists():
+                                final_cand_dir = refs_dir / f"{stem}_candidates"
+                                if final_cand_dir.exists():
+                                    shutil.rmtree(str(final_cand_dir))
+                                shutil.move(str(temp_cand_dir), str(final_cand_dir))
+                                # Rebuild candidate paths relative to project
+                                frame_candidates = []
+                                for cand_file in sorted(final_cand_dir.glob("rank_*.png")):
+                                    rel = f"refs/{stem}_candidates/{cand_file.name}"
+                                    # Parse score from filename: rank_1_score_0.841.png
+                                    parts = cand_file.stem.split("_")
+                                    rank = int(parts[1]) if len(parts) >= 2 else 0
+                                    score = float(parts[3]) if len(parts) >= 4 else 0.0
+                                    frame_candidates.append({
+                                        "path": rel,
+                                        "score": score,
+                                        "rank": rank,
+                                    })
+
                             frame_rel = f"refs/{stem}.png"
-                            extracted_frames.append({
+                            frame_entry: dict = {
                                 "video_path": rel_path,
                                 "frame_path": frame_rel,
-                            })
+                            }
+                            if frame_candidates:
+                                frame_entry["candidates"] = frame_candidates
+                            extracted_frames.append(frame_entry)
                         else:
                             logger.warning(
                                 "Frame extraction failed for %s: %s", stem, result.error
@@ -830,6 +865,15 @@ async def _run_process(
 
     finally:
         await queue.put(None)
+
+
+def _cleanup_candidate_dirs(refs_dir: Path) -> None:
+    """Remove all *_candidates/ directories under refs/."""
+    if not refs_dir.exists():
+        return
+    for d in refs_dir.iterdir():
+        if d.is_dir() and d.name.endswith("_candidates"):
+            shutil.rmtree(str(d), ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------
@@ -899,7 +943,7 @@ async def process_events(op_id: str) -> EventSourceResponse:
 
 
 @router.post("/process/{op_id}/cancel")
-async def cancel_process(op_id: str) -> dict:
+async def cancel_process(op_id: str, request: Request) -> dict:
     """Cancel a running process operation and clean up temp files."""
     task = _process_tasks.pop(op_id, None)
     _process_queues.pop(op_id, None)
@@ -914,13 +958,18 @@ async def cancel_process(op_id: str) -> dict:
         task.cancel()
         logger.info("Cancelled process operation %s", op_id)
 
-    # Clean up temp processing directory if it exists
+    # Clean up temp processing directory and candidate dirs
     results = _process_results.get(op_id)
-    if results and "temp_dir" in results:
-        temp_dir = Path(results["temp_dir"])
-        if temp_dir.exists():
-            shutil.rmtree(str(temp_dir), ignore_errors=True)
-            logger.info("Cleaned up temp dir for operation %s: %s", op_id, temp_dir)
+    if results:
+        if "temp_dir" in results:
+            temp_dir = Path(results["temp_dir"])
+            if temp_dir.exists():
+                shutil.rmtree(str(temp_dir), ignore_errors=True)
+                logger.info("Cleaned up temp dir for operation %s: %s", op_id, temp_dir)
+        # Clean up any candidate dirs that were already moved to refs/
+        project_dir = request.app.state.project_dir
+        if project_dir:
+            _cleanup_candidate_dirs(Path(project_dir) / "refs")
     _process_results.pop(op_id, None)
 
     return {"cancelled": True}
@@ -973,6 +1022,9 @@ async def confirm_process(body: ProcessConfirmRequest, request: Request) -> dict
             lambda: remove_image_entries(project_dir, set(body.video_paths)),
         )
 
+    # Clean up candidate dirs after import
+    _cleanup_candidate_dirs(project_dir / "refs")
+
     return {"imported": report.imported, "removed": removed}
 
 
@@ -993,6 +1045,14 @@ async def discard_process(body: ProcessDiscardRequest, request: Request) -> dict
         if abs_path.exists() and abs_path.is_file():
             abs_path.unlink()
             deleted += 1
+
+    # Also delete candidate dirs for discarded frames
+    refs_dir = project_dir / "refs"
+    for frame_path in body.frame_paths:
+        stem = Path(frame_path).stem
+        cand_dir = refs_dir / f"{stem}_candidates"
+        if cand_dir.exists() and cand_dir.is_dir():
+            shutil.rmtree(str(cand_dir), ignore_errors=True)
 
     videos_removed = 0
     if body.remove_videos and body.video_paths:

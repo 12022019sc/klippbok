@@ -64,6 +64,15 @@ class ExtractionConfig(BaseModel):
             "If False, skip clips that already have a reference image."
         ),
     )
+    keep_top_n: int = Field(
+        default=1,
+        ge=1,
+        description=(
+            "How many top-scoring candidates to keep alongside the winner. "
+            "1 = winner only (default). >1 saves ranked alternates in a "
+            "{stem}_candidates/ directory for user review."
+        ),
+    )
 
 
 class ExtractionResult(BaseModel):
@@ -101,6 +110,10 @@ class ExtractionResult(BaseModel):
 
     skipped: bool = False
     """True if extraction was skipped (output already exists, overwrite=False)."""
+
+    candidates: list[dict] | None = None
+    """Top-N ranked candidate frames: [{path: str, score: float, rank: int}].
+    Only populated when keep_top_n > 1 during best_frame extraction."""
 
 
 class ImageValidation(BaseModel):

@@ -61,13 +61,20 @@ _face_app = None
 def _get_face_app():
     """Return the module-level FaceAnalysis app, creating it on first call.
 
-    Uses buffalo_l model on CPU (ctx_id=-1) for compatibility.
+    Uses GPU (ctx_id=0) when CUDA is available, falls back to CPU.
     """
     global _face_app
     if _face_app is None:
         import insightface
         app = insightface.app.FaceAnalysis(name="buffalo_l")
-        app.prepare(ctx_id=-1)
+        # Use GPU if available (ctx_id=0), otherwise CPU (ctx_id=-1)
+        try:
+            import onnxruntime
+            has_gpu = "CUDAExecutionProvider" in onnxruntime.get_available_providers()
+        except ImportError:
+            has_gpu = False
+        ctx_id = 0 if has_gpu else -1
+        app.prepare(ctx_id=ctx_id)
         _face_app = app
     return _face_app
 

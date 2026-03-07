@@ -2299,6 +2299,88 @@
   margin: 0 0 0.5rem;
 }
 
+/* Frame card toggle button (Include/Remove) */
+.frame-review-toggle-btn {
+  display: block;
+  width: 100%;
+  padding: 0.3rem 0.5rem;
+  border: none;
+  border-top: 1px solid #2d2d3e;
+  background: #1a1a2e;
+  color: #ef4444;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.frame-review-toggle-btn:hover {
+  background: #2a0f0f;
+}
+
+.frame-review-toggle-btn.removed {
+  color: #22c55e;
+  background: #0a1a0f;
+}
+
+.frame-review-toggle-btn.removed:hover {
+  background: #0f2a17;
+}
+
+/* Full-size frame preview overlay */
+.frame-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.frame-preview-content {
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: default;
+}
+
+.frame-preview-content img {
+  max-width: 90vw;
+  max-height: 80vh;
+  object-fit: contain;
+  border-radius: 6px;
+  border: 1px solid #3d3d5e;
+}
+
+.frame-preview-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  color: #d1d5db;
+  font-size: 0.85rem;
+  font-family: monospace;
+}
+
+.frame-preview-close {
+  background: #2d2d3e;
+  border: 1px solid #3d3d5e;
+  color: #d1d5db;
+  padding: 0.3rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.frame-preview-close:hover {
+  background: #3d3d5e;
+  color: #f9fafb;
+}
+
 /* =============================================
    Advanced Panel
    ============================================= */
@@ -2330,5 +2412,127 @@
 
 .advanced-panel-content {
   margin-top: 1rem;
+}
+
+/* =============================================
+   Candidate Lightbox
+   ============================================= */
+
+.candidate-lightbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 95vw;
+  max-height: 95vh;
+  cursor: default;
+}
+
+.candidate-nav {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  color: #fff;
+  font-size: 1.8rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.candidate-nav:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.candidate-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.candidate-main > img {
+  max-width: 80vw;
+  max-height: 65vh;
+  object-fit: contain;
+  border-radius: 6px;
+  border: 1px solid #3d3d5e;
+}
+
+.candidate-info-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: #d1d5db;
+  font-size: 0.85rem;
+}
+
+.candidate-video-name {
+  font-family: monospace;
+  color: #9ca3af;
+}
+
+.candidate-rank-label {
+  font-weight: 600;
+  color: #f9fafb;
+}
+
+.candidate-score-badge {
+  background: rgba(99, 102, 241, 0.3);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: #a5b4fc;
+}
+
+.candidate-strip {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.candidate-strip-thumb {
+  width: 64px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+
+.candidate-strip-thumb:hover {
+  opacity: 0.9;
+}
+
+.candidate-strip-thumb.active {
+  border-color: #6366f1;
+  opacity: 1;
+}
+
+.candidate-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+/* Candidate indicator on review grid cards */
+.frame-review-candidate-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: rgba(99, 102, 241, 0.85);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+  pointer-events: none;
 }
 

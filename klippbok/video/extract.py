@@ -41,7 +41,7 @@ from klippbok.video.extract_models import (
     ExtractionResult,
     ExtractionStrategy,
 )
-from klippbok.video.image_quality import compute_sharpness, is_blank
+from klippbok.video.image_quality import compute_sharpness, is_blank, score_frame
 
 # File extensions recognized as video or image
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
@@ -218,46 +218,99 @@ def extract_frame_at(
     )
 
 
+def _get_video_fps(video_path: Path) -> float:
+    """Get the native fps of a video file via ffprobe."""
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "quiet",
+                "-select_streams", "v:0",
+                "-show_entries", "stream=r_frame_rate",
+                "-of", "csv=p=0",
+                str(video_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        # r_frame_rate is a fraction like "30/1" or "30000/1001"
+        parts = result.stdout.strip().split("/")
+        if len(parts) == 2:
+            return float(parts[0]) / float(parts[1])
+        return float(parts[0])
+    except Exception:
+        return 30.0  # safe default
+
+
+def _load_face_app() -> object | None:
+    """Try to load InsightFace for face-aware scoring. Returns None on failure."""
+    try:
+        from klippbok.services.face_service import check_insightface_available, _get_face_app
+        if check_insightface_available():
+            return _get_face_app()
+    except Exception:
+        pass
+    return None
+
+
+def _score_candidates(
+    candidates: list[Path],
+    face_app: object | None,
+) -> list[tuple[Path, float, float]]:
+    """Score a list of candidate frame paths.
+
+    Returns list of (path, score, sharpness) sorted by score descending.
+    """
+    scored: list[tuple[Path, float, float]] = []
+    for candidate in candidates:
+        try:
+            s = score_frame(candidate, face_app=face_app)
+            sharp = compute_sharpness(candidate)
+            scored.append((candidate, s, sharp))
+        except (ValueError, FileNotFoundError):
+            continue
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return scored
+
+
 def extract_best_frame(
     video_path: str | Path,
     output_path: str | Path,
-    sample_count: int = 10,
+    sample_count: int = 30,
+    keep_top_n: int = 1,
 ) -> ExtractionResult:
-    """Sample N frames from a video and keep the sharpest one.
+    """Two-pass extraction: coarse sample then dense refinement.
 
-    Extracts frames evenly distributed across the video duration,
-    measures each one's Laplacian variance (sharpness), and keeps
-    the sharpest. On ties, earlier frames are preferred (more likely
-    to be a clean starting point for I2V).
+    Pass 1 (coarse): Sample N frames evenly across the usable duration
+    (skipping first/last 10%) and score each with the composite metric.
 
-    WHY this matters: some clips start with a fade-in, motion blur,
-    or a partially obscured frame. The "best frame" strategy finds
-    the clearest frame for VAE encoding.
+    Pass 2 (dense): Take the best coarse candidate, extract frames densely
+    in a +/-1 second window around it at native fps (capped at 30). The
+    dense winner replaces the coarse winner if it scores higher.
+
+    When keep_top_n > 1, the top N candidates across both passes are saved
+    as ranked alternates alongside the winner.
 
     Args:
         video_path: Path to the source video file.
         output_path: Path for the output PNG file.
-        sample_count: Number of frames to sample. More = better pick
-            but slower. Default 10 is a good balance.
+        sample_count: Number of frames to sample in coarse pass.
+        keep_top_n: How many top candidates to keep (1 = winner only).
 
     Returns:
-        ExtractionResult with the frame number and sharpness of the pick.
+        ExtractionResult with the frame number, sharpness, and candidates.
 
     Raises:
         FFmpegNotFoundError: if ffmpeg is not in PATH.
         ExtractionError: if ffmpeg fails.
     """
+    import shutil
+
     video_path = Path(video_path).resolve()
     output_path = Path(output_path).resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Step 1: Extract sample_count frames to a temp directory
-    # Use the select filter to pick evenly-spaced frames.
-    # The expression: not(mod(n, total/count)) picks every (total/count)th frame
-    # But we don't know total frames here without probing first.
-    # Simpler approach: use fps filter to sample at a rate that gives ~N frames.
-
-    # We need the duration to compute the sampling rate
+    # Get video duration
     try:
         duration_result = subprocess.run(
             [
@@ -277,63 +330,141 @@ def extract_best_frame(
     if duration <= 0:
         raise ExtractionError(str(video_path), "Video has zero or negative duration")
 
-    # Calculate fps that gives approximately sample_count frames
-    # Add a small buffer to ensure we get enough
-    sample_fps = max(sample_count / duration, 1.0)
+    # Skip first/last 10% to avoid fade-in/outro frames
+    if duration > 3.0:
+        start_time = duration * 0.10
+        end_time = duration * 0.90
+    else:
+        start_time = 0.0
+        end_time = duration
 
-    # Extract candidate frames to temp directory
-    candidates_dir = output_path.parent / f"_candidates_{output_path.stem}"
-    candidates_dir.mkdir(parents=True, exist_ok=True)
+    usable_duration = end_time - start_time
+    sample_fps = max(sample_count / usable_duration, 1.0)
+
+    # --- Pass 1: Coarse sampling ---
+    coarse_dir = output_path.parent / f"_coarse_{output_path.stem}"
+    coarse_dir.mkdir(parents=True, exist_ok=True)
 
     cmd = [
         "ffmpeg", "-y",
+        "-ss", f"{start_time:.3f}",
+        "-t", f"{usable_duration:.3f}",
         "-i", str(video_path),
         "-vf", f"fps={sample_fps:.4f}",
         "-frames:v", str(sample_count),
-        str(candidates_dir / "frame_%04d.png"),
+        str(coarse_dir / "frame_%04d.png"),
     ]
 
     _run_ffmpeg(cmd, str(video_path))
 
-    # Step 2: Score each candidate by sharpness
-    candidates = sorted(candidates_dir.glob("frame_*.png"))
-
-    if not candidates:
-        # Clean up and fall back to first frame
-        _cleanup_dir(candidates_dir)
+    coarse_candidates = sorted(coarse_dir.glob("frame_*.png"))
+    if not coarse_candidates:
+        _cleanup_dir(coarse_dir)
         return extract_first_frame(video_path, output_path)
 
-    best_path = candidates[0]
-    best_sharpness = -1.0
-    best_index = 0
+    face_app = _load_face_app()
+    coarse_scored = _score_candidates(coarse_candidates, face_app)
 
-    for i, candidate in enumerate(candidates):
+    if not coarse_scored:
+        _cleanup_dir(coarse_dir)
+        return extract_first_frame(video_path, output_path)
+
+    # Determine the timestamp of the best coarse candidate
+    best_coarse_path = coarse_scored[0][0]
+    # Frame index from filename (frame_0001.png -> 0)
+    best_coarse_idx = coarse_candidates.index(best_coarse_path)
+    best_timestamp = start_time + best_coarse_idx * usable_duration / max(len(coarse_candidates), 1)
+
+    # --- Pass 2: Dense refinement around best coarse candidate ---
+    dense_scored: list[tuple[Path, float, float]] = []
+    dense_dir = output_path.parent / f"_dense_{output_path.stem}"
+
+    # Only do dense pass if video is long enough to benefit
+    if usable_duration > 1.0:
+        dense_dir.mkdir(parents=True, exist_ok=True)
+        dense_start = max(0.0, best_timestamp - 1.0)
+        dense_end = min(duration, best_timestamp + 1.0)
+        dense_duration = dense_end - dense_start
+
+        # Sample ~15 frames across the dense window (enough to find the
+        # sharpest moment without being slow). No need for native fps.
+        dense_sample_count = 15
+        dense_fps_rate = max(dense_sample_count / dense_duration, 1.0)
+
+        dense_cmd = [
+            "ffmpeg", "-y",
+            "-ss", f"{dense_start:.3f}",
+            "-t", f"{dense_duration:.3f}",
+            "-i", str(video_path),
+            "-vf", f"fps={dense_fps_rate:.4f}",
+            "-frames:v", str(dense_sample_count),
+            str(dense_dir / "dense_%04d.png"),
+        ]
+
         try:
-            sharpness = compute_sharpness(candidate)
-            # On tie, prefer earlier frame (already established by iteration order)
-            if sharpness > best_sharpness:
-                best_sharpness = sharpness
-                best_path = candidate
-                best_index = i
-        except (ValueError, FileNotFoundError):
-            continue
+            _run_ffmpeg(dense_cmd, str(video_path))
+            dense_candidates = sorted(dense_dir.glob("dense_*.png"))
+            # Skip face detection in dense pass — we already know this
+            # region has a good face from the coarse pass. Visual quality
+            # metrics alone pick the sharpest moment (eyes open, in focus).
+            dense_scored = _score_candidates(dense_candidates, None)
+        except Exception:
+            pass  # dense pass failure is not fatal; coarse result stands
 
-    # Step 3: Copy the winner to the output path and clean up
-    import shutil
-    shutil.copy2(str(best_path), str(output_path))
-    _cleanup_dir(candidates_dir)
+    # --- Pick winner ---
+    # Dense pass uses lighter scoring (no face detection), so scores aren't
+    # directly comparable. The dense winner replaces the coarse winner if its
+    # sharpness (the primary visual quality signal) is higher — meaning we
+    # found a crisper frame in the same face region.
+    winner_path, winner_score, winner_sharpness = coarse_scored[0]
+    if dense_scored:
+        dense_best_path, dense_best_score, dense_best_sharpness = dense_scored[0]
+        if dense_best_sharpness > winner_sharpness:
+            winner_path = dense_best_path
+            winner_score = coarse_scored[0][1]  # keep coarse score for ranking
+            winner_sharpness = dense_best_sharpness
 
-    # Estimate the actual frame number based on sampling position
-    # This is approximate — the exact frame depends on fps filter behavior
-    estimated_frame = int(best_index * (duration * 16) / max(len(candidates), 1))
+    # For candidate ranking, use coarse scores (comparable scale)
+    all_scored = coarse_scored.copy()
+    # Insert dense winner at proper position if it won
+    if winner_path not in [s[0] for s in coarse_scored]:
+        all_scored.insert(0, (winner_path, winner_score, winner_sharpness))
+    all_scored.sort(key=lambda x: x[1], reverse=True)
+
+    # Copy winner to output
+    shutil.copy2(str(winner_path), str(output_path))
+
+    # Keep top-N candidates if requested
+    candidates_list: list[dict] | None = None
+    if keep_top_n > 1 and len(all_scored) > 1:
+        candidates_dir = output_path.parent / f"{output_path.stem}_candidates"
+        candidates_dir.mkdir(parents=True, exist_ok=True)
+        candidates_list = []
+
+        for rank, (cand_path, cand_score, _cand_sharp) in enumerate(all_scored[:keep_top_n]):
+            dest = candidates_dir / f"rank_{rank + 1}_score_{cand_score:.3f}.png"
+            shutil.copy2(str(cand_path), str(dest))
+            candidates_list.append({
+                "path": str(dest),
+                "score": round(cand_score, 4),
+                "rank": rank + 1,
+            })
+
+    # Clean up temp dirs
+    _cleanup_dir(coarse_dir)
+    _cleanup_dir(dense_dir)
+
+    # Estimate frame number from winner timestamp
+    estimated_frame = int(best_timestamp * 16)
 
     return ExtractionResult(
         source=video_path,
         output=output_path,
         frame_number=estimated_frame,
         strategy=ExtractionStrategy.BEST_FRAME,
-        sharpness=best_sharpness if best_sharpness >= 0 else None,
+        sharpness=winner_sharpness if winner_sharpness >= 0 else None,
         source_type="video",
+        candidates=candidates_list,
     )
 
 
@@ -440,7 +571,9 @@ def extract_reference_image(
             return extract_first_frame(source_path, output_path)
         elif config.strategy == ExtractionStrategy.BEST_FRAME:
             return extract_best_frame(
-                source_path, output_path, sample_count=config.sample_count
+                source_path, output_path,
+                sample_count=config.sample_count,
+                keep_top_n=config.keep_top_n,
             )
         else:
             # USER_SELECTED without a manifest — fall back to first frame

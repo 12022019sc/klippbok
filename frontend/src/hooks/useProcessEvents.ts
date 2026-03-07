@@ -1,8 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 
+export interface FrameCandidate {
+  path: string
+  score: number
+  rank: number
+}
+
 export interface ExtractedFrame {
   video_path: string
   frame_path: string
+  candidates?: FrameCandidate[]
 }
 
 export interface ProcessState {
