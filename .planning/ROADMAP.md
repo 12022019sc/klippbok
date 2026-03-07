@@ -22,6 +22,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6.2: Captioning Enhancement: JoyCaption Integration Planning** - Caption modes, context-only modes, post-processing pipeline, token budgets, trigger word injection (INSERTED) (completed 2026-03-05)
 - [x] **Phase 7: Video and CLIP Integration** - Existing video pipeline accessible from GUI, CLIP triage extended to standalone images (completed 2026-03-05)
 - [ ] **Phase 7.1: Gallery Cleanup Tool** - ML-powered media filtering for subject relevance (INSERTED)
+- [ ] **Phase 7.2: Video-Gallery Integration** - Unified Video tab with Quick Process pipeline, frame review, lightbox enhancements, Triage UX (INSERTED)
 - [ ] **Phase 8: Export Pipeline** - Multi-trainer export with format-specific config generation and dataset download
 
 ## Phase Details
@@ -183,6 +184,27 @@ Plans:
 - [ ] 07-04-PLAN.md -- TriagePage with CLIP triage UI, concepts gallery, face clusters, gallery video extensions
 - [ ] 07-05-PLAN.md -- Gap closure: POST /triage/concepts/upload file upload endpoint
 
+### Phase 07.2: Video-Gallery Integration (Process Videos Feature) (INSERTED)
+
+**Goal:** Users can process videos through an automated pipeline (scene detect, split, extract frames, review, confirm import) from a unified Video tab, with Quick Process as the default view, Advanced tabs as a toggle, and Gallery integration for frame import -- replacing the disconnected ProcessVideosPage
+**Requirements**: VGAL-01, VGAL-02, VGAL-03, VGAL-04, VGAL-05, VGAL-06, VGAL-07, VGAL-08, VGAL-09
+**Depends on:** Phase 7
+**Success Criteria** (what must be TRUE):
+  1. Video tab opens to Quick Process by default with a streamlined automated pipeline
+  2. Long videos (>=30s) get scene detection + split; short clips (<30s) get direct frame extraction
+  3. Stage-aware progress shows current pipeline stage and per-stage progress bar
+  4. Frame review grid shows extracted frames with toggle-select (all selected by default, click to deselect)
+  5. Confirm imports only selected frames via batch_import_images and removes video entries from manifest
+  6. Gallery "Process Videos" button navigates to /video with queued paths
+  7. Lightbox supports scroll wheel navigation and videos are muted by default with working toggle
+  8. Triage page has workflow guidance explaining when and why to use CLIP Triage and Face Clustering
+**Plans:** 3 plans
+
+Plans:
+- [ ] 07.2-01-PLAN.md -- Backend: enhanced process pipeline with scene detection + split, selective confirm/discard
+- [ ] 07.2-02-PLAN.md -- Frontend: VideoPage rewrite with Quick Process, FrameReviewGrid, AdvancedPanel
+- [ ] 07.2-03-PLAN.md -- Frontend: Gallery navigation fix, lightbox scroll wheel + mute, Triage UX, route cleanup
+
 ### Phase 07.1: Gallery Cleanup Tool (INSERTED)
 
 **Goal:** Users can import a large mixed-content folder and run an ML-powered cleanup tool that scans all images and videos, identifies those containing an appropriate human female subject, and moves non-matching media to a separate review folder — enabling rapid dataset curation from raw media libraries without manual sorting
@@ -221,7 +243,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 6.2 -> 7 -> 7.1 -> 8
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 6.2 -> 7 -> 7.1 -> 7.2 -> 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -235,4 +257,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 6.2 -> 7 -
 | 6.2 Caption Enhancement: JoyCaption | 3/3 | Complete   | 2026-03-05 |
 | 7. Video and CLIP Integration | 5/5 | Complete   | 2026-03-06 |
 | 7.1 Gallery Cleanup Tool | 2/3 | In progress | - |
+| 7.2 Video-Gallery Integration | 0/3 | Not started | - |
 | 8. Export Pipeline | 0/3 | Not started | - |
