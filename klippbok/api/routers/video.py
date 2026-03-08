@@ -979,9 +979,10 @@ async def cancel_process(op_id: str, request: Request) -> dict:
 async def confirm_process(body: ProcessConfirmRequest, request: Request) -> dict:
     """Confirm video processing: import extracted frames and remove video entries.
 
-    If body.frame_paths is provided, only those specific frames are imported
-    (copied to a temp dir, then batch_import_images runs on that dir).
-    If frame_paths is None, imports all frames from refs/.
+    Imports frames from refs/ (which is under project_dir so manifest paths
+    resolve correctly as e.g. ``refs/frame.png``).  When frame_paths is
+    provided, candidate-selected frames are copied into refs/ and unselected
+    frames are deleted before import so only chosen frames are catalogued.
     """
     project_dir: Path | None = request.app.state.project_dir
     if project_dir is None:
@@ -994,26 +995,35 @@ async def confirm_process(body: ProcessConfirmRequest, request: Request) -> dict
     loop = asyncio.get_running_loop()
 
     if body.frame_paths is not None:
-        # Selective import: copy only specified frames to a temp dir
-        import tempfile
-        temp_import_dir = Path(tempfile.mkdtemp(prefix="klippbok-confirm-"))
-        try:
-            for fp in body.frame_paths:
-                src = project_dir / fp
-                if src.exists():
-                    shutil.copy2(str(src), str(temp_import_dir / src.name))
+        selected_set = set(body.frame_paths)
 
-            report = await loop.run_in_executor(
-                None,
-                lambda d=temp_import_dir: batch_import_images(d, project_dir),
-            )
-        finally:
-            shutil.rmtree(str(temp_import_dir), ignore_errors=True)
-    else:
-        report = await loop.run_in_executor(
-            None,
-            lambda: batch_import_images(refs_dir, project_dir),
-        )
+        # If user picked a candidate (path inside a _candidates/ subdir),
+        # copy it into refs/ as the main frame so it survives cleanup.
+        for fp in list(selected_set):
+            src = project_dir / fp
+            if "_candidates" in fp and src.exists():
+                # Derive the original frame stem from the candidates dir name
+                # e.g. refs/video1_candidates/rank_2_score_0.850.png -> video1
+                cand_dir_name = Path(fp).parent.name  # "video1_candidates"
+                orig_stem = cand_dir_name.removesuffix("_candidates")
+                dest = refs_dir / f"{orig_stem}{src.suffix}"
+                shutil.copy2(str(src), str(dest))
+                # Update selected set: replace candidate path with refs/ path
+                selected_set.discard(fp)
+                selected_set.add(f"refs/{orig_stem}{src.suffix}")
+
+        # Remove unselected frames from refs/ (only direct files, not subdirs)
+        for f in refs_dir.iterdir():
+            if f.is_file():
+                rel = f"refs/{f.name}"
+                if rel not in selected_set:
+                    f.unlink()
+
+    # Import from refs/ — paths resolve correctly as refs/frame.png
+    report = await loop.run_in_executor(
+        None,
+        lambda: batch_import_images(refs_dir, project_dir),
+    )
 
     removed = 0
     if body.video_paths:
@@ -1023,7 +1033,7 @@ async def confirm_process(body: ProcessConfirmRequest, request: Request) -> dict
         )
 
     # Clean up candidate dirs after import
-    _cleanup_candidate_dirs(project_dir / "refs")
+    _cleanup_candidate_dirs(refs_dir)
 
     return {"imported": report.imported, "removed": removed}
 

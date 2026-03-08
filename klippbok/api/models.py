@@ -51,6 +51,18 @@ class ImageStatusResponse(BaseModel):
     caption: str | None
     """Caption text if available, or None."""
 
+    blur_score: float | None = None
+    """Laplacian variance blur metric. Higher = sharper. None if not computed."""
+
+    format: str | None = None
+    """Image format (e.g. 'jpeg', 'png'), or None."""
+
+    file_size: int | None = None
+    """File size in bytes, or None if not available."""
+
+    created_at: str | None = None
+    """File creation timestamp as ISO 8601 string, or None."""
+
     media_type: str = "image"
     """Media type: 'image' or 'video'."""
 

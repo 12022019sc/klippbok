@@ -170,6 +170,11 @@ def batch_import_images(
             if "phash" in entry and "path" in entry:
                 hash_map[entry["phash"]] = project_dir / entry["path"]
 
+    # Also skip paths that were explicitly excluded (e.g. processed videos)
+    if manifest:
+        for excluded_path in manifest.get("excluded_paths", []):
+            known_paths.add(excluded_path)
+
     # Step 2: Discover media (images + videos)
     discovered_paths = discover_media(directory, recursive=recursive)
     total_discovered = len(discovered_paths)

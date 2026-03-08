@@ -140,6 +140,20 @@ def detect_nmkd_siax() -> Path | None:
 # Keyed by operation ID. Cleaned up when process exits.
 _procs: dict[str, subprocess.Popen] = {}
 
+# Mapping from staged filename → original absolute path, keyed by op_id.
+# Used by the apply endpoint to copy upscaled files back over originals.
+_mappings: dict[str, dict[str, Path]] = {}
+
+
+def get_mapping(op_id: str) -> dict[str, Path] | None:
+    """Return the staged-name → original-path mapping for an operation."""
+    return _mappings.get(op_id)
+
+
+def clear_mapping(op_id: str) -> None:
+    """Remove the mapping for a completed/cancelled operation."""
+    _mappings.pop(op_id, None)
+
 
 def cancel_upscale(op_id: str) -> bool:
     """Kill a running upscale subprocess.
@@ -168,6 +182,7 @@ def _stdout_reader(
     op_id: str,
     total: int,
     upscaler: str,
+    staging_dir: Path | None = None,
 ) -> None:
     """Read upscaler stdout in a background thread and push progress to asyncio queue.
 
@@ -181,6 +196,7 @@ def _stdout_reader(
         op_id: Operation UUID for event payloads.
         total: Total number of images (the ground truth for progress).
         upscaler: Upscaler backend name ("seedvr2" or "nmkd_siax").
+        staging_dir: Temp input dir to clean up after process exits.
     """
     from klippbok.api.models import UpscaleProgress
 
@@ -263,6 +279,11 @@ def _stdout_reader(
     # Sentinel to signal SSE generator to stop
     asyncio.run_coroutine_threadsafe(queue.put(None), loop)
 
+    # Clean up staging input dir (selected images were copied here)
+    if staging_dir and staging_dir.exists():
+        import shutil
+        shutil.rmtree(str(staging_dir), ignore_errors=True)
+
 
 async def start_upscale(
     image_paths: list[Path],
@@ -271,6 +292,7 @@ async def start_upscale(
     scale_factor: int,
     queue: asyncio.Queue,
     op_id: str,
+    project_dir: Path | None = None,
 ) -> None:
     """Start an upscale subprocess and push progress events to the queue.
 
@@ -285,14 +307,41 @@ async def start_upscale(
         scale_factor: Upscale multiplier (e.g. 2 for 2x).
         queue: asyncio.Queue to receive UpscaleProgress events.
         op_id: Operation UUID for event payloads.
+        project_dir: Project directory for staging within .klippbok/.
 
     Raises:
         RuntimeError: If the requested upscaler is not installed or configured.
     """
     from klippbok.api.models import UpscaleProgress
+    import shutil
 
     total = len(image_paths)
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create staging dir with only the selected images so the upscaler
+    # doesn't process the entire source directory.
+    # Keep staging inside the project's .klippbok/ dir.
+    if project_dir is not None:
+        staging_dir = project_dir / ".klippbok" / "staging" / f"upscale-{op_id}"
+    else:
+        import tempfile
+        staging_dir = Path(tempfile.mkdtemp(prefix="klippbok-upscale-input-"))
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    name_mapping: dict[str, Path] = {}  # staged_name -> original_abs_path
+    used_names: set[str] = set()
+    for img_path in image_paths:
+        name = img_path.name
+        if name in used_names:
+            stem, suffix = img_path.stem, img_path.suffix
+            counter = 2
+            while name in used_names:
+                name = f"{stem}_{counter}{suffix}"
+                counter += 1
+        used_names.add(name)
+        shutil.copy2(str(img_path), str(staging_dir / name))
+        name_mapping[name] = img_path.resolve()
+
+    _mappings[op_id] = name_mapping
 
     if upscaler == "seedvr2":
         seedvr2_root = detect_seedvr2()
@@ -327,7 +376,7 @@ async def start_upscale(
         # Call inference_cli.py directly instead of batch_upscale.py to avoid
         # subprocess-in-subprocess fragility and give us direct stdout control.
         cli_script = seedvr2_root / "inference_cli.py"
-        input_dir = image_paths[0].parent  # Assume all in same dir for batch
+        input_dir = staging_dir
 
         # Map scale factor to resolution (matching batch_upscale.py SCALE_PRESETS)
         scale_to_resolution = {2: 1440, 4: 2160, 8: 4320}
@@ -392,7 +441,7 @@ async def start_upscale(
 
         # realesrgan-ncnn-vulkan processes one image at a time;
         # for batch, spawn one subprocess per image
-        input_dir = image_paths[0].parent
+        input_dir = staging_dir
         cmd = [
             str(binary),
             "-i", str(input_dir),
@@ -441,7 +490,7 @@ async def start_upscale(
     loop = asyncio.get_event_loop()
     reader_thread = threading.Thread(
         target=_stdout_reader,
-        args=(proc, queue, loop, op_id, total, upscaler),
+        args=(proc, queue, loop, op_id, total, upscaler, staging_dir),
         daemon=True,
         name=f"upscale-reader-{op_id}",
     )

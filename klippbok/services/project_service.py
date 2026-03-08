@@ -184,6 +184,11 @@ def remove_image_entries(project_dir: Path, paths_to_remove: set[str]) -> int:
         existing["images"] = new_images
         existing["updated"] = datetime.now(timezone.utc).isoformat()
 
+        # Add removed paths to excluded_paths so rescan won't re-import them
+        excluded: set[str] = set(existing.get("excluded_paths", []))
+        excluded |= paths_to_remove
+        existing["excluded_paths"] = sorted(excluded)
+
         manifest_path = project_dir / MANIFEST_DIR / MANIFEST_FILE
         manifest_path.write_text(
             json.dumps(existing, indent=2, ensure_ascii=False) + "\n",

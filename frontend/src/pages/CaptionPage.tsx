@@ -53,7 +53,10 @@ async function fetchSettings(): Promise<{ anchor_word?: string }> {
 export default function CaptionPage() {
   const queryClient = useQueryClient()
   const { data: imagesData, isLoading: imagesLoading } = useImages()
-  const images: GalleryItem[] = imagesData?.images ?? []
+  const allImages: GalleryItem[] = imagesData?.images ?? []
+  // Only show cropped images (from .klippbok/crops/) in the Caption tab
+  const croppedImages = allImages.filter((img) => img.relative_path.startsWith('.klippbok/crops/'))
+  const images: GalleryItem[] = croppedImages.length > 0 ? croppedImages : allImages
 
   const { data: config = DEFAULT_CONFIG } = useQuery<CaptionProviderConfig>({
     queryKey: ['caption-config'],
@@ -161,10 +164,13 @@ export default function CaptionPage() {
     setIsGenerating(true)
     setFailedImageIds([])
     try {
+      // When showing cropped images, only caption those specific IDs
+      const captionImageIds = croppedImages.length > 0 ? croppedImages.map((img) => img.id) : null
       const res = await fetch('/api/v1/captions/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          image_ids: captionImageIds,
           caption_mode: config.caption_mode,
           provider_preset: config.provider,
           overwrite: overwriteExisting,

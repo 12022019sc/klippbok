@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { CropState } from '../types/crop'
+import type { GallerySortKey, GallerySortDir } from '../types/image'
 import type { TriageScore } from '../types/triage'
 import type { CleanupClassification } from '../types/cleanup'
 
@@ -34,9 +35,12 @@ interface AppState {
   removeCropState: (id: string) => void
   clearCropStates: () => void
 
-  // --- gallery filter ---
+  // --- gallery filter & sort ---
   galleryFilter: 'all' | 'images' | 'videos'
   setGalleryFilter: (filter: 'all' | 'images' | 'videos') => void
+  gallerySortKey: GallerySortKey
+  gallerySortDir: GallerySortDir
+  setGallerySort: (key: GallerySortKey, dir: GallerySortDir) => void
 
   // --- triage results ---
   triageResults: Record<string, TriageScore>
@@ -114,9 +118,12 @@ export const useAppStore = create<AppState>((set) => ({
   clearCropStates: () =>
     set({ cropStates: new Map<string, CropState>() }),
 
-  // --- gallery filter state ---
+  // --- gallery filter & sort state ---
   galleryFilter: 'all',
   setGalleryFilter: (filter) => set({ galleryFilter: filter }),
+  gallerySortKey: 'name',
+  gallerySortDir: 'asc',
+  setGallerySort: (key, dir) => set({ gallerySortKey: key, gallerySortDir: dir }),
 
   // --- triage results state ---
   triageResults: {},

@@ -34,10 +34,12 @@ export default function QuickProcess({ queuedPaths }: QuickProcessProps) {
   const processState = useProcessEvents(operationId)
 
   // Transition to review when processing completes
+  // NOTE: Do NOT null operationId here — useProcessEvents resets to INITIAL_STATE
+  // when operationId becomes null, which would wipe extractedFrames before review renders.
+  // The EventSource is already closed by the hook on process_done.
   useEffect(() => {
     if (processState.isComplete && operationId) {
       setViewState('review')
-      setOperationId(null)
     }
   }, [processState.isComplete, operationId])
 
@@ -153,6 +155,7 @@ export default function QuickProcess({ queuedPaths }: QuickProcessProps) {
       if (removeVideos) {
         await queryClient.invalidateQueries({ queryKey: ['images'] })
       }
+      setOperationId(null)
       setViewState('setup')
     } catch (err) {
       toast.error('Failed to discard', {

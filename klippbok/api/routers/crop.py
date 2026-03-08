@@ -105,6 +105,7 @@ async def apply_crops(body: CropApplyRequest, request: Request) -> list[CropAppl
     output_dir.mkdir(parents=True, exist_ok=True)
 
     results: list[CropApplyResult] = []
+    successful_outputs: list[Path] = []
 
     for item in body.crops:
         try:
@@ -144,6 +145,7 @@ async def apply_crops(body: CropApplyRequest, request: Request) -> list[CropAppl
                 success=True,
                 output_path=str(output_path),
             ))
+            successful_outputs.append(output_path)
         except Exception as exc:
             logger.error("Crop failed for image_id=%s: %s", item.image_id, exc)
             results.append(CropApplyResult(
@@ -152,7 +154,83 @@ async def apply_crops(body: CropApplyRequest, request: Request) -> list[CropAppl
                 error=str(exc),
             ))
 
+    # Register cropped outputs in the manifest so the Caption tab can find them
+    if successful_outputs:
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: _register_crop_outputs(project_dir, successful_outputs),
+        )
+
     return results
+
+
+def _register_crop_outputs(project_dir: Path, output_paths: list[Path]) -> None:
+    """Add cropped images to the manifest so they're available for captioning.
+
+    Each entry gets ``source: "crop"`` so the Caption page can filter to
+    only show training-ready cropped images.
+    """
+    import json
+
+    from klippbok.image.probe import probe_image
+    from klippbok.services.project_service import MANIFEST_DIR, MANIFEST_FILE, load_manifest
+
+    manifest = load_manifest(project_dir)
+    if not manifest:
+        logger.warning("No manifest found; cannot register crop outputs")
+        return
+
+    existing_paths = {e.get("path") for e in manifest.get("images", [])}
+
+    added = 0
+    for output_path in output_paths:
+        try:
+            rel_path = output_path.resolve().relative_to(project_dir.resolve()).as_posix()
+        except ValueError:
+            logger.warning("Cannot relativize crop output: %s", output_path)
+            continue
+
+        # Skip if already registered (e.g. re-crop)
+        if rel_path in existing_paths:
+            # Update existing entry dimensions
+            for entry in manifest["images"]:
+                if entry.get("path") == rel_path:
+                    try:
+                        meta = probe_image(output_path)
+                        entry["width"] = meta.width
+                        entry["height"] = meta.height
+                        entry["source"] = "crop"
+                    except Exception:
+                        pass
+                    break
+            added += 1
+            continue
+
+        try:
+            meta = probe_image(output_path)
+        except Exception as exc:
+            logger.warning("Failed to probe crop output %s: %s", output_path, exc)
+            continue
+
+        manifest["images"].append({
+            "type": "image",
+            "path": rel_path,
+            "status": "valid",
+            "width": meta.width,
+            "height": meta.height,
+            "format": meta.format.lower() if meta.format else "unknown",
+            "source": "crop",
+            "issues": [],
+        })
+        added += 1
+
+    if added > 0:
+        manifest_path = project_dir / MANIFEST_DIR / MANIFEST_FILE
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        logger.info("Registered %d crop outputs in manifest", added)
 
 
 @router.post("/auto", response_model=list[AutoCropResult], status_code=200)

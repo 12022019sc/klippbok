@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { useUpscaleEvents } from '../../hooks/useUpscaleEvents'
 
 interface UpscalerStatus {
@@ -18,6 +20,7 @@ type UpscalerOption = 'seedvr2' | 'nmkd_siax'
 type ScaleFactor = 2 | 4
 
 export default function UpscaleStep({ selectedImageIds, onComplete, onSkip }: UpscaleStepProps) {
+  const queryClient = useQueryClient()
   const [status, setStatus] = useState<UpscalerStatus | null>(null)
   const [statusLoading, setStatusLoading] = useState<boolean>(true)
   const [selectedUpscaler, setSelectedUpscaler] = useState<UpscalerOption>('seedvr2')
@@ -25,6 +28,7 @@ export default function UpscaleStep({ selectedImageIds, onComplete, onSkip }: Up
   const [operationId, setOperationId] = useState<string | null>(null)
   const [isStarting, setIsStarting] = useState<boolean>(false)
   const [isCancelling, setIsCancelling] = useState<boolean>(false)
+  const [isApplying, setIsApplying] = useState<boolean>(false)
 
   const upscaleProgress = useUpscaleEvents(operationId)
 
@@ -50,15 +54,30 @@ export default function UpscaleStep({ selectedImageIds, onComplete, onSkip }: Up
     void fetchStatus()
   }, [])
 
-  // Auto-advance after upscale completes (1.5s delay)
-  useEffect(() => {
-    if (upscaleProgress.isComplete) {
-      const timer = setTimeout(() => {
-        onComplete()
-      }, 1500)
-      return () => clearTimeout(timer)
+  async function handleApplyUpscaled() {
+    if (!operationId || isApplying) return
+    setIsApplying(true)
+    try {
+      const res = await fetch(`/api/v1/upscale/${operationId}/apply`, { method: 'POST' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Unknown error' })) as { detail: string }
+        toast.error('Failed to apply upscaled images', { description: err.detail })
+        return
+      }
+      const data = await res.json() as { replaced: number; re_evaluated: number }
+      toast.success(`Replaced ${data.replaced} image${data.replaced !== 1 ? 's' : ''} with upscaled versions`, {
+        description: data.re_evaluated > 0 ? `Quality re-evaluated for ${data.re_evaluated} image${data.re_evaluated !== 1 ? 's' : ''}` : undefined,
+      })
+      await queryClient.invalidateQueries({ queryKey: ['images'] })
+      onComplete()
+    } catch (err) {
+      toast.error('Failed to apply upscaled images', {
+        description: err instanceof Error ? err.message : String(err),
+      })
+    } finally {
+      setIsApplying(false)
     }
-  }, [upscaleProgress.isComplete, onComplete])
+  }
 
   async function handleStartUpscaling() {
     if (isStarting || selectedImageIds.length === 0) return
@@ -112,9 +131,9 @@ export default function UpscaleStep({ selectedImageIds, onComplete, onSkip }: Up
 
   return (
     <div className="upscale-step">
-      <h2 className="upscale-step-title">Step 1: Upscale Images (Optional)</h2>
+      <h2 className="upscale-step-title">Upscale Images</h2>
       <p className="upscale-step-subtitle">
-        Upscale your {selectedImageIds.length} selected image{selectedImageIds.length !== 1 ? 's' : ''} before cropping to improve crop quality for small images.
+        Upscale {selectedImageIds.length} selected image{selectedImageIds.length !== 1 ? 's' : ''}. Originals will be replaced with upscaled versions.
       </p>
 
       {/* Upscaler status indicators */}
@@ -209,8 +228,12 @@ export default function UpscaleStep({ selectedImageIds, onComplete, onSkip }: Up
               <p className="upscale-complete-msg">
                 Upscaling complete! {upscaleProgress.current}/{upscaleProgress.total} images processed.
               </p>
-              <button className="upscale-continue-btn" onClick={onComplete}>
-                Continue to Crop
+              <button
+                className="upscale-continue-btn"
+                onClick={() => void handleApplyUpscaled()}
+                disabled={isApplying}
+              >
+                {isApplying ? 'Applying...' : 'Apply & Return to Gallery'}
               </button>
             </div>
           ) : (
@@ -246,9 +269,9 @@ export default function UpscaleStep({ selectedImageIds, onComplete, onSkip }: Up
       {!upscaleProgress.isComplete && (
         <div className="upscale-skip-row">
           <button className="upscale-skip-btn" onClick={onSkip}>
-            Skip Upscaling
+            Cancel
           </button>
-          <span className="upscale-skip-hint">Go directly to the crop editor</span>
+          <span className="upscale-skip-hint">Return to gallery without upscaling</span>
         </div>
       )}
     </div>

@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import MasonryGrid from '../components/Gallery/MasonryGrid'
 import SelectionToolbar from '../components/Gallery/SelectionToolbar'
 import { GalleryFilter } from '../components/Gallery/GalleryFilter'
+import { GallerySort } from '../components/Gallery/GallerySort'
 import ImageLightbox from '../components/Lightbox/ImageLightbox'
 import type { GalleryItem } from '../types/image'
 
@@ -131,7 +132,9 @@ export default function GalleryPage() {
     )
   }
 
-  if (images.length === 0) {
+  // True empty: no media in the project at all (unfiltered)
+  const totalUnfiltered = rawData?.images?.length ?? 0
+  if (totalUnfiltered === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>
         <p>No media found in this project.</p>
@@ -161,15 +164,22 @@ export default function GalleryPage() {
           >
             Cleanup
           </button>
+          <GallerySort />
           <GalleryFilter />
         </div>
       </div>
-      <MasonryGrid
-        items={images}
-        onItemClick={handleItemClick}
-        selectionMode={selectionMode}
-        selectedIds={selectedImageIds}
-      />
+      {images.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>
+          <p>No matching media for the current filter.</p>
+        </div>
+      ) : (
+        <MasonryGrid
+          items={images}
+          onItemClick={handleItemClick}
+          selectionMode={selectionMode}
+          selectedIds={selectedImageIds}
+        />
+      )}
       {!selectionMode && selectedIndex !== null && (
         <ImageLightbox
           items={images}

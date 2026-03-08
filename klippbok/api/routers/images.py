@@ -93,11 +93,14 @@ def _image_id(relative_path: str) -> str:
 def _entry_to_response(
     entry: dict,
     triage_lookup: dict[str, dict] | None = None,
+    project_dir: Path | None = None,
 ) -> ImageStatusResponse:
     """Convert a manifest image dict to an ImageStatusResponse.
 
     Args:
         entry: A dict from manifest["images"].
+        triage_lookup: Optional triage results by relative path.
+        project_dir: Project root for resolving file paths (used for file stats).
 
     Returns:
         ImageStatusResponse for the API.
@@ -123,6 +126,19 @@ def _entry_to_response(
     # Triage results from path-based lookup
     triage_data = triage_lookup.get(relative_path) if triage_lookup else None
 
+    # File stats (size, creation time) — read from disk
+    file_size: int | None = None
+    created_at: str | None = None
+    if project_dir:
+        abs_path = project_dir / relative_path
+        try:
+            st = abs_path.stat()
+            file_size = st.st_size
+            from datetime import datetime, timezone
+            created_at = datetime.fromtimestamp(st.st_ctime, tz=timezone.utc).isoformat()
+        except OSError:
+            pass
+
     return ImageStatusResponse(
         id=image_id,
         relative_path=relative_path,
@@ -131,6 +147,10 @@ def _entry_to_response(
         height=entry.get("height", 0),
         resolution_ok=resolution_ok,
         quality_pass=quality_pass,
+        blur_score=entry.get("blur_score"),
+        format=entry.get("format"),
+        file_size=file_size,
+        created_at=created_at,
         bucket=entry.get("bucket"),
         is_near_duplicate=is_near_duplicate,
         duplicate_group_id=duplicate_group_id,
@@ -270,7 +290,7 @@ def list_images(request: Request) -> GalleryResponse:
     triage_lookup = _build_triage_lookup(project_dir)
 
     images = [
-        _entry_to_response(entry, triage_lookup=triage_lookup)
+        _entry_to_response(entry, triage_lookup=triage_lookup, project_dir=project_dir)
         for entry in manifest["images"]
         if (project_dir / entry.get("path", "")).exists()
     ]

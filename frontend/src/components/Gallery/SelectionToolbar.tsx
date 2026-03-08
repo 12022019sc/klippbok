@@ -27,13 +27,22 @@ export default function SelectionToolbar({ items }: SelectionToolbarProps) {
     selectByFilter(items.filter((item) => !item.is_near_duplicate).map((item) => item.id))
   }
 
-  function handleProcess() {
+  function handleUpscale() {
     navigate('/process')
+  }
+
+  function handleCrop() {
+    navigate('/crop')
   }
 
   // Detect selected videos for "Process Videos" action
   const selectedVideos = items.filter(
     (item) => selectedImageIds.has(item.id) && item.media_type === 'video'
+  )
+
+  // Detect selected images (non-video) for upscale/crop
+  const selectedImages = items.filter(
+    (item) => selectedImageIds.has(item.id) && item.media_type !== 'video'
   )
 
   function handleProcessSelectedVideos() {
@@ -78,10 +87,15 @@ export default function SelectionToolbar({ items }: SelectionToolbarProps) {
               {selectedCount} selected
             </span>
 
-            {selectedCount >= 1 && (
-              <button className="selection-process-btn" onClick={handleProcess}>
-                Process ({selectedCount})
-              </button>
+            {selectedImages.length >= 1 && (
+              <>
+                <button className="selection-process-btn" onClick={handleUpscale}>
+                  Upscale ({selectedImages.length})
+                </button>
+                <button className="selection-process-btn" onClick={handleCrop}>
+                  Crop ({selectedImages.length})
+                </button>
+              </>
             )}
 
             {selectedVideos.length > 0 && (
