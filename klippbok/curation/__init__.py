@@ -24,9 +24,11 @@ from klippbok.curation.presets import (
     get_weights,
 )
 
-# Lazy imports for heavy dependencies (scorer, diversity)
+# Lazy imports for heavy dependencies (scorer, diversity, pipeline)
 # These are available as klippbok.curation.scorer.score_image etc.
 # Direct imports deferred to avoid loading ML models at module import time.
+# Pipeline functions re-exported here for convenience:
+# from klippbok.curation.pipeline import run_curation, rediversify, etc.
 
 __all__ = [
     "CurationConfig",
