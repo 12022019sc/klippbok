@@ -197,7 +197,7 @@ Plans:
   4. Two-panel review UI shows selected images (top grid with score badges) and rejected pool (collapsible, dimmed)
   5. Click-to-pin/exclude adjusts selection, Re-diversify re-runs subset selection respecting constraints
   6. Apply sets gallery selection and navigates back for seamless workflow continuation
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 
 Plans:
 - [ ] 07.3-01-PLAN.md -- Backend core: Pydantic models, multi-signal scorer, diversity selection, presets

@@ -3,11 +3,27 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
+stopped_at: "Completed 07.3-04-PLAN.md (Curation Results UI: two-panel layout, score popover, pipeline summary)"
+last_updated: "2026-03-08T20:22:44.882Z"
+last_activity: 2026-03-08 -- Completed 07.3-02-PLAN.md (Pipeline orchestrator + API router with SSE progress)
+progress:
+  total_phases: 13
+  completed_phases: 11
+  total_plans: 42
+  completed_plans: 41
+  percent: 98
+---
+
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: executing
 stopped_at: "Completed 07.3-01-PLAN.md (curation backend core: scorer, diversity, presets)"
 last_updated: "2026-03-08T20:06:56.053Z"
 last_activity: "2026-03-08 -- Completed 07.3-03-PLAN.md (Frontend Scaffolding: CuratePage, SSE hook, navigation)"
 progress:
-  total_phases: 13
+  [██████████] 98%
   completed_phases: 10
   total_plans: 42
   completed_plans: 40
@@ -216,6 +232,7 @@ Progress: [██████████████░] ~98% (41 of ~42 estima
 | Phase 07.3 P03 | 205 | 2 tasks | 8 files |
 | Phase 07.3 P01 | 424 | 2 tasks | 9 files |
 | Phase 07.3 P02 | 326 | 2 tasks | 6 files |
+| Phase 07.3 P04 | 235 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -365,6 +382,7 @@ Recent decisions affecting current work:
 - [Phase 07.3-02]: Auto-reference face detection uses compute_face_embeddings + cluster_face_embeddings + largest cluster centroid
 - [Phase 07.3-02]: Quality floor filters by percentile cutoff AND is_duplicate flag simultaneously
 - [Phase 07.3-02]: SSE curation pattern mirrors cleanup.py exactly: asyncio.Queue per op_id, None sentinel, thread-safe callbacks
+- [Phase 07.3]: CSS-only green dot for pinned indicator instead of emoji
 
 ### Roadmap Evolution
 
@@ -386,6 +404,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-08T20:14:00Z
-Stopped at: Completed 07.3-02-PLAN.md (pipeline orchestrator + API router with SSE progress)
+Last session: 2026-03-08T20:22:44.879Z
+Stopped at: Completed 07.3-04-PLAN.md (Curation Results UI: two-panel layout, score popover, pipeline summary)
 Resume file: None
