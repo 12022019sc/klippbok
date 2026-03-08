@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 07.3-03-PLAN.md (Frontend Scaffolding: CuratePage, SSE hook, navigation)"
-last_updated: "2026-03-08T20:02:50.470Z"
+stopped_at: "Completed 07.3-01-PLAN.md (curation backend core: scorer, diversity, presets)"
+last_updated: "2026-03-08T20:06:56.053Z"
 last_activity: "2026-03-08 -- Completed 07.3-03-PLAN.md (Frontend Scaffolding: CuratePage, SSE hook, navigation)"
 progress:
   total_phases: 13
   completed_phases: 10
   total_plans: 42
-  completed_plans: 38
+  completed_plans: 39
 ---
 
 ---
@@ -214,6 +214,7 @@ Progress: [██████████████░] ~98% (40 of ~41 estima
 | Phase 07.2 P02 | 382 | 2 tasks | 7 files |
 | Phase 07.2 P03 | 218 | 2 tasks | 6 files |
 | Phase 07.3 P03 | 205 | 2 tasks | 8 files |
+| Phase 07.3 P01 | 424 | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -356,6 +357,9 @@ Recent decisions affecting current work:
 - [Phase 07.2]: QP-03: Discard prompts about video removal via inline prompt (not browser confirm())
 - [Phase 07.2]: Controller ref approach for lightbox wheel navigation
 - [Phase 07.3]: Reused cleanup CSS classes for CuratePage visual consistency
+- [Phase 07.3]: GPU-aware lazy singletons for pyiqa, aesthetic predictor, CLIP, InsightFace -- reuses existing face_service and CLIPEmbedder patterns
+- [Phase 07.3]: Composite score maps signals to 4 weight categories (face, technical, aesthetic, other) -- not individual signal weights
+- [Phase 07.3]: FacilityLocation with precomputed cosine similarity and lazy optimizer for diversity selection
 
 ### Roadmap Evolution
 
@@ -377,6 +381,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-08T20:02:43.714Z
-Stopped at: Completed 07.3-03-PLAN.md (Frontend Scaffolding: CuratePage, SSE hook, navigation)
+Last session: 2026-03-08T20:06:56.050Z
+Stopped at: Completed 07.3-01-PLAN.md (curation backend core: scorer, diversity, presets)
 Resume file: None
