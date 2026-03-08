@@ -10,6 +10,7 @@ import ProcessPage from './pages/ProcessPage'
 import CaptionPage from './pages/CaptionPage'
 import VideoPage from './pages/VideoPage'
 import CleanupPage from './pages/CleanupPage'
+import CuratePage from './pages/CuratePage'
 import TriagePage from './pages/TriagePage'
 import ProjectPickerPage from './pages/ProjectPickerPage'
 
@@ -43,6 +44,7 @@ export default function App() {
           <Route index element={<GalleryPage />} />
           <Route path="/import" element={<ImportPage />} />
           <Route path="/cleanup" element={<CleanupPage />} />
+          <Route path="/curate" element={<CuratePage />} />
           <Route path="/crop" element={<CropPage />} />
           <Route path="/process" element={<ProcessPage />} />
           <Route path="/caption" element={<CaptionPage />} />

@@ -35,6 +35,10 @@ export default function SelectionToolbar({ items }: SelectionToolbarProps) {
     navigate('/crop')
   }
 
+  function handleCurate() {
+    navigate('/curate')
+  }
+
   // Detect selected videos for "Process Videos" action
   const selectedVideos = items.filter(
     (item) => selectedImageIds.has(item.id) && item.media_type === 'video'
@@ -89,6 +93,9 @@ export default function SelectionToolbar({ items }: SelectionToolbarProps) {
 
             {selectedImages.length >= 1 && (
               <>
+                <button className="selection-process-btn" onClick={handleCurate}>
+                  Curate ({selectedCount})
+                </button>
                 <button className="selection-process-btn" onClick={handleUpscale}>
                   Upscale ({selectedImages.length})
                 </button>

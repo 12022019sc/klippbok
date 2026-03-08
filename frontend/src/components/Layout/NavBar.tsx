@@ -26,6 +26,11 @@ export default function NavBar() {
           </NavLink>
         </li>
         <li>
+          <NavLink to="/curate" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            Curate
+          </NavLink>
+        </li>
+        <li>
           <NavLink to="/crop" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
             Crop
           </NavLink>
