@@ -63,6 +63,12 @@ crop = [
     "klippbok[image]",
     "mediapipe>=0.10",
 ]
+curation = [
+    "klippbok[triage]",
+    "pyiqa>=0.1.12",
+    "apricot-select>=0.6.1",
+    "aesthetic-predictor-v2-5>=0.1.0",
+]
 gui = [
     "klippbok[image]",
     "klippbok[crop]",
@@ -78,6 +84,7 @@ all = [
     "klippbok[triage]",
     "klippbok[tagger]",
     "klippbok[crop]",
+    "klippbok[curation]",
     "klippbok[gui]",
 ]
 dev = [
