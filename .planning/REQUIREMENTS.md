@@ -54,7 +54,7 @@
 - [ ] **GUI-02**: Image gallery view with thumbnail grid, click to expand/edit
 - [ ] **GUI-03**: Gallery shows per-image: thumbnail, resolution, quality status, caption preview
 - [x] **GUI-04**: Inline caption editor alongside image preview in expanded view
-- [x] **GUI-05**: Crop editor accessible from gallery (click image → crop tool)
+- [x] **GUI-05**: Crop editor accessible from gallery (click image -> crop tool)
 - [x] **GUI-06**: Model configuration selector (dropdown/panel) affecting resolution + caption defaults
 - [ ] **GUI-07**: Dataset export interface: select trainer format, configure options, download/export
 - [x] **GUI-08**: Video pipeline accessible from GUI (existing ingest, scan, triage workflows)
@@ -67,6 +67,23 @@
 - [x] **CLEAN-03**: Non-matching media is flagged with clear visual indicator and confidence score in the cleanup review page
 - [x] **CLEAN-04**: User can review flagged items and confirm removal -- moved to _review/ subfolder, NOT deleted
 - [x] **CLEAN-05**: Cleanup handles large folders (1000+) with progress indication and can be cancelled mid-operation
+
+### Dataset Curation
+
+- [ ] **CUR-01**: Multi-signal image scoring (7 signals: InsightFace, pyiqa TOPIQ-NR, Aesthetic V2.5, OpenCV Laplacian, MediaPipe Pose, CLIP zero-shot, pHash) on GPU/CPU
+- [ ] **CUR-02**: Composite score with mode-dependent weights (Character: face 40%, technical 25%, aesthetic 20%, other 15%; Style: aesthetic 35%, technical 30%, face 20%, other 15%)
+- [ ] **CUR-03**: Quality floor filtering removes bottom N% of images by composite score (default 30%)
+- [ ] **CUR-04**: Diversity-maximizing subset selection via apricot FacilityLocation on concatenated CLIP+Pose+Face embeddings
+- [ ] **CUR-05**: Two-panel review UI with selected images (top grid, score badges) and rejected pool (collapsible, dimmed)
+- [ ] **CUR-06**: Click-to-pin/exclude adjustment with re-diversification respecting constraints
+- [ ] **CUR-07**: Score breakdown popover with horizontal bar chart showing each scoring dimension
+- [ ] **CUR-08**: Pipeline summary with funnel stats (scanned -> passed quality -> selected) and diversity metrics
+- [ ] **CUR-09**: Apply action sets gallery selectedImageIds, enables selection mode, navigates to Gallery
+- [ ] **CUR-10**: Curation results persist to .klippbok/curation_results.json, loadable on revisit
+- [ ] **CUR-11**: Model-aware target count defaults (SD1.5->40, SDXL->80, Flux->100, Pony->70, Custom->60)
+- [ ] **CUR-12**: Auto-detect reference face from largest face cluster (no manual face picker needed)
+- [ ] **CUR-13**: SSE progress for long-running scoring pipeline with stage and per-item progress
+- [ ] **CUR-14**: NavBar "Curate" link and SelectionToolbar "Curate" button as entry points
 
 ### Export
 
@@ -96,7 +113,7 @@
 - **ADV-01**: Per-image crop memory persisted across sessions (relative coordinates)
 - **ADV-02**: Bucket distribution histogram/bar chart visualization
 - **ADV-03**: CLIP-based similarity scoring between images (find redundant/outlier images)
-- **ADV-04**: Batch auto-crop with review queue (auto-crop all → review/adjust each)
+- **ADV-04**: Batch auto-crop with review queue (auto-crop all -> review/adjust each)
 - **ADV-05**: Caption comparison view (side-by-side: auto-generated vs edited)
 - **ADV-06**: Resumable pipeline operations (checkpoint after each image processed)
 - **ADV-07**: Progress bars with ETA for all batch operations
@@ -114,7 +131,7 @@
 |---------|--------|
 | Built-in LoRA training | Dataset preparation tool, not a trainer. Export to kohya/ai-toolkit/OneTrainer instead. |
 | Image generation (txt2img) | Synthetic data is lower quality than real images for LoRA training |
-| Image upscaling | Actively harmful for training — adds no real detail, introduces artifacts |
+| Image upscaling | Actively harmful for training -- adds no real detail, introduces artifacts |
 | Cloud storage integration | Single-user local tool. Use external sync tools if needed. |
 | Multi-user / authentication | Internal tool for single developer. No auth complexity. |
 | Real-time collaborative editing | Single user. No WebSocket sync needed. |
@@ -167,6 +184,25 @@
 | GUI-07 | Phase 8 | Pending |
 | GUI-08 | Phase 7 | Complete |
 | GUI-09 | Phase 4 | Pending |
+| CLEAN-01 | Phase 7.1 | Complete |
+| CLEAN-02 | Phase 7.1 | Complete |
+| CLEAN-03 | Phase 7.1 | Complete |
+| CLEAN-04 | Phase 7.1 | Complete |
+| CLEAN-05 | Phase 7.1 | Complete |
+| CUR-01 | Phase 7.3 | Pending |
+| CUR-02 | Phase 7.3 | Pending |
+| CUR-03 | Phase 7.3 | Pending |
+| CUR-04 | Phase 7.3 | Pending |
+| CUR-05 | Phase 7.3 | Pending |
+| CUR-06 | Phase 7.3 | Pending |
+| CUR-07 | Phase 7.3 | Pending |
+| CUR-08 | Phase 7.3 | Pending |
+| CUR-09 | Phase 7.3 | Pending |
+| CUR-10 | Phase 7.3 | Pending |
+| CUR-11 | Phase 7.3 | Pending |
+| CUR-12 | Phase 7.3 | Pending |
+| CUR-13 | Phase 7.3 | Pending |
+| CUR-14 | Phase 7.3 | Pending |
 | EXPT-01 | Phase 8 | Pending |
 | EXPT-02 | Phase 8 | Pending |
 | EXPT-03 | Phase 8 | Pending |
@@ -182,17 +218,12 @@
 | ARCH-06 | Phase 4 | Pending |
 | ARCH-07 | Phase 1 | Complete |
 | ARCH-08 | Phase 7 | Complete |
-| CLEAN-01 | Phase 7.1 | Complete |
-| CLEAN-02 | Phase 7.1 | Complete |
-| CLEAN-03 | Phase 7.1 | Complete |
-| CLEAN-04 | Phase 7.1 | Complete |
-| CLEAN-05 | Phase 7.1 | Complete |
 
 **Coverage:**
-- v1 requirements: 60 total
-- Mapped to phases: 60
+- v1 requirements: 74 total
+- Mapped to phases: 74
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-27*
-*Last updated: 2026-02-27 after roadmap creation*
+*Last updated: 2026-03-08 after Phase 7.3 planning*

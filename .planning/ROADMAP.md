@@ -23,6 +23,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 7: Video and CLIP Integration** - Existing video pipeline accessible from GUI, CLIP triage extended to standalone images (completed 2026-03-05)
 - [ ] **Phase 7.1: Gallery Cleanup Tool** - ML-powered media filtering for subject relevance (INSERTED)
 - [ ] **Phase 7.2: Video-Gallery Integration** - Unified Video tab with Quick Process pipeline, frame review, lightbox enhancements, Triage UX (INSERTED)
+- [ ] **Phase 7.3: Dataset Curation** - Automated image selection for LoRA training (INSERTED)
 - [ ] **Phase 8: Export Pipeline** - Multi-trainer export with format-specific config generation and dataset download
 
 ## Phase Details
@@ -184,6 +185,26 @@ Plans:
 - [ ] 07-04-PLAN.md -- TriagePage with CLIP triage UI, concepts gallery, face clusters, gallery video extensions
 - [ ] 07-05-PLAN.md -- Gap closure: POST /triage/concepts/upload file upload endpoint
 
+### Phase 07.3: Dataset Curation — Automated Image Selection for LoRA Training (INSERTED)
+
+**Goal:** Users can run an ML-powered curation pipeline that scores all gallery images on 7 quality/diversity signals, selects a maximally diverse subset via submodular optimization, and interactively adjusts the selection before applying it to the Gallery for downstream Crop/Caption workflow
+**Requirements**: CUR-01, CUR-02, CUR-03, CUR-04, CUR-05, CUR-06, CUR-07, CUR-08, CUR-09, CUR-10, CUR-11, CUR-12, CUR-13, CUR-14
+**Depends on:** Phase 7
+**Success Criteria** (what must be TRUE):
+  1. Every gallery image is scored on 7 ML signals (InsightFace, pyiqa, Aesthetic V2.5, OpenCV, MediaPipe, CLIP, pHash) with composite scores
+  2. Character mode weights face 40% and Style mode weights aesthetic 35% for different curation goals
+  3. Quality floor removes bottom N% of images, diversity selection via apricot FacilityLocation returns target count
+  4. Two-panel review UI shows selected images (top grid with score badges) and rejected pool (collapsible, dimmed)
+  5. Click-to-pin/exclude adjusts selection, Re-diversify re-runs subset selection respecting constraints
+  6. Apply sets gallery selection and navigates back for seamless workflow continuation
+**Plans:** 4 plans
+
+Plans:
+- [ ] 07.3-01-PLAN.md -- Backend core: Pydantic models, multi-signal scorer, diversity selection, presets
+- [ ] 07.3-02-PLAN.md -- Pipeline orchestrator, API router with SSE progress, result persistence
+- [ ] 07.3-03-PLAN.md -- Frontend: types, SSE hook, CuratePage (Config + Progress), NavBar/routing
+- [ ] 07.3-04-PLAN.md -- Frontend: Results UI (two-panel, score popover, re-diversify, apply)
+
 ### Phase 07.2: Video-Gallery Integration (Process Videos Feature) (INSERTED)
 
 **Goal:** Users can process videos through an automated pipeline (scene detect, split, extract frames, review, confirm import) from a unified Video tab, with Quick Process as the default view, Advanced tabs as a toggle, and Gallery integration for frame import -- replacing the disconnected ProcessVideosPage
@@ -243,7 +264,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 6.2 -> 7 -> 7.1 -> 7.2 -> 8
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 6.2 -> 7 -> 7.1 -> 7.2 -> 7.3 -> 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -258,4 +279,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 6.2 -> 7 -
 | 7. Video and CLIP Integration | 5/5 | Complete   | 2026-03-06 |
 | 7.1 Gallery Cleanup Tool | 2/3 | In progress | - |
 | 7.2 Video-Gallery Integration | 0/3 | Not started | - |
+| 7.3 Dataset Curation | 0/4 | Not started | - |
 | 8. Export Pipeline | 0/3 | Not started | - |
