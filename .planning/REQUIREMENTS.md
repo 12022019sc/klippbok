@@ -72,16 +72,16 @@
 
 - [x] **CUR-01**: Multi-signal image scoring (7 signals: InsightFace, pyiqa TOPIQ-NR, Aesthetic V2.5, OpenCV Laplacian, MediaPipe Pose, CLIP zero-shot, pHash) on GPU/CPU
 - [x] **CUR-02**: Composite score with mode-dependent weights (Character: face 40%, technical 25%, aesthetic 20%, other 15%; Style: aesthetic 35%, technical 30%, face 20%, other 15%)
-- [ ] **CUR-03**: Quality floor filtering removes bottom N% of images by composite score (default 30%)
+- [x] **CUR-03**: Quality floor filtering removes bottom N% of images by composite score (default 30%)
 - [x] **CUR-04**: Diversity-maximizing subset selection via apricot FacilityLocation on concatenated CLIP+Pose+Face embeddings
 - [x] **CUR-05**: Two-panel review UI with selected images (top grid, score badges) and rejected pool (collapsible, dimmed)
 - [x] **CUR-06**: Click-to-pin/exclude adjustment with re-diversification respecting constraints
 - [x] **CUR-07**: Score breakdown popover with horizontal bar chart showing each scoring dimension
-- [ ] **CUR-08**: Pipeline summary with funnel stats (scanned -> passed quality -> selected) and diversity metrics
-- [ ] **CUR-09**: Apply action sets gallery selectedImageIds, enables selection mode, navigates to Gallery
-- [ ] **CUR-10**: Curation results persist to .klippbok/curation_results.json, loadable on revisit
+- [x] **CUR-08**: Pipeline summary with funnel stats (scanned -> passed quality -> selected) and diversity metrics
+- [x] **CUR-09**: Apply action sets gallery selectedImageIds, enables selection mode, navigates to Gallery
+- [x] **CUR-10**: Curation results persist to .klippbok/curation_results.json, loadable on revisit
 - [x] **CUR-11**: Model-aware target count defaults (SD1.5->40, SDXL->80, Flux->100, Pony->70, Custom->60)
-- [ ] **CUR-12**: Auto-detect reference face from largest face cluster (no manual face picker needed)
+- [x] **CUR-12**: Auto-detect reference face from largest face cluster (no manual face picker needed)
 - [x] **CUR-13**: SSE progress for long-running scoring pipeline with stage and per-item progress
 - [x] **CUR-14**: NavBar "Curate" link and SelectionToolbar "Curate" button as entry points
 
@@ -191,16 +191,16 @@
 | CLEAN-05 | Phase 7.1 | Complete |
 | CUR-01 | Phase 7.3 | Complete |
 | CUR-02 | Phase 7.3 | Complete |
-| CUR-03 | Phase 7.3 | Pending |
+| CUR-03 | Phase 7.3 | Complete |
 | CUR-04 | Phase 7.3 | Complete |
 | CUR-05 | Phase 7.3 | Complete |
 | CUR-06 | Phase 7.3 | Complete |
 | CUR-07 | Phase 7.3 | Complete |
-| CUR-08 | Phase 7.3 | Pending |
-| CUR-09 | Phase 7.3 | Pending |
-| CUR-10 | Phase 7.3 | Pending |
+| CUR-08 | Phase 7.3 | Complete |
+| CUR-09 | Phase 7.3 | Complete |
+| CUR-10 | Phase 7.3 | Complete |
 | CUR-11 | Phase 7.3 | Complete |
-| CUR-12 | Phase 7.3 | Pending |
+| CUR-12 | Phase 7.3 | Complete |
 | CUR-13 | Phase 7.3 | Complete |
 | CUR-14 | Phase 7.3 | Complete |
 | EXPT-01 | Phase 8 | Pending |

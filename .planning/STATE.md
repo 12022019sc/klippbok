@@ -10,7 +10,7 @@ progress:
   total_phases: 13
   completed_phases: 10
   total_plans: 42
-  completed_plans: 39
+  completed_plans: 40
 ---
 
 ---
@@ -162,11 +162,11 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 ## Current Position
 
 Phase: 07.3-dataset-curation-automated-image-selection-for-lora-training
-Plan: 3 of 4 in phase 07.3 (complete)
+Plan: 3 of 4 in phase 07.3 (02 complete, 03 complete, 01 complete)
 Status: Executing
-Last activity: 2026-03-08 -- Completed 07.3-03-PLAN.md (Frontend Scaffolding: CuratePage, SSE hook, navigation)
+Last activity: 2026-03-08 -- Completed 07.3-02-PLAN.md (Pipeline orchestrator + API router with SSE progress)
 
-Progress: [██████████████░] ~98% (40 of ~41 estimated plans)
+Progress: [██████████████░] ~98% (41 of ~42 estimated plans)
 
 ## Performance Metrics
 
@@ -215,6 +215,7 @@ Progress: [██████████████░] ~98% (40 of ~41 estima
 | Phase 07.2 P03 | 218 | 2 tasks | 6 files |
 | Phase 07.3 P03 | 205 | 2 tasks | 8 files |
 | Phase 07.3 P01 | 424 | 2 tasks | 9 files |
+| Phase 07.3 P02 | 326 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -360,6 +361,10 @@ Recent decisions affecting current work:
 - [Phase 07.3]: GPU-aware lazy singletons for pyiqa, aesthetic predictor, CLIP, InsightFace -- reuses existing face_service and CLIPEmbedder patterns
 - [Phase 07.3]: Composite score maps signals to 4 weight categories (face, technical, aesthetic, other) -- not individual signal weights
 - [Phase 07.3]: FacilityLocation with precomputed cosine similarity and lazy optimizer for diversity selection
+- [Phase 07.3-02]: Embeddings persisted to .npz alongside results for rediversify after server restart
+- [Phase 07.3-02]: Auto-reference face detection uses compute_face_embeddings + cluster_face_embeddings + largest cluster centroid
+- [Phase 07.3-02]: Quality floor filters by percentile cutoff AND is_duplicate flag simultaneously
+- [Phase 07.3-02]: SSE curation pattern mirrors cleanup.py exactly: asyncio.Queue per op_id, None sentinel, thread-safe callbacks
 
 ### Roadmap Evolution
 
@@ -381,6 +386,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-08T20:06:56.050Z
-Stopped at: Completed 07.3-01-PLAN.md (curation backend core: scorer, diversity, presets)
+Last session: 2026-03-08T20:14:00Z
+Stopped at: Completed 07.3-02-PLAN.md (pipeline orchestrator + API router with SSE progress)
 Resume file: None
