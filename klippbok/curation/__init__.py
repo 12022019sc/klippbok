@@ -24,6 +24,10 @@ from klippbok.curation.presets import (
     get_weights,
 )
 
+# Lazy imports for heavy dependencies (scorer, diversity)
+# These are available as klippbok.curation.scorer.score_image etc.
+# Direct imports deferred to avoid loading ML models at module import time.
+
 __all__ = [
     "CurationConfig",
     "CurationMode",
