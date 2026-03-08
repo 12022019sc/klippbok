@@ -74,7 +74,7 @@
 - [ ] **CUR-02**: Composite score with mode-dependent weights (Character: face 40%, technical 25%, aesthetic 20%, other 15%; Style: aesthetic 35%, technical 30%, face 20%, other 15%)
 - [ ] **CUR-03**: Quality floor filtering removes bottom N% of images by composite score (default 30%)
 - [ ] **CUR-04**: Diversity-maximizing subset selection via apricot FacilityLocation on concatenated CLIP+Pose+Face embeddings
-- [ ] **CUR-05**: Two-panel review UI with selected images (top grid, score badges) and rejected pool (collapsible, dimmed)
+- [x] **CUR-05**: Two-panel review UI with selected images (top grid, score badges) and rejected pool (collapsible, dimmed)
 - [ ] **CUR-06**: Click-to-pin/exclude adjustment with re-diversification respecting constraints
 - [ ] **CUR-07**: Score breakdown popover with horizontal bar chart showing each scoring dimension
 - [ ] **CUR-08**: Pipeline summary with funnel stats (scanned -> passed quality -> selected) and diversity metrics
@@ -82,8 +82,8 @@
 - [ ] **CUR-10**: Curation results persist to .klippbok/curation_results.json, loadable on revisit
 - [ ] **CUR-11**: Model-aware target count defaults (SD1.5->40, SDXL->80, Flux->100, Pony->70, Custom->60)
 - [ ] **CUR-12**: Auto-detect reference face from largest face cluster (no manual face picker needed)
-- [ ] **CUR-13**: SSE progress for long-running scoring pipeline with stage and per-item progress
-- [ ] **CUR-14**: NavBar "Curate" link and SelectionToolbar "Curate" button as entry points
+- [x] **CUR-13**: SSE progress for long-running scoring pipeline with stage and per-item progress
+- [x] **CUR-14**: NavBar "Curate" link and SelectionToolbar "Curate" button as entry points
 
 ### Export
 
@@ -193,7 +193,7 @@
 | CUR-02 | Phase 7.3 | Pending |
 | CUR-03 | Phase 7.3 | Pending |
 | CUR-04 | Phase 7.3 | Pending |
-| CUR-05 | Phase 7.3 | Pending |
+| CUR-05 | Phase 7.3 | Complete |
 | CUR-06 | Phase 7.3 | Pending |
 | CUR-07 | Phase 7.3 | Pending |
 | CUR-08 | Phase 7.3 | Pending |
@@ -201,8 +201,8 @@
 | CUR-10 | Phase 7.3 | Pending |
 | CUR-11 | Phase 7.3 | Pending |
 | CUR-12 | Phase 7.3 | Pending |
-| CUR-13 | Phase 7.3 | Pending |
-| CUR-14 | Phase 7.3 | Pending |
+| CUR-13 | Phase 7.3 | Complete |
+| CUR-14 | Phase 7.3 | Complete |
 | EXPT-01 | Phase 8 | Pending |
 | EXPT-02 | Phase 8 | Pending |
 | EXPT-03 | Phase 8 | Pending |
