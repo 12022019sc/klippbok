@@ -3,6 +3,8 @@ import { toast } from 'sonner'
 import { useCurationEvents } from '../hooks/useCurationEvents'
 import CurationConfig from '../components/Curation/CurationConfig'
 import CurationProgress from '../components/Curation/CurationProgress'
+import CurationResults from '../components/Curation/CurationResults'
+import PipelineSummary from '../components/Curation/PipelineSummary'
 import type { CurationConfig as CurationConfigType, CurationResult, CurationProgress as CurationProgressType } from '../types/curation'
 
 type PageState = 'config' | 'progress' | 'results'
@@ -106,21 +108,19 @@ export default function CuratePage() {
     )
   }
 
-  if (pageState === 'results') {
+  if (pageState === 'results' && result) {
     return (
       <div style={{ padding: '2rem' }}>
         <h1 className="page-title">Dataset Curation</h1>
         <p className="page-subtitle">
-          {result ? `${result.selected_ids.length} images selected from ${result.summary.total_scanned} scanned` : 'Results'}
+          {`${result.selected_ids.length} images selected from ${result.summary.total_scanned} scanned`}
         </p>
-        <div style={{ padding: '2rem', color: '#9ca3af', border: '1px dashed #374151', borderRadius: '0.5rem', textAlign: 'center', marginTop: '1rem' }}>
-          Results will be shown here
-        </div>
-        <div style={{ marginTop: '1.5rem' }}>
-          <button className="import-button" onClick={handleNewCuration}>
-            New Curation
-          </button>
-        </div>
+        <PipelineSummary summary={result.summary} />
+        <CurationResults
+          result={result}
+          onNewCuration={handleNewCuration}
+          onResultUpdate={(updated) => setResult(updated)}
+        />
       </div>
     )
   }

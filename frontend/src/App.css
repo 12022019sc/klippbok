@@ -2582,3 +2582,247 @@
   pointer-events: none;
 }
 
+/* ===== Curation Page ===== */
+
+.curation-config {
+  padding: 1.5rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.curation-mode-selector {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.curation-mode-btn {
+  padding: 0.5rem 1.25rem;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  background: transparent;
+  color: #d1d5db;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.15s, border-color 0.15s;
+}
+.curation-mode-btn:hover {
+  background: #1f2937;
+}
+.curation-mode-btn.active {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #fff;
+}
+
+.curation-advanced-toggle {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 0.85rem;
+  padding: 0;
+  margin-top: 0.5rem;
+}
+.curation-advanced-toggle:hover {
+  color: #d1d5db;
+}
+
+.curation-advanced-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding: 1rem;
+  background: #1a1a2e;
+  border-radius: 8px;
+  border: 1px solid #2a2a3e;
+}
+
+.curation-progress {
+  max-width: 500px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.curation-progress-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: #333;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+.curation-progress-bar-fill {
+  height: 100%;
+  background: #6366f1;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+/* Pipeline summary */
+.pipeline-summary {
+  padding: 1rem 0;
+  text-align: center;
+}
+
+.pipeline-funnel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.pipeline-stat {
+  background: #1a1a2e;
+  padding: 0.75rem 1.25rem;
+  border-radius: 8px;
+  text-align: center;
+  border: 1px solid #2a2a3e;
+}
+.pipeline-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+}
+.pipeline-stat-label {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+.pipeline-arrow {
+  font-size: 1.2em;
+  color: #6b7280;
+}
+
+.pipeline-diversity {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  margin-top: 0.75rem;
+}
+
+/* Curation results */
+.curation-results {
+  padding: 1rem 0;
+}
+
+.curation-selected-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.curation-rejected-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 6px;
+  opacity: 0.6;
+}
+
+.curation-card {
+  position: relative;
+  cursor: pointer;
+  border-radius: 6px;
+  overflow: hidden;
+  transition: transform 0.15s;
+}
+.curation-card:hover {
+  transform: scale(1.03);
+}
+.curation-card img {
+  width: 100%;
+  display: block;
+}
+
+.curation-score-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75em;
+  font-weight: 600;
+}
+
+.curation-pinned {
+  outline: 2px solid #22c55e;
+  outline-offset: -2px;
+}
+.curation-pinned::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 8px;
+  height: 8px;
+  background: #22c55e;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.curation-rejected-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  padding: 0.75rem 0;
+  margin-top: 1rem;
+  color: #d1d5db;
+  font-weight: 600;
+  border-top: 1px solid #2a2a3e;
+}
+.curation-rejected-header:hover {
+  color: #fff;
+}
+
+.curation-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 1.5rem;
+  justify-content: center;
+}
+
+/* Score popover */
+.score-popover {
+  position: fixed;
+  z-index: 1000;
+  background: #1a1a2e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  min-width: 260px;
+  pointer-events: none;
+}
+
+.score-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.score-bar-label {
+  width: 110px;
+  text-align: right;
+  font-size: 0.8em;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.score-bar-fill {
+  height: 12px;
+  border-radius: 3px;
+  transition: width 0.2s;
+}
+
+.score-bar-value {
+  width: 40px;
+  font-size: 0.8em;
+  color: #d1d5db;
+  flex-shrink: 0;
+}
+

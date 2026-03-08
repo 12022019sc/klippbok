@@ -3,6 +3,7 @@ import type { CropState } from '../types/crop'
 import type { GallerySortKey, GallerySortDir } from '../types/image'
 import type { TriageScore } from '../types/triage'
 import type { CleanupClassification } from '../types/cleanup'
+import type { CurationResult } from '../types/curation'
 
 interface ImportProgress {
   current: number
@@ -57,6 +58,17 @@ interface AppState {
   toggleCleanupUnflag: (itemId: string) => void
   setCleanupAutoStart: (autoStart: boolean) => void
   clearCleanup: () => void
+
+  // --- curation state ---
+  curationResults: CurationResult | null
+  setCurationResults: (results: CurationResult | null) => void
+  curationPinnedIds: Set<string>
+  curationExcludedIds: Set<string>
+  setCurationPinnedIds: (ids: Set<string>) => void
+  setCurationExcludedIds: (ids: Set<string>) => void
+  toggleCurationPin: (id: string) => void
+  toggleCurationExclude: (id: string) => void
+  clearCuration: () => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -153,5 +165,43 @@ export const useAppStore = create<AppState>((set) => ({
       cleanupResults: [],
       cleanupUnflaggedIds: new Set<string>(),
       cleanupAutoStart: false,
+    }),
+
+  // --- curation state ---
+  curationResults: null,
+  setCurationResults: (results) => set({ curationResults: results }),
+  curationPinnedIds: new Set<string>(),
+  curationExcludedIds: new Set<string>(),
+  setCurationPinnedIds: (ids) => set({ curationPinnedIds: ids }),
+  setCurationExcludedIds: (ids) => set({ curationExcludedIds: ids }),
+  toggleCurationPin: (id) =>
+    set((state) => {
+      const pinned = new Set(state.curationPinnedIds)
+      const excluded = new Set(state.curationExcludedIds)
+      if (pinned.has(id)) {
+        pinned.delete(id)
+      } else {
+        pinned.add(id)
+        excluded.delete(id)
+      }
+      return { curationPinnedIds: pinned, curationExcludedIds: excluded }
+    }),
+  toggleCurationExclude: (id) =>
+    set((state) => {
+      const excluded = new Set(state.curationExcludedIds)
+      const pinned = new Set(state.curationPinnedIds)
+      if (excluded.has(id)) {
+        excluded.delete(id)
+      } else {
+        excluded.add(id)
+        pinned.delete(id)
+      }
+      return { curationExcludedIds: excluded, curationPinnedIds: pinned }
+    }),
+  clearCuration: () =>
+    set({
+      curationResults: null,
+      curationPinnedIds: new Set<string>(),
+      curationExcludedIds: new Set<string>(),
     }),
 }))
