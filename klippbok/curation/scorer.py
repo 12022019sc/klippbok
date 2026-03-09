@@ -106,9 +106,19 @@ def _get_clip_embedder():
 # Utility functions
 # ---------------------------------------------------------------------------
 
-def _image_id(path: Path) -> str:
-    """Compute SHA256[:16] of path string as image ID."""
-    return hashlib.sha256(str(path).encode()).hexdigest()[:16]
+def _image_id(path: Path, project_dir: Path | None = None) -> str:
+    """Compute SHA256[:16] of relative path string as image ID.
+
+    Must use relative path to match gallery convention in images.py.
+    """
+    if project_dir is not None:
+        try:
+            rel = str(path.relative_to(project_dir))
+        except ValueError:
+            rel = str(path)
+    else:
+        rel = str(path)
+    return hashlib.sha256(rel.encode()).hexdigest()[:16]
 
 
 def normalize_score(value: float, low: float, high: float) -> float:
@@ -254,6 +264,7 @@ def score_image(
     image_path: Path,
     mode: CurationMode,
     reference_embedding: np.ndarray | None = None,
+    project_dir: Path | None = None,
 ) -> ImageScore:
     """Score a single image across all signal dimensions.
 
@@ -270,8 +281,8 @@ def score_image(
     if img_bgr is None:
         logger.warning("Failed to load image: %s", image_path)
         return ImageScore(
-            image_id=_image_id(image_path),
-            relative_path=str(image_path),
+            image_id=_image_id(image_path, project_dir),
+            relative_path=str(image_path.relative_to(project_dir)) if project_dir else str(image_path),
             mode=mode,
         )
 
@@ -357,8 +368,8 @@ def score_image(
     composite = _compute_composite(signals, mode)
 
     return ImageScore(
-        image_id=_image_id(image_path),
-        relative_path=str(image_path),
+        image_id=_image_id(image_path, project_dir),
+        relative_path=str(image_path.relative_to(project_dir)) if project_dir else str(image_path),
         signals=signals,
         composite_score=composite,
         mode=mode,
@@ -370,6 +381,7 @@ def score_images(
     mode: CurationMode,
     reference_embedding: np.ndarray | None = None,
     progress_callback: Callable[[int, int], None] | None = None,
+    project_dir: Path | None = None,
 ) -> list[ImageScore]:
     """Score multiple images sequentially.
 
@@ -381,6 +393,7 @@ def score_images(
         mode: Curation mode.
         reference_embedding: Optional face embedding for identity similarity.
         progress_callback: Optional callable(current, total) for progress tracking.
+        project_dir: Project root for relative path ID computation.
 
     Returns:
         List of ImageScore objects in same order as input.
@@ -389,7 +402,7 @@ def score_images(
     results: list[ImageScore] = []
 
     for i, path in enumerate(image_paths, 1):
-        score = score_image(path, mode, reference_embedding)
+        score = score_image(path, mode, reference_embedding, project_dir=project_dir)
         results.append(score)
         if progress_callback is not None:
             progress_callback(i, total)

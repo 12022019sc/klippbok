@@ -318,7 +318,7 @@ def run_curation(
         if progress_callback:
             progress_callback("scoring", current, total)
 
-    all_scores = score_images(image_paths, config.mode, reference_embedding, scoring_progress)
+    all_scores = score_images(image_paths, config.mode, reference_embedding, scoring_progress, project_dir=project_dir)
 
     # 3. Mark duplicates
     mark_duplicates(all_scores, image_paths)
