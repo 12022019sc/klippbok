@@ -379,17 +379,30 @@ def classify_items(
         item_path = Path(item_path)
         suffix = item_path.suffix.lower()
 
-        if suffix in VIDEO_EXTENSIONS:
-            # Video: sample frames, classify each, use best score
-            result = _classify_video(
-                item_path, embedder, positive_embeddings, negative_embeddings,
-                clip_threshold, face_app, project_dir=project_dir,
-            )
-        else:
-            # Image: classify directly
-            result = classify_item(
-                item_path, embedder, positive_embeddings, negative_embeddings,
-                clip_threshold, face_app, project_dir=project_dir,
+        try:
+            if suffix in VIDEO_EXTENSIONS:
+                # Video: sample frames, classify each, use best score
+                result = _classify_video(
+                    item_path, embedder, positive_embeddings, negative_embeddings,
+                    clip_threshold, face_app, project_dir=project_dir,
+                )
+            else:
+                # Image: classify directly
+                result = classify_item(
+                    item_path, embedder, positive_embeddings, negative_embeddings,
+                    clip_threshold, face_app, project_dir=project_dir,
+                )
+        except Exception as exc:
+            logger.warning("Classification failed for %s: %s", item_path, exc)
+            rel = str(item_path.relative_to(project_dir)) if project_dir else str(item_path)
+            item_id = hashlib.sha256(rel.encode()).hexdigest()[:16]
+            result = CleanupClassification(
+                item_path=str(item_path),
+                item_id=item_id,
+                clip_score=0.0,
+                has_face=False,
+                confidence=0.0,
+                label="remove",
             )
 
         results.append(result)
@@ -427,8 +440,35 @@ def classify_items_by_reference(
 
     embedder = _get_or_create_embedder()
 
-    # Encode ALL reference images ONCE
-    reference_embeddings = embedder.encode_images(reference_paths)
+    # Encode ALL reference images ONCE — extract frames from video references
+    _ensure_sampler_imports()
+    image_ref_paths: list[Path] = []
+    temp_frame_paths: list[Path] = []
+    for ref_path in reference_paths:
+        if ref_path.suffix.lower() in VIDEO_EXTENSIONS:
+            try:
+                frames = sample_clip_frames(ref_path, count=1)
+                if frames:
+                    image_ref_paths.append(frames[0])
+                    temp_frame_paths.extend(frames)
+                else:
+                    logger.warning("No frames extracted from video reference: %s", ref_path)
+            except Exception as exc:
+                logger.warning("Frame extraction failed for reference %s: %s", ref_path, exc)
+        else:
+            image_ref_paths.append(ref_path)
+
+    if not image_ref_paths:
+        raise ValueError("No valid reference images after filtering video files")
+
+    reference_embeddings = embedder.encode_images(image_ref_paths)
+
+    # Clean up temp frames from video references
+    for fp in temp_frame_paths:
+        try:
+            fp.unlink(missing_ok=True)
+        except Exception:
+            pass
 
     face_app = None
     if check_insightface_available():
@@ -444,15 +484,28 @@ def classify_items_by_reference(
         item_path = Path(item_path)
         suffix = item_path.suffix.lower()
 
-        if suffix in VIDEO_EXTENSIONS:
-            result = _classify_video_by_reference(
-                item_path, embedder, reference_embeddings,
-                clip_threshold, face_app, project_dir=project_dir,
-            )
-        else:
-            result = classify_item_by_reference(
-                item_path, embedder, reference_embeddings,
-                clip_threshold, face_app, project_dir=project_dir,
+        try:
+            if suffix in VIDEO_EXTENSIONS:
+                result = _classify_video_by_reference(
+                    item_path, embedder, reference_embeddings,
+                    clip_threshold, face_app, project_dir=project_dir,
+                )
+            else:
+                result = classify_item_by_reference(
+                    item_path, embedder, reference_embeddings,
+                    clip_threshold, face_app, project_dir=project_dir,
+                )
+        except Exception as exc:
+            logger.warning("Classification failed for %s: %s", item_path, exc)
+            rel = str(item_path.relative_to(project_dir)) if project_dir else str(item_path)
+            item_id = hashlib.sha256(rel.encode()).hexdigest()[:16]
+            result = CleanupClassification(
+                item_path=str(item_path),
+                item_id=item_id,
+                clip_score=0.0,
+                has_face=False,
+                confidence=0.0,
+                label="remove",
             )
 
         results.append(result)

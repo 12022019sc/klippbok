@@ -57,10 +57,13 @@ _curation_results: dict[str, dict] = {}  # op_id -> result dict
 class CurationStartRequest(BaseModel):
     """Request body for starting a curation pipeline run."""
 
+    model_config = {"extra": "ignore"}
+
     mode: str = Field(default="character", description="Curation mode: 'character' or 'style'")
     target_count: int | None = Field(default=None, description="Target image count (None = use preset)")
     quality_floor_pct: float = Field(default=0.3, ge=0.0, le=1.0, description="Bottom percentile to discard")
     reference_image_id: str | None = Field(default=None, description="Image ID for reference face")
+    model_profile: str | None = Field(default=None, description="Model profile: sd15, sdxl, flux, pony, custom")
 
 
 class RediversifyRequest(BaseModel):

@@ -113,7 +113,7 @@ export default function CuratePage() {
       <div style={{ padding: '2rem' }}>
         <h1 className="page-title">Dataset Curation</h1>
         <p className="page-subtitle">
-          {`${result.selected_ids.length} images selected from ${result.summary.total_scanned} scanned`}
+          {`${result.selected_ids?.length ?? 0} images selected from ${result.summary?.total_scanned ?? 0} scanned`}
         </p>
         <PipelineSummary summary={result.summary} />
         <CurationResults

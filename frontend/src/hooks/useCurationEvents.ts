@@ -61,12 +61,12 @@ export function useCurationEvents(operationId: string | null): CurationEventStat
     // "curation_done" -- curation completed successfully
     es.addEventListener('curation_done', (e: MessageEvent) => {
       try {
-        const data = JSON.parse(e.data) as CurationResult
+        const data = JSON.parse(e.data) as { result?: CurationResult }
         setState((prev) => ({
           ...prev,
           isComplete: true,
           error: null,
-          result: data,
+          result: data.result ?? null,
         }))
       } catch {
         setState((prev) => ({

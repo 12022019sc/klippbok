@@ -242,12 +242,15 @@ async def _run_cleanup_bg(
         })
 
     except Exception as exc:
-        logger.error("Cleanup operation %s failed: %s", op_id, exc)
+        import traceback
+        tb = traceback.format_exc()
+        logger.error("Cleanup operation %s failed: %s\n%s", op_id, exc, tb)
         await queue.put({
             "event": "cleanup_error",
             "data": {
                 "operation_id": op_id,
                 "message": f"Cleanup failed: {exc}",
+                "traceback": tb,
             },
         })
 

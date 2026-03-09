@@ -38,7 +38,7 @@ export default function CurationConfig({ onStart }: CurationConfigProps) {
     onStart({
       mode,
       target_count: targetCount,
-      quality_floor_pct: qualityFloor,
+      quality_floor_pct: qualityFloor / 100,  // Convert percentage to 0.0-1.0
       face_confidence_threshold: faceConfidence,
       pose_angle_limit: poseAngleLimit,
       identity_threshold: identityThreshold,
