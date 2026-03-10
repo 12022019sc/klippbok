@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 08-03-PLAN.md (export API router + ExportPage frontend with trainer picker, SSE progress)
-last_updated: "2026-03-10T18:59:54.451Z"
+stopped_at: Completed 08-04-PLAN.md (training panel UI, SSE progress, TensorBoard iframe, GPU busy guards on Cleanup/Curate/Triage)
+last_updated: "2026-03-10T19:14:24.945Z"
 last_activity: 2026-03-09 -- Phase 07.3 UAT passed
 progress:
   total_phases: 13
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 46
-  completed_plans: 44
+  completed_plans: 45
 ---
 
 ---
@@ -251,6 +251,7 @@ Progress: [██████████████░] ~99% (42 of ~43 estima
 | Phase 08-export-pipeline P02 | 4 | 2 tasks | 3 files |
 | Phase 08-export-pipeline P01 | 4 | 2 tasks | 2 files |
 | Phase 08-export-pipeline P03 | 418 | 2 tasks | 12 files |
+| Phase 08-export-pipeline PP04 | 655 | 2 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -410,6 +411,9 @@ Recent decisions affecting current work:
 - [Phase 08-03]: EXPT-SSE-01: Export router uses asyncio.Queue per op_id with None sentinel, mirrors cleanup.py pattern exactly
 - [Phase 08-03]: EXPT-NAV-01: Export NavLink inserted between Triage and Settings as pipeline endpoint
 - [Phase 08-03]: EXPT-OT-RECOMMENDED: OneTrainer set as default selected trainer and badged Recommended
+- [Phase 08-04]: GPU busy guard uses OR of gpuBusy || trainingActive for maximum VRAM safety during training
+- [Phase 08-04]: TrainingPanel visible only for onetrainer trainer since preset_path is OT-specific concept
+- [Phase 08-04]: useGpuStatus uses TanStack Query refetchInterval:30000 for efficient polling without manual loops
 
 ### Roadmap Evolution
 
@@ -431,6 +435,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-10T18:59:54.447Z
-Stopped at: Completed 08-03-PLAN.md (export API router + ExportPage frontend with trainer picker, SSE progress)
+Last session: 2026-03-10T19:13:59.846Z
+Stopped at: Completed 08-04-PLAN.md (training panel UI, SSE progress, TensorBoard iframe, GPU busy guards on Cleanup/Curate/Triage)
 Resume file: None

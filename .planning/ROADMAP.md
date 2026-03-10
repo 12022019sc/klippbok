@@ -24,7 +24,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 7.1: Gallery Cleanup Tool** - ML-powered media filtering for subject relevance (INSERTED) (completed 2026-03-06)
 - [x] **Phase 7.2: Video-Gallery Integration** - Unified Video tab with Quick Process pipeline, frame review, lightbox enhancements, Triage UX (INSERTED) (completed 2026-03-07)
 - [x] **Phase 7.3: Dataset Curation** - Automated image selection for LoRA training (INSERTED) (completed 2026-03-09)
-- [ ] **Phase 8: Export Pipeline** - Multi-trainer export with format-specific config generation and OneTrainer launch integration
+- [x] **Phase 8: Export Pipeline** - Multi-trainer export with format-specific config generation and OneTrainer launch integration (completed 2026-03-10)
 
 ## Phase Details
 
@@ -282,4 +282,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 6.2 -> 7 -
 | 7.1 Gallery Cleanup Tool | 3/3 | Complete | 2026-03-06 |
 | 7.2 Video-Gallery Integration | 3/3 | Complete | 2026-03-07 |
 | 7.3 Dataset Curation | 4/4 | Complete | 2026-03-09 |
-| 8. Export Pipeline | 3/4 | In Progress|  |
+| 8. Export Pipeline | 4/4 | Complete   | 2026-03-10 |
