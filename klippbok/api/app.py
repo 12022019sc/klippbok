@@ -39,6 +39,7 @@ def create_app(project_dir: Path | None = None) -> FastAPI:
     from klippbok.api.routers.cleanup import router as cleanup_router
     from klippbok.api.routers.curation import router as curation_router
     from klippbok.api.routers.crop import router as crop_router
+    from klippbok.api.routers.export import router as export_router
     from klippbok.api.routers.images import router as images_router
     from klippbok.api.routers.settings import router as settings_router
     from klippbok.api.routers.triage import router as triage_router
@@ -57,6 +58,7 @@ def create_app(project_dir: Path | None = None) -> FastAPI:
         from klippbok.api.routers.captions import _tasks as caption_tasks
         from klippbok.api.routers.cleanup import _cleanup_tasks
         from klippbok.api.routers.curation import _curation_tasks
+        from klippbok.api.routers.export import _export_tasks
         from klippbok.api.routers.import_ import _tasks as import_tasks
         from klippbok.api.routers.triage import _face_tasks, _triage_tasks
         from klippbok.api.routers.upscale import _tasks as upscale_tasks
@@ -73,6 +75,7 @@ def create_app(project_dir: Path | None = None) -> FastAPI:
             (_face_tasks, "face-embedding"),
             (_cleanup_tasks, "cleanup"),
             (_curation_tasks, "curation"),
+            (_export_tasks, "export"),
             (video_ingest_tasks, "video-ingest"),
             (video_extract_tasks, "video-extract"),
         ]:
@@ -109,6 +112,7 @@ def create_app(project_dir: Path | None = None) -> FastAPI:
     app.include_router(video_router, prefix="/api/v1")
     app.include_router(cleanup_router, prefix="/api/v1")
     app.include_router(curation_router, prefix="/api/v1")
+    app.include_router(export_router, prefix="/api/v1")
 
     # SPA static files + fallback to index.html for client-side routes.
     # StaticFiles(html=True) alone only serves index.html at "/" — it 404s
