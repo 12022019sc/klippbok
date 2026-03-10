@@ -5,6 +5,8 @@ Endpoints:
     PUT /settings/       -- Update project settings (project_dir, active_profile).
     DELETE /settings/project -- Delete project data (.klippbok/) and clear active project.
     POST /settings/shutdown  -- Gracefully shut down the server and child processes.
+    GET /settings/tools  -- Return external tool paths (onetrainer_path, model_dir).
+    PUT /settings/tools  -- Update external tool paths and validate existence.
 
 The PUT endpoint sets app.state.project_dir at runtime, enabling the
 project picker flow where users select a project from the web UI.
@@ -20,11 +22,20 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 
+from pydantic import BaseModel
+
 from klippbok.api.models import ProfileInfo, SettingsResponse, SettingsUpdate
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/settings", tags=["settings"])
+
+
+class ToolSettingsUpdate(BaseModel):
+    """Request body for updating external tool paths."""
+
+    onetrainer_path: str | None = None
+    model_dir: str | None = None
 
 
 @router.get("/", response_model=SettingsResponse)
@@ -224,3 +235,76 @@ async def shutdown_server() -> dict:
     os.kill(os.getpid(), signal.SIGTERM)
 
     return {"status": "shutting_down"}
+
+
+@router.get("/tools")
+def get_tool_settings() -> dict:
+    """Return external tool paths from global config.
+
+    Returns:
+        Dict with onetrainer_path and model_dir (both may be None).
+    """
+    from klippbok.services.global_config_service import load_global_config
+
+    config = load_global_config()
+    ot_section = config.get("onetrainer", {})
+
+    return {
+        "onetrainer_path": ot_section.get("onetrainer_path"),
+        "model_dir": ot_section.get("model_dir"),
+    }
+
+
+@router.put("/tools")
+def update_tool_settings(body: ToolSettingsUpdate) -> dict:
+    """Update external tool paths in global config.
+
+    Validates that paths exist as directories (when provided).
+    Saves under the 'onetrainer' key in global config.
+
+    Args:
+        body: ToolSettingsUpdate with onetrainer_path and/or model_dir.
+
+    Returns:
+        Dict with updated onetrainer_path and model_dir values.
+
+    Raises:
+        HTTPException 400: If a provided path does not exist.
+    """
+    from klippbok.services.global_config_service import load_global_config, save_global_config
+
+    if body.onetrainer_path is not None:
+        p = Path(body.onetrainer_path)
+        if not p.exists():
+            raise HTTPException(
+                status_code=400,
+                detail=f"OneTrainer path does not exist: {body.onetrainer_path}",
+            )
+
+    if body.model_dir is not None:
+        p = Path(body.model_dir)
+        if not p.exists():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Model directory does not exist: {body.model_dir}",
+            )
+
+    config = load_global_config()
+    ot_section = config.setdefault("onetrainer", {})
+
+    if body.onetrainer_path is not None:
+        ot_section["onetrainer_path"] = body.onetrainer_path
+    if body.model_dir is not None:
+        ot_section["model_dir"] = body.model_dir
+
+    save_global_config(config)
+    logger.info(
+        "Tool settings updated: onetrainer_path=%s, model_dir=%s",
+        body.onetrainer_path,
+        body.model_dir,
+    )
+
+    return {
+        "onetrainer_path": ot_section.get("onetrainer_path"),
+        "model_dir": ot_section.get("model_dir"),
+    }
