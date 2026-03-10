@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 08-01-PLAN.md (export service: manifest filtering, validation, kohya/aitoolkit/onetrainer config generators)"
-last_updated: "2026-03-10T18:49:23.655Z"
+stopped_at: Completed 08-03-PLAN.md (export API router + ExportPage frontend with trainer picker, SSE progress)
+last_updated: "2026-03-10T18:59:54.451Z"
 last_activity: 2026-03-09 -- Phase 07.3 UAT passed
 progress:
   total_phases: 13
   completed_phases: 11
   total_plans: 46
-  completed_plans: 43
+  completed_plans: 44
 ---
 
 ---
@@ -250,6 +250,7 @@ Progress: [██████████████░] ~99% (42 of ~43 estima
 | Phase 07.3 P04 | 235 | 2 tasks | 6 files |
 | Phase 08-export-pipeline P02 | 4 | 2 tasks | 3 files |
 | Phase 08-export-pipeline P01 | 4 | 2 tasks | 2 files |
+| Phase 08-export-pipeline P03 | 418 | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -406,6 +407,9 @@ Recent decisions affecting current work:
 - [Phase 08-01]: EXPT-TOML-01: kohya TOML written as string concatenation matching musubi pattern
 - [Phase 08-01]: EXPT-OT-01: training_preset.json based on user Prodigy preset with TODO markers for base_model_name
 - [Phase 08-01]: EXPT-CAPTION-01: caption .txt files always written from manifest entry caption field, never from disk
+- [Phase 08-03]: EXPT-SSE-01: Export router uses asyncio.Queue per op_id with None sentinel, mirrors cleanup.py pattern exactly
+- [Phase 08-03]: EXPT-NAV-01: Export NavLink inserted between Triage and Settings as pipeline endpoint
+- [Phase 08-03]: EXPT-OT-RECOMMENDED: OneTrainer set as default selected trainer and badged Recommended
 
 ### Roadmap Evolution
 
@@ -427,6 +431,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-10T18:49:23.652Z
-Stopped at: Completed 08-01-PLAN.md (export service: manifest filtering, validation, kohya/aitoolkit/onetrainer config generators)
+Last session: 2026-03-10T18:59:54.447Z
+Stopped at: Completed 08-03-PLAN.md (export API router + ExportPage frontend with trainer picker, SSE progress)
 Resume file: None
