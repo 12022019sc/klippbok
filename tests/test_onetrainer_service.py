@@ -34,28 +34,33 @@ def _make_fake_ot_root(tmp_path: Path, has_python: bool = True, has_train: bool 
 
 
 class TestDetectOnetrainer:
-    def test_detects_valid_installation(self, tmp_path: Path) -> None:
+    def test_detects_valid_installation(self, tmp_path: Path, monkeypatch) -> None:
         """detect_onetrainer returns root when both python.exe and train.py exist."""
-        from klippbok.services.onetrainer_service import detect_onetrainer
+        from klippbok.services import onetrainer_service
 
         ot_root = _make_fake_ot_root(tmp_path)
-        result = detect_onetrainer(configured_path=str(ot_root))
+        monkeypatch.setattr(onetrainer_service, "_ONETRAINER_COMMON_PATHS", [])
+        result = onetrainer_service.detect_onetrainer(configured_path=str(ot_root))
         assert result == ot_root
 
-    def test_returns_none_when_python_missing(self, tmp_path: Path) -> None:
+    def test_returns_none_when_python_missing(self, tmp_path: Path, monkeypatch) -> None:
         """detect_onetrainer returns None when venv/Scripts/python.exe is absent."""
-        from klippbok.services.onetrainer_service import detect_onetrainer
+        from klippbok.services import onetrainer_service
 
         ot_root = _make_fake_ot_root(tmp_path, has_python=False, has_train=True)
-        result = detect_onetrainer(configured_path=str(ot_root))
+        # Patch common paths to empty so only configured_path is checked
+        monkeypatch.setattr(onetrainer_service, "_ONETRAINER_COMMON_PATHS", [])
+        result = onetrainer_service.detect_onetrainer(configured_path=str(ot_root))
         assert result is None
 
-    def test_returns_none_when_train_missing(self, tmp_path: Path) -> None:
+    def test_returns_none_when_train_missing(self, tmp_path: Path, monkeypatch) -> None:
         """detect_onetrainer returns None when scripts/train.py is absent."""
-        from klippbok.services.onetrainer_service import detect_onetrainer
+        from klippbok.services import onetrainer_service
 
         ot_root = _make_fake_ot_root(tmp_path, has_python=True, has_train=False)
-        result = detect_onetrainer(configured_path=str(ot_root))
+        # Patch common paths to empty so only configured_path is checked
+        monkeypatch.setattr(onetrainer_service, "_ONETRAINER_COMMON_PATHS", [])
+        result = onetrainer_service.detect_onetrainer(configured_path=str(ot_root))
         assert result is None
 
     def test_configured_path_checked_first(self, tmp_path: Path, monkeypatch) -> None:
@@ -84,12 +89,13 @@ class TestDetectOnetrainer:
         result = onetrainer_service.detect_onetrainer(configured_path=None)
         assert result is None
 
-    def test_returns_path_object(self, tmp_path: Path) -> None:
+    def test_returns_path_object(self, tmp_path: Path, monkeypatch) -> None:
         """detect_onetrainer always returns a Path (not str) on success."""
-        from klippbok.services.onetrainer_service import detect_onetrainer
+        from klippbok.services import onetrainer_service
 
         ot_root = _make_fake_ot_root(tmp_path)
-        result = detect_onetrainer(configured_path=str(ot_root))
+        monkeypatch.setattr(onetrainer_service, "_ONETRAINER_COMMON_PATHS", [])
+        result = onetrainer_service.detect_onetrainer(configured_path=str(ot_root))
         assert isinstance(result, Path)
 
 
