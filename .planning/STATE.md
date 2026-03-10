@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 8 context gathered
-last_updated: "2026-03-10T18:07:17.061Z"
+stopped_at: "Completed 08-01-PLAN.md (export service: manifest filtering, validation, kohya/aitoolkit/onetrainer config generators)"
+last_updated: "2026-03-10T18:49:23.655Z"
 last_activity: 2026-03-09 -- Phase 07.3 UAT passed
 progress:
   total_phases: 13
   completed_phases: 11
-  total_plans: 42
-  completed_plans: 41
+  total_plans: 46
+  completed_plans: 43
 ---
 
 ---
@@ -248,6 +248,8 @@ Progress: [██████████████░] ~99% (42 of ~43 estima
 | Phase 07.3 P01 | 424 | 2 tasks | 9 files |
 | Phase 07.3 P02 | 326 | 2 tasks | 6 files |
 | Phase 07.3 P04 | 235 | 2 tasks | 6 files |
+| Phase 08-export-pipeline P02 | 4 | 2 tasks | 3 files |
+| Phase 08-export-pipeline P01 | 4 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -398,6 +400,12 @@ Recent decisions affecting current work:
 - [Phase 07.3-02]: Quality floor filters by percentile cutoff AND is_duplicate flag simultaneously
 - [Phase 07.3-02]: SSE curation pattern mirrors cleanup.py exactly: asyncio.Queue per op_id, None sentinel, thread-safe callbacks
 - [Phase 07.3]: CSS-only green dot for pinned indicator instead of emoji
+- [Phase 08-02]: OT-01: _ONETRAINER_COMMON_PATHS patched via monkeypatch in tests to prevent real installation hits
+- [Phase 08-02]: GPU-01: VRAM_BUSY_THRESHOLD_MB=4096 (4GB) — above idle noise, below LoRA training footprint on RTX 5080
+- [Phase 08-01]: EXPT-YAML-01: PyYAML used for ai-toolkit YAML generation
+- [Phase 08-01]: EXPT-TOML-01: kohya TOML written as string concatenation matching musubi pattern
+- [Phase 08-01]: EXPT-OT-01: training_preset.json based on user Prodigy preset with TODO markers for base_model_name
+- [Phase 08-01]: EXPT-CAPTION-01: caption .txt files always written from manifest entry caption field, never from disk
 
 ### Roadmap Evolution
 
@@ -419,6 +427,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-10T18:07:17.058Z
-Stopped at: Phase 8 context gathered
-Resume file: .planning/phases/08-export-pipeline/08-CONTEXT.md
+Last session: 2026-03-10T18:49:23.652Z
+Stopped at: Completed 08-01-PLAN.md (export service: manifest filtering, validation, kohya/aitoolkit/onetrainer config generators)
+Resume file: None

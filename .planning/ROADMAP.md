@@ -282,4 +282,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 6.2 -> 7 -
 | 7.1 Gallery Cleanup Tool | 3/3 | Complete | 2026-03-06 |
 | 7.2 Video-Gallery Integration | 3/3 | Complete | 2026-03-07 |
 | 7.3 Dataset Curation | 4/4 | Complete | 2026-03-09 |
-| 8. Export Pipeline | 0/4 | Not started | - |
+| 8. Export Pipeline | 2/4 | In Progress|  |
