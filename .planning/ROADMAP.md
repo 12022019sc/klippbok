@@ -21,10 +21,10 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6.1: Caption Provider Configuration** - Dedicated captioning page with provider config, model picker, API key management, and caption workspace (INSERTED) (completed 2026-03-04)
 - [x] **Phase 6.2: Captioning Enhancement: JoyCaption Integration Planning** - Caption modes, context-only modes, post-processing pipeline, token budgets, trigger word injection (INSERTED) (completed 2026-03-05)
 - [x] **Phase 7: Video and CLIP Integration** - Existing video pipeline accessible from GUI, CLIP triage extended to standalone images (completed 2026-03-05)
-- [ ] **Phase 7.1: Gallery Cleanup Tool** - ML-powered media filtering for subject relevance (INSERTED)
-- [ ] **Phase 7.2: Video-Gallery Integration** - Unified Video tab with Quick Process pipeline, frame review, lightbox enhancements, Triage UX (INSERTED)
-- [ ] **Phase 7.3: Dataset Curation** - Automated image selection for LoRA training (INSERTED)
-- [ ] **Phase 8: Export Pipeline** - Multi-trainer export with format-specific config generation and dataset download
+- [x] **Phase 7.1: Gallery Cleanup Tool** - ML-powered media filtering for subject relevance (INSERTED) (completed 2026-03-06)
+- [x] **Phase 7.2: Video-Gallery Integration** - Unified Video tab with Quick Process pipeline, frame review, lightbox enhancements, Triage UX (INSERTED) (completed 2026-03-07)
+- [x] **Phase 7.3: Dataset Curation** - Automated image selection for LoRA training (INSERTED) (completed 2026-03-09)
+- [ ] **Phase 8: Export Pipeline** - Multi-trainer export with format-specific config generation and OneTrainer launch integration
 
 ## Phase Details
 
@@ -245,21 +245,23 @@ Plans:
 - [ ] 07.1-03-PLAN.md -- Gap closure: fix results pipeline wiring, thumbnail ID mismatch, CLEAN-XX requirements
 
 ### Phase 8: Export Pipeline
-**Goal**: Users can export their cropped, captioned dataset in the format required by their chosen trainer -- ready to train with no manual file manipulation
+**Goal**: Users can export their cropped, captioned dataset in the format required by their chosen trainer and optionally launch OneTrainer training directly from the export page -- ready to train with no manual file manipulation
 **Depends on**: Phase 5, Phase 6
 **Requirements**: EXPT-01, EXPT-02, EXPT-03, EXPT-04, EXPT-05, EXPT-06, EXPT-07, GUI-07
 **Success Criteria** (what must be TRUE):
   1. User can export as kohya/sd-scripts folder structure (repeats_trigger class/ format) with TOML config
   2. User can export as ai-toolkit format (YAML config + flat image directory)
-  3. User can export as OneTrainer format (JSON config + image directory) and SimpleTuner format (multidatabackend.json)
-  4. Every export includes correctly paired image + .txt caption files, with images resized/cropped to target bucket dimensions
-  5. Export interface in GUI lets user select trainer format, configure options, and download/export the result
-**Plans**: TBD
+  3. User can export as OneTrainer format (JSON concept + training preset)
+  4. Every export includes correctly paired image + .txt caption files, with images copied at bucket dimensions
+  5. Export interface in GUI lets user select trainer format, configure options, and export with SSE progress
+  6. Post-export training panel enables OneTrainer headless launch, TensorBoard embedding, and graceful stop
+**Plans**: 4 plans
 
 Plans:
-- [ ] 08-01: Kohya/sd-scripts export with TOML config generation
-- [ ] 08-02: ai-toolkit and OneTrainer export formats
-- [ ] 08-03: SimpleTuner export and export UI integration
+- [ ] 08-01-PLAN.md -- Export service: manifest filtering, validation, file copy, three trainer config generators (kohya, ai-toolkit, OneTrainer)
+- [ ] 08-02-PLAN.md -- OneTrainer service: detection, subprocess launch/stop, progress parsing, GPU VRAM monitoring
+- [ ] 08-03-PLAN.md -- Export API router with SSE progress, ExportPage frontend (trainer picker, options, validation, progress)
+- [ ] 08-04-PLAN.md -- Training panel: OneTrainer launch/stop, TensorBoard iframe, settings extension, human verification
 
 ## Progress
 
@@ -277,7 +279,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 6.2 -> 7 -
 | 6.1 Caption Provider Config | 2/2 | Complete   | 2026-03-04 |
 | 6.2 Caption Enhancement: JoyCaption | 3/3 | Complete   | 2026-03-05 |
 | 7. Video and CLIP Integration | 5/5 | Complete   | 2026-03-06 |
-| 7.1 Gallery Cleanup Tool | 2/3 | In progress | - |
-| 7.2 Video-Gallery Integration | 0/3 | Not started | - |
-| 7.3 Dataset Curation | 0/4 | Not started | - |
-| 8. Export Pipeline | 0/3 | Not started | - |
+| 7.1 Gallery Cleanup Tool | 3/3 | Complete | 2026-03-06 |
+| 7.2 Video-Gallery Integration | 3/3 | Complete | 2026-03-07 |
+| 7.3 Dataset Curation | 4/4 | Complete | 2026-03-09 |
+| 8. Export Pipeline | 0/4 | Not started | - |
