@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useCleanupEvents } from '../hooks/useCleanupEvents'
 import { useAppStore } from '../stores/appStore'
+import { useGpuStatus } from '../hooks/useGpuStatus'
 import type { CleanupClassification } from '../types/cleanup'
 
 export default function CleanupPage() {
@@ -29,6 +30,8 @@ export default function CleanupPage() {
   const clearCleanup = useAppStore((s) => s.clearCleanup)
 
   const events = useCleanupEvents(operationId)
+  const { gpuBusy, trainingActive } = useGpuStatus()
+  const gpuInUse = gpuBusy || trainingActive
 
   // Store results when scan completes
   useEffect(() => {
@@ -306,6 +309,12 @@ export default function CleanupPage() {
       <h1 className="page-title">Cleanup</h1>
       <p className="page-subtitle">Define the subject to keep, then scan.</p>
 
+      {gpuInUse && (
+        <div className="gpu-busy-banner">
+          GPU is currently in use for training. GPU-intensive features are temporarily disabled.
+        </div>
+      )}
+
       {/* Mode toggle */}
       <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
         <button
@@ -394,7 +403,12 @@ export default function CleanupPage() {
         </div>
       </div>
 
-      <button className="import-button" onClick={startScan} disabled={!canStart}>
+      <button
+        className="import-button"
+        onClick={startScan}
+        disabled={!canStart || gpuInUse}
+        title={gpuInUse ? 'GPU in use for training' : undefined}
+      >
         Start Cleanup Scan
       </button>
       <p style={{ color: '#6b7280', fontSize: '0.75rem', marginTop: '0.5rem' }}>

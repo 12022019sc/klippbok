@@ -1,8 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAppStore } from '../stores/appStore'
 import { toast } from 'sonner'
 import ProviderConfigSection from '../components/Caption/ProviderConfigSection'
+
+interface ToolSettings {
+  onetrainer_path: string | null
+  model_dir: string | null
+}
+
+interface TrainStatusForDetect {
+  onetrainer_detected: boolean
+  onetrainer_path: string | null
+}
 
 interface CaptionProviderConfig {
   provider: string
@@ -69,6 +79,26 @@ export default function SettingsPage() {
   })
 
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false)
+  const didAutoSelect = useRef(false)
+
+  // Auto-select sd15 if no profile is set
+  useEffect(() => {
+    if (didAutoSelect.current || !data || data.active_profile || !profiles?.length) return
+    didAutoSelect.current = true
+    const hasSd15 = profiles.some((p) => p.name === 'sd15')
+    if (!hasSd15) return
+
+    // Silently set default profile (no toast)
+    fetch('/api/v1/settings/', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active_profile: 'sd15' }),
+    })
+      .then((res) => {
+        if (res.ok) void queryClient.invalidateQueries({ queryKey: ['settings'] })
+      })
+      .catch(() => {})
+  }, [data, profiles, queryClient])
 
   const { data: captionConfig = DEFAULT_CAPTION_CONFIG } = useQuery<CaptionProviderConfig>({
     queryKey: ['caption-config'],
@@ -80,6 +110,70 @@ export default function SettingsPage() {
   })
 
   const triggerWord = data?.anchor_word ?? ''
+
+  // Tool settings state
+  const [toolSettings, setToolSettings] = useState<ToolSettings>({ onetrainer_path: null, model_dir: null })
+  const [toolSettingsLoaded, setToolSettingsLoaded] = useState(false)
+  const [onetrainerDetected, setOnetrainerDetected] = useState<boolean | null>(null)
+  const [isSavingTools, setIsSavingTools] = useState(false)
+  const [isAutoDetecting, setIsAutoDetecting] = useState(false)
+
+  // Load tool settings on mount
+  useEffect(() => {
+    fetch('/api/v1/settings/tools')
+      .then((r) => r.json())
+      .then((d: ToolSettings) => {
+        setToolSettings(d)
+        setToolSettingsLoaded(true)
+      })
+      .catch(() => setToolSettingsLoaded(true))
+  }, [])
+
+  async function handleAutoDetect() {
+    setIsAutoDetecting(true)
+    try {
+      const res = await fetch('/api/v1/export/train/status')
+      if (!res.ok) return
+      const data = (await res.json()) as TrainStatusForDetect
+      setOnetrainerDetected(data.onetrainer_detected)
+      if (data.onetrainer_path) {
+        setToolSettings((prev) => ({ ...prev, onetrainer_path: data.onetrainer_path }))
+        toast.success('OneTrainer detected', { description: data.onetrainer_path ?? undefined })
+      } else {
+        toast.info('OneTrainer not found at common paths. Set path manually.')
+      }
+    } catch {
+      toast.error('Auto-detect failed')
+    } finally {
+      setIsAutoDetecting(false)
+    }
+  }
+
+  async function handleSaveTools() {
+    setIsSavingTools(true)
+    try {
+      const res = await fetch('/api/v1/settings/tools', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          onetrainer_path: toolSettings.onetrainer_path || null,
+          model_dir: toolSettings.model_dir || null,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Save failed' }))
+        toast.error('Failed to save tool settings', { description: (err as { detail: string }).detail })
+        return
+      }
+      toast.success('Tool settings saved')
+    } catch (err) {
+      toast.error('Failed to save tool settings', {
+        description: err instanceof Error ? err.message : String(err),
+      })
+    } finally {
+      setIsSavingTools(false)
+    }
+  }
 
   const setProjectDir = useAppStore((s) => s.setProjectDir)
   const clearImport = useAppStore((s) => s.clearImport)
@@ -226,6 +320,67 @@ export default function SettingsPage() {
             triggerWord={triggerWord}
             onTriggerWordSave={() => void queryClient.invalidateQueries({ queryKey: ['settings'] })}
           />
+
+          <div className="settings-section-divider" />
+
+          <h2 className="settings-section-title">External Tools</h2>
+          {toolSettingsLoaded && (
+            <div className="settings-tools">
+              <div className="settings-field">
+                <span className="settings-label">OneTrainer Install Path</span>
+                <div className="settings-tool-input-row">
+                  <input
+                    type="text"
+                    className="settings-tool-input"
+                    value={toolSettings.onetrainer_path ?? ''}
+                    onChange={(e) =>
+                      setToolSettings((prev) => ({ ...prev, onetrainer_path: e.target.value || null }))
+                    }
+                    placeholder="e.g. C:\OneTrainer"
+                  />
+                  <button
+                    className="settings-btn settings-btn--secondary"
+                    onClick={() => void handleAutoDetect()}
+                    disabled={isAutoDetecting}
+                    style={{ flexShrink: 0 }}
+                  >
+                    {isAutoDetecting ? 'Detecting...' : 'Auto-detect'}
+                  </button>
+                  {onetrainerDetected === true && (
+                    <span className="settings-tool-status settings-tool-status--ok">Detected</span>
+                  )}
+                  {onetrainerDetected === false && (
+                    <span className="settings-tool-status settings-tool-status--err">Not found</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="settings-field">
+                <span className="settings-label">Model Directory</span>
+                <div className="settings-tool-input-row">
+                  <input
+                    type="text"
+                    className="settings-tool-input"
+                    value={toolSettings.model_dir ?? ''}
+                    onChange={(e) =>
+                      setToolSettings((prev) => ({ ...prev, model_dir: e.target.value || null }))
+                    }
+                    placeholder="e.g. C:\GenAI\Models"
+                  />
+                </div>
+              </div>
+
+              <div className="settings-actions" style={{ marginTop: '0.75rem' }}>
+                <button
+                  className="settings-btn settings-btn--primary"
+                  onClick={() => void handleSaveTools()}
+                  disabled={isSavingTools}
+                >
+                  {isSavingTools ? 'Saving...' : 'Save Tool Settings'}
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="settings-section-divider" />
 

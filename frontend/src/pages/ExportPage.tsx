@@ -3,6 +3,7 @@ import TrainerPicker from '../components/Export/TrainerPicker'
 import ExportOptions from '../components/Export/ExportOptions'
 import ExportSummary from '../components/Export/ExportSummary'
 import ExportProgress from '../components/Export/ExportProgress'
+import TrainingPanel from '../components/Export/TrainingPanel'
 import { useExportEvents } from '../hooks/useExportEvents'
 
 interface ExportDefaults {
@@ -195,6 +196,13 @@ export default function ExportPage() {
               error={error}
               isExporting={isExporting}
             />
+          </section>
+        )}
+
+        {/* Section: Training Panel — visible only after successful export (result non-null) */}
+        {result !== null && trainer === 'onetrainer' && (
+          <section className="export-section">
+            <TrainingPanel presetPath={`${result.output_dir}/training_preset.json`} />
           </section>
         )}
       </div>

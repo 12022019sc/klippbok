@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { useCurationEvents } from '../hooks/useCurationEvents'
+import { useGpuStatus } from '../hooks/useGpuStatus'
 import CurationConfig from '../components/Curation/CurationConfig'
 import CurationProgress from '../components/Curation/CurationProgress'
 import CurationResults from '../components/Curation/CurationResults'
@@ -16,6 +17,8 @@ export default function CuratePage() {
   const [progress, setProgress] = useState<CurationProgressType | null>(null)
 
   const events = useCurationEvents(operationId)
+  const { gpuBusy, trainingActive } = useGpuStatus()
+  const gpuInUse = gpuBusy || trainingActive
 
   // Check for existing results on mount
   useEffect(() => {
@@ -130,7 +133,12 @@ export default function CuratePage() {
     <div style={{ padding: '2rem', maxWidth: 700 }}>
       <h1 className="page-title">Dataset Curation</h1>
       <p className="page-subtitle">Automatically select the best images for LoRA training.</p>
-      <CurationConfig onStart={handleStart} />
+      {gpuInUse && (
+        <div className="gpu-busy-banner">
+          GPU is currently in use for training. GPU-intensive features are temporarily disabled.
+        </div>
+      )}
+      <CurationConfig onStart={gpuInUse ? () => undefined : handleStart} />
     </div>
   )
 }

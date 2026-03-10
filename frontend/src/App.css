@@ -3265,3 +3265,378 @@
   border-radius: 4px;
   transition: width 0.3s ease;
 }
+
+/* ── GPU Busy Banner ── */
+.gpu-busy-banner {
+  background: #78350f;
+  border: 1px solid #d97706;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  color: #fef3c7;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+/* ── Training Panel ── */
+.training-panel {
+  background: #0f0f1a;
+  border: 1px solid #1e1e3a;
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.training-panel-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #f9fafb;
+  margin: 0 0 1rem 0;
+}
+
+.training-not-configured {
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+.training-not-configured-hint {
+  color: #6b7280;
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+}
+
+.training-settings-link {
+  color: #6366f1;
+  text-decoration: none;
+}
+
+.training-settings-link:hover {
+  text-decoration: underline;
+}
+
+.training-action-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.training-btn {
+  padding: 0.5rem 1.25rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: opacity 0.15s;
+}
+
+.training-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.training-btn--primary {
+  background: #6366f1;
+  color: #fff;
+}
+
+.training-btn--primary:hover:not(:disabled) {
+  background: #4f46e5;
+}
+
+.training-btn--secondary {
+  background: #1e1e3a;
+  color: #d1d5db;
+  border: 1px solid #374151;
+}
+
+.training-btn--secondary:hover:not(:disabled) {
+  background: #2a2a4a;
+}
+
+.training-btn--stop {
+  background: #dc2626;
+  color: #fff;
+  margin-top: 1rem;
+}
+
+.training-btn--stop:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+/* Training progress */
+.training-in-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.training-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  color: #d1d5db;
+}
+
+.training-epoch-label {
+  font-weight: 500;
+  color: #f3f4f6;
+}
+
+.training-pct {
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+
+.training-progress-track {
+  background: #1e1e3a;
+  border-radius: 4px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.training-progress-fill {
+  height: 100%;
+  background: #6366f1;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+/* TensorBoard iframe */
+.tensorboard-container {
+  margin-top: 1rem;
+}
+
+.tensorboard-label {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  margin: 0 0 0.5rem 0;
+}
+
+.tensorboard-iframe {
+  width: 100%;
+  height: 600px;
+  border: 1px solid #1e1e3a;
+  border-radius: 6px;
+  background: #fff;
+}
+
+/* Completion banner */
+.completion-banner {
+  background: #052e16;
+  border: 1px solid #16a34a;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.completion-banner-title {
+  color: #4ade80;
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem 0;
+}
+
+.completion-banner-detail {
+  color: #d1fae5;
+  font-size: 0.85rem;
+  margin: 0.25rem 0;
+}
+
+.completion-banner-label {
+  color: #86efac;
+  font-weight: 500;
+}
+
+.completion-banner-path {
+  font-family: monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+
+/* Training error panel */
+.training-error-panel {
+  background: #1c0e0e;
+  border: 1px solid #dc2626;
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.training-error-message {
+  color: #fca5a5;
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem 0;
+}
+
+.training-error-log {
+  background: #0f0f0f;
+  border: 1px solid #374151;
+  border-radius: 4px;
+  padding: 0.75rem;
+  font-family: monospace;
+  font-size: 0.78rem;
+  color: #f87171;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 0.75rem;
+}
+
+/* GPU warning banner (inside training panel) */
+.gpu-warning-banner {
+  background: #78350f;
+  border: 1px solid #d97706;
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+  color: #fef3c7;
+  font-size: 0.82rem;
+  margin-bottom: 0.75rem;
+}
+
+/* ── Training Config form ── */
+.training-config {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.training-config-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+@media (max-width: 600px) {
+  .training-config-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.training-config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.training-config-label {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.training-config-input {
+  background: #0a0a14;
+  border: 1px solid #374151;
+  border-radius: 4px;
+  color: #f3f4f6;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.9rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.training-config-input:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+/* ── Model Picker ── */
+.model-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.model-picker-label {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.model-picker-select {
+  background: #0a0a14;
+  border: 1px solid #374151;
+  border-radius: 4px;
+  color: #f3f4f6;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.9rem;
+  width: 100%;
+}
+
+.model-picker-select:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+.model-picker-empty {
+  color: #9ca3af;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.model-picker-link {
+  color: #6366f1;
+  text-decoration: none;
+}
+
+.model-picker-link:hover {
+  text-decoration: underline;
+}
+
+/* ── Settings Tools section ── */
+.settings-tool-input-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.settings-tool-input {
+  flex: 1;
+  min-width: 200px;
+  background: #0a0a14;
+  border: 1px solid #374151;
+  border-radius: 4px;
+  color: #f3f4f6;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+.settings-tool-input:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+.settings-tool-status {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.settings-tool-status--ok {
+  color: #4ade80;
+  background: #052e16;
+  border: 1px solid #16a34a;
+}
+
+.settings-tool-status--err {
+  color: #f87171;
+  background: #1c0e0e;
+  border: 1px solid #dc2626;
+}
+
+.settings-btn--primary {
+  background: #6366f1;
+  color: #fff;
+  border: none;
+}
+
+.settings-btn--primary:hover:not(:disabled) {
+  background: #4f46e5;
+}
+
+.settings-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}

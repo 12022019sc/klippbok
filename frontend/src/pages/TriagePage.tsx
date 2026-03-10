@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { useAppStore } from '../stores/appStore'
 import { useTriageEvents } from '../hooks/useTriageEvents'
 import { useFaceEvents } from '../hooks/useFaceEvents'
+import { useGpuStatus } from '../hooks/useGpuStatus'
 import type { ConceptRef, FaceCluster, TriageScore } from '../types/triage'
 
 interface HealthStatus {
@@ -280,6 +281,9 @@ export default function TriagePage() {
   const isTriageRunning = triageOpId !== null
   const isFaceRunning = faceOpId !== null
 
+  const { gpuBusy, trainingActive } = useGpuStatus()
+  const gpuInUse = gpuBusy || trainingActive
+
   const borderlineLow = Math.max(0, triageThreshold - 0.1)
 
   return (
@@ -346,6 +350,13 @@ export default function TriagePage() {
       {/* Right: Main Content */}
       <main className="triage-main">
         <h1 className="page-title">Triage</h1>
+
+        {gpuInUse && (
+          <div className="gpu-busy-banner">
+            GPU is currently in use for training. GPU-intensive features are temporarily disabled.
+          </div>
+        )}
+
         <p className="triage-intro">
           Triage helps identify which images in your dataset match your training subject.
           Use CLIP Triage to score images against reference photos, and Face Clustering
@@ -429,7 +440,8 @@ export default function TriagePage() {
             <button
               className="triage-btn"
               onClick={handleRunTriage}
-              disabled={isTriageRunning || !projectDir}
+              disabled={isTriageRunning || !projectDir || gpuInUse}
+              title={gpuInUse ? 'GPU in use for training' : undefined}
               type="button"
             >
               {isTriageRunning ? 'Running…' : 'Run Triage'}
@@ -591,7 +603,8 @@ export default function TriagePage() {
             <button
               className="triage-btn"
               onClick={handleRunFaceEmbedding}
-              disabled={isFaceRunning || !projectDir || (health ? !health.insightface_available : false)}
+              disabled={isFaceRunning || !projectDir || (health ? !health.insightface_available : false) || gpuInUse}
+              title={gpuInUse ? 'GPU in use for training' : undefined}
               type="button"
             >
               {isFaceRunning ? 'Computing…' : 'Compute Face Embeddings'}
