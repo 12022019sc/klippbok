@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FrameCandidate } from '../../hooks/useProcessEvents'
 
 interface FrameCandidateLightboxProps {
@@ -22,6 +22,7 @@ export default function FrameCandidateLightbox({
 }: FrameCandidateLightboxProps) {
   const [index, setIndex] = useState(0)
   const current = candidates[index]
+  const bustKey = useMemo(() => Date.now(), [candidates])
 
   const goPrev = useCallback(() => {
     setIndex((i) => (i > 0 ? i - 1 : candidates.length - 1))
@@ -48,7 +49,7 @@ export default function FrameCandidateLightbox({
   }
 
   const thumbUrl = (path: string) =>
-    `/api/v1/video/process/frame?path=${encodeURIComponent(path)}`
+    `/api/v1/video/process/frame?path=${encodeURIComponent(path)}&v=${bustKey}`
 
   return (
     <div className="frame-preview-overlay" onClick={onClose} onWheel={handleWheel}>

@@ -43,6 +43,10 @@ _aesthetic_model = None
 _aesthetic_preprocessor = None
 _clip_embedder = None
 
+# Warn-once flags for dependency failures
+_pyiqa_warned = False
+_aesthetic_warned = False
+
 
 def _get_face_app():
     """Return InsightFace FaceAnalysis singleton (GPU-aware)."""
@@ -54,9 +58,23 @@ def _get_face_app():
 
 
 def _get_pyiqa_model():
-    """Return pyiqa TOPIQ-NR singleton with GPU if available."""
+    """Return pyiqa TOPIQ-NR singleton with GPU if available.
+
+    Includes a numpy compatibility shim: pyiqa depends on imgaug which
+    uses ``np.sctypes`` removed in NumPy 2.0.  We restore the attribute
+    before importing so the rest of the library works normally.
+    """
     global _pyiqa_model
     if _pyiqa_model is None:
+        import numpy as _np
+        if not hasattr(_np, "sctypes"):
+            _np.sctypes = {
+                "float": [_np.float16, _np.float32, _np.float64],
+                "int": [_np.int8, _np.int16, _np.int32, _np.int64],
+                "uint": [_np.uint8, _np.uint16, _np.uint32, _np.uint64],
+                "complex": [_np.complex64, _np.complex128],
+                "others": [bool, object, bytes, str, _np.void],
+            }
         import pyiqa
         import torch
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -325,19 +343,35 @@ def score_image(
         raw_quality = pyiqa_model(str(image_path)).item()
         quality_score = normalize_score(raw_quality, 0.0, 1.0)
     except Exception as e:
-        logger.debug("pyiqa scoring failed: %s", e)
+        global _pyiqa_warned
+        if not _pyiqa_warned:
+            logger.warning("pyiqa scoring failed (will default to 0.0): %s", e)
+            _pyiqa_warned = True
+        else:
+            logger.debug("pyiqa scoring failed: %s", e)
 
     # --- Aesthetic Predictor V2.5 ---
     aesthetic_score = 0.0
     try:
+        import torch as _torch
         model, preprocessor = _get_aesthetic_model()
-        inputs = preprocessor(image_path)
-        pixel_values = inputs["pixel_values"].to(next(model.parameters()).device)
+        inputs = preprocessor(str(image_path))
+        pv = inputs["pixel_values"]
+        # preprocessor may return list[ndarray] — convert to tensor
+        if isinstance(pv, list):
+            pv = _torch.stack([_torch.from_numpy(a) for a in pv])
+        param = next(model.parameters())
+        pixel_values = pv.to(device=param.device, dtype=param.dtype)
         output = model(pixel_values)
         raw_aesthetic = output.logits[0].item()
         aesthetic_score = normalize_score(raw_aesthetic, 3.0, 8.0)
     except Exception as e:
-        logger.debug("Aesthetic scoring failed: %s", e)
+        global _aesthetic_warned
+        if not _aesthetic_warned:
+            logger.warning("Aesthetic scoring failed (will default to 0.0): %s", e)
+            _aesthetic_warned = True
+        else:
+            logger.debug("Aesthetic scoring failed: %s", e)
 
     # --- Whole-image sharpness (Laplacian) ---
     sharpness_whole = 0.0

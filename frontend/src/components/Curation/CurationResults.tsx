@@ -23,6 +23,7 @@ export default function CurationResults({ result, onNewCuration, onResultUpdate 
   const [popoverPos, setPopoverPos] = useState({ x: 0, y: 0 })
   const [isRediversifying, setIsRediversifying] = useState(false)
   const [rejectedCollapsed, setRejectedCollapsed] = useState(false)
+  const [gridFlash, setGridFlash] = useState(false)
 
   // Sync from result when it changes (e.g. after rediversify)
   useEffect(() => {
@@ -116,7 +117,15 @@ export default function CurationResults({ result, onNewCuration, onResultUpdate 
         return
       }
       const updated = (await res.json()) as CurationResult
+      const prevCount = result.selected_ids.length
+      const newCount = updated.selected_ids.length
+      const diff = newCount - prevCount
+      const diffLabel = diff >= 0 ? `+${diff}` : `${diff}`
+      toast.success(`Re-diversified (${diffLabel} images), ${newCount} now selected`)
       onResultUpdate(updated)
+      // Flash the grid to signal refresh
+      setGridFlash(true)
+      setTimeout(() => setGridFlash(false), 400)
     } catch (err) {
       toast.error('Re-diversify failed', {
         description: err instanceof Error ? err.message : String(err),
@@ -138,13 +147,25 @@ export default function CurationResults({ result, onNewCuration, onResultUpdate 
     navigate('/')
   }
 
+  async function handleProceedToCrop() {
+    try {
+      await fetch('/api/v1/curation/apply', { method: 'POST' })
+    } catch {
+      // best-effort
+    }
+    selectByFilter(effectiveSelectedIds)
+    if (!selectionMode) toggleSelectionMode()
+    toast.success(`Curated ${effectiveSelectedIds.length} images → proceeding to crop`)
+    navigate('/crop')
+  }
+
   return (
     <div className="curation-results">
       {/* Selected images */}
       <h3 style={{ margin: '0 0 0.5rem' }}>
         Selected ({selectedScores.length})
       </h3>
-      <div className="curation-selected-grid">
+      <div className={`curation-selected-grid${gridFlash ? ' curation-grid-flash' : ''}`}>
         {selectedScores.map((score) => (
           <div
             key={score.image_id}
@@ -204,6 +225,9 @@ export default function CurationResults({ result, onNewCuration, onResultUpdate 
         </button>
         <button className="import-button" onClick={handleApply}>
           Apply to Gallery
+        </button>
+        <button className="import-button" onClick={handleProceedToCrop}>
+          Proceed to Crop
         </button>
         <button
           className="import-button"

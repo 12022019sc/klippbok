@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ExtractedFrame } from '../../hooks/useProcessEvents'
 import FrameCandidateLightbox from './FrameCandidateLightbox'
 
@@ -23,6 +23,9 @@ export default function FrameReviewGrid({ frames, skippedVideos, onConfirm, onDi
   const [candidateFrame, setCandidateFrame] = useState<ExtractedFrame | null>(null)
   // Maps video_path -> user-selected candidate path (override from default winner)
   const [selectedFrames, setSelectedFrames] = useState<Record<string, string>>({})
+
+  // Cache-bust key: regenerated when frames change so browser fetches fresh content
+  const bustKey = useMemo(() => Date.now(), [frames])
 
   function toggleFrame(framePath: string) {
     setDeselected((prev) => {
@@ -157,7 +160,7 @@ export default function FrameReviewGrid({ frames, skippedVideos, onConfirm, onDi
         {frames.map((frame) => {
           const isDeselected = deselected.has(frame.frame_path)
           const displayPath = resolvedPath(frame)
-          const thumbUrl = `/api/v1/video/process/frame?path=${encodeURIComponent(displayPath)}`
+          const thumbUrl = `/api/v1/video/process/frame?path=${encodeURIComponent(displayPath)}&v=${bustKey}`
           const hasCandidates = frame.candidates && frame.candidates.length > 1
           const isOverridden = selectedFrames[frame.video_path] != null
           return (
@@ -204,7 +207,7 @@ export default function FrameReviewGrid({ frames, skippedVideos, onConfirm, onDi
             onClick={(e) => e.stopPropagation()}
           >
             <img
-              src={`/api/v1/video/process/frame?path=${encodeURIComponent(resolvedPath(previewFrame))}`}
+              src={`/api/v1/video/process/frame?path=${encodeURIComponent(resolvedPath(previewFrame))}&v=${bustKey}`}
               alt={previewFrame.frame_path}
             />
             <div className="frame-preview-info">

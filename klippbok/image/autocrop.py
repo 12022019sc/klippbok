@@ -9,12 +9,20 @@ Model discovery order:
 3. ~/.klippbok/models/pose_landmarker_full.task (user cache)
 4. Download on first use to user cache location
 
-When a person is detected: derives a bounding box from the 33 pose
-landmarks, adds 10% padding, maps to nearest bucket aspect ratio, and
-expands the bbox to fill the bucket AR.
+Algorithm — "subject-fitted crop with safety floor":
+  1. Detect pose landmarks, discard any outside [0,1] image range.
+  2. Compute tight bounding box from in-bounds landmarks + 25% padding.
+  3. Pick bucket by IMAGE AR (not bbox AR) — handles extreme ARs.
+  4. Expand padded bbox to fill bucket AR.
+  5. Enforce a minimum crop size (70% of image short edge) so bad
+     detections never produce absurdly small crops.
+  6. Center on face (or body center), clamped to image bounds.
 
-When no person is detected: falls back to a center crop at the nearest
-bucket aspect ratio (_center_crop).
+This zooms in on the subject when there's excess background, keeps
+full body when the person fills the frame, and gracefully handles
+MediaPipe's out-of-bounds landmark predictions.
+
+When no person is detected: falls back to a plain center crop.
 """
 
 from __future__ import annotations
@@ -172,41 +180,92 @@ def auto_crop_image(
         )
         return (*_center_crop(img_width, img_height, buckets), "center")
 
-    # Derive bounding box from all detected landmarks
+    # -- Subject-fitted crop with safety floor --
     landmarks = result.pose_landmarks[0]
-    xs = [lm.x * img_width for lm in landmarks]
-    ys = [lm.y * img_height for lm in landmarks]
+    _FACE_IDS = range(0, 11)  # nose, eyes, mouth, ears
 
-    bbox_left = int(min(xs))
-    bbox_top = int(min(ys))
-    bbox_right = int(max(xs))
-    bbox_bottom = int(max(ys))
-    bbox_w = bbox_right - bbox_left
-    bbox_h = bbox_bottom - bbox_top
-
-    # Add 10% padding around the bbox
-    pad_x = int(bbox_w * 0.10)
-    pad_y = int(bbox_h * 0.10)
-    bbox_left = max(0, bbox_left - pad_x)
-    bbox_top = max(0, bbox_top - pad_y)
-    bbox_right = min(img_width, bbox_right + pad_x)
-    bbox_bottom = min(img_height, bbox_bottom + pad_y)
-    bbox_w = bbox_right - bbox_left
-    bbox_h = bbox_bottom - bbox_top
-
-    # Find nearest bucket by aspect ratio
-    bucket = assign_to_bucket(bbox_w, bbox_h, buckets)
-    if bucket is None:
-        logger.debug(
-            "auto_crop_image: bbox AR out of range for any bucket in %s, using center crop",
-            image_path.name,
-        )
+    # Step 1: Filter to in-bounds landmarks only (discard wild predictions)
+    in_bounds = [
+        lm for lm in landmarks
+        if 0.0 <= lm.x <= 1.0 and 0.0 <= lm.y <= 1.0
+    ]
+    if not in_bounds:
         return (*_center_crop(img_width, img_height, buckets), "center")
 
-    return (*_fit_crop_to_bucket(
-        bbox_left, bbox_top, bbox_w, bbox_h,
-        bucket, img_width, img_height,
-    ), "pose")
+    # Step 2: Subject bounding box from in-bounds landmarks
+    xs = [lm.x * img_width for lm in in_bounds]
+    ys = [lm.y * img_height for lm in in_bounds]
+    subj_left = int(min(xs))
+    subj_top = int(min(ys))
+    subj_right = int(max(xs))
+    subj_bottom = int(max(ys))
+    subj_w = subj_right - subj_left
+    subj_h = subj_bottom - subj_top
+
+    # Step 3: Add 25% padding around subject (generous but bounded)
+    pad_x = int(subj_w * 0.25)
+    pad_y = int(subj_h * 0.25)
+    padded_left = max(0, subj_left - pad_x)
+    padded_top = max(0, subj_top - pad_y)
+    padded_right = min(img_width, subj_right + pad_x)
+    padded_bottom = min(img_height, subj_bottom + pad_y)
+    padded_w = padded_right - padded_left
+    padded_h = padded_bottom - padded_top
+
+    # Step 4: Choose bucket by IMAGE AR (handles extreme ARs gracefully)
+    bucket = assign_to_bucket(img_width, img_height, buckets)
+    if bucket is None:
+        # Image has extreme AR (e.g., very tall phone screenshots).
+        # Pick the most portrait/landscape bucket instead.
+        image_ar = img_width / img_height
+        if image_ar < 1.0:
+            bucket = min(buckets, key=lambda b: b[0] / b[1])  # most portrait
+        else:
+            bucket = max(buckets, key=lambda b: b[0] / b[1])  # most landscape
+    bucket_ar = bucket[0] / bucket[1]
+
+    # Step 5: Expand padded subject bbox to fill bucket AR
+    if padded_w / max(padded_h, 1) >= bucket_ar:
+        crop_w = padded_w
+        crop_h = int(crop_w / bucket_ar)
+    else:
+        crop_h = padded_h
+        crop_w = int(crop_h * bucket_ar)
+
+    # Step 6: Enforce minimum size — at least 70% of image short edge.
+    # Prevents bad detections from producing absurdly small crops.
+    min_dim = int(min(img_width, img_height) * 0.70)
+    if crop_w < min_dim or crop_h < min_dim:
+        if bucket_ar >= 1.0:
+            crop_w = max(crop_w, min_dim)
+            crop_h = int(crop_w / bucket_ar)
+        else:
+            crop_h = max(crop_h, min_dim)
+            crop_w = int(crop_h * bucket_ar)
+
+    # Step 7: Clamp to image bounds (preserve AR)
+    if crop_w > img_width or crop_h > img_height:
+        if img_width / img_height >= bucket_ar:
+            crop_h = min(crop_h, img_height)
+            crop_w = int(crop_h * bucket_ar)
+        else:
+            crop_w = min(crop_w, img_width)
+            crop_h = int(crop_w / bucket_ar)
+    crop_w = min(crop_w, img_width)
+    crop_h = min(crop_h, img_height)
+
+    # Step 8: Center on subject bbox midpoint.
+    # The bbox center naturally sits at the body's vertical midpoint,
+    # which avoids wasting crop space on empty sky above the head
+    # (as face-centering would).
+    cx = (subj_left + subj_right) // 2
+    cy = (subj_top + subj_bottom) // 2
+
+    # Step 9: Position crop, clamped to image bounds
+    left = max(0, min(cx - crop_w // 2, img_width - crop_w))
+    top = max(0, min(cy - crop_h // 2, img_height - crop_h))
+
+    return left, top, crop_w, crop_h, "pose"
 
 
 def _center_crop(
@@ -274,11 +333,13 @@ def _fit_crop_to_bucket(
     bucket: tuple[int, int],
     img_w: int,
     img_h: int,
+    *,
+    focus_point: tuple[int, int] | None = None,
 ) -> tuple[int, int, int, int]:
     """Expand or contract a bbox to match the bucket aspect ratio.
 
-    Keeps the expansion centered on the original bbox center and clamps
-    to image bounds.
+    Keeps the expansion centered on the focus point (or bbox center) and
+    clamps to image bounds.
 
     Does NOT require mediapipe to be installed -- pure Python math.
 
@@ -290,6 +351,9 @@ def _fit_crop_to_bucket(
         bucket: Target (width, height) bucket tuple.
         img_w: Full image width for clamping.
         img_h: Full image height for clamping.
+        focus_point: Optional (x, y) center to prefer when positioning
+            the crop. When provided, the crop is centered on this point
+            instead of the bbox geometric center.
 
     Returns:
         (left, top, width, height) crop coordinates clamped to image bounds.
@@ -297,9 +361,12 @@ def _fit_crop_to_bucket(
     bucket_w, bucket_h = bucket
     bucket_ar = bucket_w / bucket_h
 
-    # Center of the original bbox
-    cx = bbox_left + bbox_w // 2
-    cy = bbox_top + bbox_h // 2
+    # Use focus_point as crop center when available, otherwise bbox center
+    if focus_point is not None:
+        cx, cy = focus_point
+    else:
+        cx = bbox_left + bbox_w // 2
+        cy = bbox_top + bbox_h // 2
 
     # Expand to match bucket AR while covering the bbox
     if bbox_w / max(bbox_h, 1) >= bucket_ar:
