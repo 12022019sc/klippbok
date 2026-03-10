@@ -11,6 +11,7 @@ import CaptionPage from './pages/CaptionPage'
 import VideoPage from './pages/VideoPage'
 import CleanupPage from './pages/CleanupPage'
 import CuratePage from './pages/CuratePage'
+import ExportPage from './pages/ExportPage'
 import TriagePage from './pages/TriagePage'
 import ProjectPickerPage from './pages/ProjectPickerPage'
 
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="/caption" element={<CaptionPage />} />
           <Route path="/video" element={<VideoPage />} />
           <Route path="/triage" element={<TriagePage />} />
+          <Route path="/export" element={<ExportPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>

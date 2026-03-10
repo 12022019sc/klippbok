@@ -46,6 +46,11 @@ export default function NavBar() {
           </NavLink>
         </li>
         <li>
+          <NavLink to="/export" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            Export
+          </NavLink>
+        </li>
+        <li>
           <NavLink to="/settings" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
             Settings
           </NavLink>
