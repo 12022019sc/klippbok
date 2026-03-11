@@ -145,14 +145,19 @@ class CLIPEmbedder:
 
         return embedding
 
-    def encode_images(self, image_paths: list[Path]) -> list[np.ndarray]:
-        """Compute CLIP embeddings for multiple images (batched).
+    def encode_images(
+        self,
+        image_paths: list[Path],
+        batch_size: int = 16,
+    ) -> list[np.ndarray]:
+        """Compute CLIP embeddings for multiple images in chunks.
 
-        More efficient than calling encode_image() in a loop because
-        images are processed in a single forward pass.
+        Processes images in batches to avoid OOM on large datasets.
+        Each batch loads images, runs inference, then frees memory.
 
         Args:
             image_paths: List of image file paths.
+            batch_size: Max images per GPU batch (default 16).
 
         Returns:
             List of normalized embedding arrays, same order as input.
@@ -162,26 +167,37 @@ class CLIPEmbedder:
         if not image_paths:
             return []
 
-        images = []
-        for path in image_paths:
-            img = Image.open(path).convert("RGB")
-            images.append(img)
+        all_embeddings: list[np.ndarray] = []
 
-        with torch.no_grad():
-            inputs = self._processor(images=images, return_tensors="pt")
-            pixel_values = inputs["pixel_values"].to(self.device)
-            features = self._get_image_features(pixel_values)
+        for batch_start in range(0, len(image_paths), batch_size):
+            batch_paths = image_paths[batch_start:batch_start + batch_size]
+            images = []
+            for path in batch_paths:
+                try:
+                    img = Image.open(path).convert("RGB")
+                    images.append(img)
+                except Exception:
+                    # Use a small placeholder so indices stay aligned
+                    images.append(Image.new("RGB", (224, 224)))
 
-        # features shape: (batch_size, 512)
-        embeddings = []
-        for i in range(len(image_paths)):
-            emb = features[i].cpu().numpy()
-            norm = np.linalg.norm(emb)
-            if norm > 0:
-                emb = emb / norm
-            embeddings.append(emb)
+            with torch.no_grad():
+                inputs = self._processor(images=images, return_tensors="pt")
+                pixel_values = inputs["pixel_values"].to(self.device)
+                features = self._get_image_features(pixel_values)
 
-        return embeddings
+            for i in range(len(batch_paths)):
+                emb = features[i].cpu().numpy()
+                norm = np.linalg.norm(emb)
+                if norm > 0:
+                    emb = emb / norm
+                all_embeddings.append(emb)
+
+            # Explicitly free GPU tensors between batches
+            del features, pixel_values, inputs, images
+            if self.device == "cuda":
+                torch.cuda.empty_cache()
+
+        return all_embeddings
 
     def encode_text(self, text: str) -> np.ndarray:
         """Compute a CLIP embedding for a text prompt.

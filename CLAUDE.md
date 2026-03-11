@@ -4,38 +4,9 @@
 
 ## Critical Rules
 
-### 0. NEVER Publish Sensitive Data
+Security rules (secrets, credentials, deploy gates) inherited from ~/.claude/CLAUDE.md.
 
-- NEVER commit passwords, API keys, tokens, or secrets to git/npm/docker
-- NEVER commit `.env` files — ALWAYS verify `.env` is in `.gitignore`
-- Before ANY commit: verify no secrets are included
-- NEVER output secrets in suggestions, logs, or responses
-
-### 5. NEVER Hardcode Credentials
-
-- ALWAYS use environment variables for secrets
-- NEVER put API keys, passwords, or tokens directly in code
-- NEVER hardcode connection strings — use DATABASE_URL from .env
-
-### 6. ALWAYS Ask Before Deploying
-
-- NEVER auto-deploy, even if the fix seems simple
-- NEVER assume approval — wait for explicit "yes, deploy"
-- ALWAYS ask before deploying to production
-
-### 7. Quality Gates (soft warnings, not blockers)
-
-- Source files > 500 lines should be reviewed for splitting opportunities
-- Functions > 50 lines should be reviewed for extraction opportunities
-- Test files are exempt from line limits
-- All tests must pass before committing
-
-### 8. Parallelize Independent Awaits
-
-- When multiple `await` calls are independent, ALWAYS use `Promise.all` (or `asyncio.gather` in Python)
-- NEVER await independent operations sequentially
-
-### 9. Git Workflow — NEVER Work Directly on Main
+### Git Workflow — NEVER Work Directly on Main
 
 **Branch BEFORE editing any files:**
 
@@ -70,21 +41,26 @@ Before jumping to conclusions:
 ## Project Structure
 
 ```
-project/
-├── CLAUDE.md              # You are here
-├── CLAUDE.local.md        # Personal overrides (gitignored)
-├── .claude/
-│   ├── commands/          # Slash commands
-│   ├── hooks/             # Enforcement scripts
-│   ├── skills/            # Triggered expertise
-│   └── agents/            # Custom subagents
-├── project-docs/
-│   ├── ARCHITECTURE.md    # System overview & data flow
-│   ├── INFRASTRUCTURE.md  # Deployment & environment details
-│   └── DECISIONS.md       # Why we chose X over Y
-├── src/                   # Application source
-├── tests/                 # Test files
-└── scripts/               # Dev/build scripts
+klippbok-main/
+├── klippbok/              # Python package
+│   ├── api/               # FastAPI server + routers
+│   │   ├── routers/       # API endpoints (images, video, captions, crop, triage, etc.)
+│   │   └── static/        # Built frontend served here
+│   ├── caption/           # AI captioning (Gemini, OpenAI, Replicate, LM Studio)
+│   ├── config/            # YAML schema, defaults, config loading
+│   ├── dataset/           # Discovery, validation, bucketing, manifest
+│   ├── image/             # Autocrop, dedup, quality scoring, bucketing, probe
+│   ├── services/          # Business logic layer (caption, crop, face, upscale, video, etc.)
+│   ├── triage/            # Embedding-based scene triage and filtering
+│   └── video/             # Probing, splitting, frame extraction, scene detection
+├── frontend/              # React 19 + TypeScript + Vite + Zustand
+│   └── src/
+│       ├── components/    # Caption, Crop, Gallery, Video, Layout, Lightbox
+│       ├── pages/         # Gallery, Video, Caption, Crop, Triage, Import, Settings, etc.
+│       └── stores/        # Zustand state management
+├── tests/                 # pytest test suite
+├── project-docs/          # ARCHITECTURE.md, DECISIONS.md, INFRASTRUCTURE.md
+└── .planning/             # GSD planning artifacts (roadmap, phases, state)
 ```
 
 ---
@@ -137,27 +113,3 @@ WRONG:   /api/users
 ```
 
 Every API endpoint MUST use `/api/v1/` prefix. No exceptions.
-
----
-
-## Naming — NEVER Rename Mid-Project
-
-Renaming packages, modules, or key variables mid-project causes cascading failures. If you must rename:
-
-1. Create a checklist of ALL files and references first
-2. Use IDE semantic rename (not search-and-replace)
-3. Full project search for old name after renaming
-
----
-
-## Plan Mode — Plan First, Code Second
-
-For any non-trivial task, start in plan mode. Use plan mode for: new features, refactors, architectural changes, multi-file edits.
-
----
-
-## Workflow Preferences
-
-- Quality over speed — if unsure, ask before executing
-- Plan first, code second — use plan mode for non-trivial tasks
-- One task, one chat — `/clear` between unrelated tasks

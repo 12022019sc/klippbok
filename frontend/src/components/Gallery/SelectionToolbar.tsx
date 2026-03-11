@@ -14,6 +14,7 @@ export default function SelectionToolbar({ items }: SelectionToolbarProps) {
   const selectAll = useAppStore((s) => s.selectAll)
   const deselectAll = useAppStore((s) => s.deselectAll)
   const selectByFilter = useAppStore((s) => s.selectByFilter)
+  const setCurationSelectedIds = useAppStore((s) => s.setCurationSelectedIds)
 
   function handleSelectAll() {
     selectAll(items.map((item) => item.id))
@@ -27,6 +28,14 @@ export default function SelectionToolbar({ items }: SelectionToolbarProps) {
     selectByFilter(items.filter((item) => !item.is_near_duplicate).map((item) => item.id))
   }
 
+  function handleSelectBlurry() {
+    selectByFilter(
+      items
+        .filter((item) => !item.quality_pass && item.media_type !== 'video')
+        .map((item) => item.id),
+    )
+  }
+
   function handleUpscale() {
     navigate('/process')
   }
@@ -36,6 +45,7 @@ export default function SelectionToolbar({ items }: SelectionToolbarProps) {
   }
 
   function handleCurate() {
+    setCurationSelectedIds(Array.from(selectedImageIds))
     navigate('/curate')
   }
 
@@ -84,6 +94,9 @@ export default function SelectionToolbar({ items }: SelectionToolbarProps) {
               </button>
               <button className="selection-filter-btn" onClick={handleSelectNonDuplicates}>
                 Select Non-Duplicates
+              </button>
+              <button className="selection-filter-btn" onClick={handleSelectBlurry}>
+                Select Blurry
               </button>
             </div>
 

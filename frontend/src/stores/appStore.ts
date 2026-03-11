@@ -69,6 +69,10 @@ interface AppState {
   toggleCurationPin: (id: string) => void
   toggleCurationExclude: (id: string) => void
   clearCuration: () => void
+
+  // --- curation selection (IDs from gallery selection toolbar) ---
+  curationSelectedIds: string[] | null
+  setCurationSelectedIds: (ids: string[] | null) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -204,4 +208,25 @@ export const useAppStore = create<AppState>((set) => ({
       curationPinnedIds: new Set<string>(),
       curationExcludedIds: new Set<string>(),
     }),
+
+  // --- curation selection (from gallery toolbar) ---
+  // Persisted to sessionStorage so it survives page refresh / NavBar navigation
+  curationSelectedIds: (() => {
+    try {
+      const stored = sessionStorage.getItem('curationSelectedIds')
+      return stored ? JSON.parse(stored) as string[] : null
+    } catch {
+      return null
+    }
+  })(),
+  setCurationSelectedIds: (ids) => {
+    try {
+      if (ids && ids.length > 0) {
+        sessionStorage.setItem('curationSelectedIds', JSON.stringify(ids))
+      } else {
+        sessionStorage.removeItem('curationSelectedIds')
+      }
+    } catch { /* sessionStorage unavailable */ }
+    set({ curationSelectedIds: ids })
+  },
 }))

@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 
@@ -57,6 +58,12 @@ def main(argv: list[str] | None = None) -> None:
     import uvicorn
 
     from klippbok.api.app import create_app
+
+    # Configure logging so all klippbok loggers emit to console
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(levelname)s:%(name)s: %(message)s",
+    )
 
     parser = build_parser()
     args = parser.parse_args(argv)

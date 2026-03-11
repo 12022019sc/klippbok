@@ -3,6 +3,7 @@
 Endpoints:
     POST /import/           -- Start a batch import, returns operation_id.
     GET  /import/{op_id}/events -- Stream SSE progress events for an import.
+    POST /import/prune      -- Remove manifest entries for deleted files.
 
 Named SSE event types:
     "progress"     -- In-progress update (status="running")
@@ -83,12 +84,28 @@ async def _run_import(
         ))
 
         # Step 2: Run the full batch import in a thread (synchronous, CPU-bound)
-        report = await asyncio.get_event_loop().run_in_executor(
+        loop = asyncio.get_event_loop()
+
+        def _import_progress(current: int, total_files: int) -> None:
+            """Thread-safe bridge: push per-file progress onto the async queue."""
+            loop.call_soon_threadsafe(
+                queue.put_nowait,
+                ImportProgress(
+                    operation_id=op_id,
+                    current=current,
+                    total=total_files,
+                    message=f"Processing file {current}/{total_files}...",
+                    status="running",
+                ),
+            )
+
+        report = await loop.run_in_executor(
             None,
             lambda: batch_import_images(
                 directory=import_dir,
                 project_dir=project_dir,
                 recursive=request.recursive,
+                progress_callback=_import_progress,
             ),
         )
 
@@ -212,3 +229,27 @@ async def import_events(op_id: str) -> EventSourceResponse:
                 logger.debug("Cancelled import task for operation %s", op_id)
 
     return EventSourceResponse(event_generator())
+
+
+@router.post("/prune")
+async def prune_manifest(request: Request) -> dict:
+    """Remove manifest entries for files that no longer exist on disk.
+
+    This is called automatically at the start of every import, but can
+    also be triggered manually to clean up after external file deletions.
+
+    Returns:
+        {"pruned": int, "remaining": int}.
+    """
+    project_dir: Path | None = request.app.state.project_dir
+    if project_dir is None:
+        raise HTTPException(status_code=409, detail="No project directory selected")
+
+    from klippbok.services.project_service import load_manifest, prune_dead_entries
+
+    pruned = prune_dead_entries(project_dir)
+
+    manifest = load_manifest(project_dir)
+    remaining = len(manifest.get("images", [])) if manifest else 0
+
+    return {"pruned": pruned, "remaining": remaining}

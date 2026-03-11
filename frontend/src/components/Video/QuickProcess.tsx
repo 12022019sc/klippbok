@@ -24,6 +24,7 @@ export default function QuickProcess({ queuedPaths }: QuickProcessProps) {
   const [operationId, setOperationId] = useState<string | null>(null)
   const [isStarting, setIsStarting] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [restoredFromRefs, setRestoredFromRefs] = useState(false)
 
   // Settings (collapsed by default)
   const [showSettings, setShowSettings] = useState(false)
@@ -51,6 +52,28 @@ export default function QuickProcess({ queuedPaths }: QuickProcessProps) {
       setViewState('setup')
     }
   }, [processState.error])
+
+  // On mount, check for existing refs from a previous processing run
+  useEffect(() => {
+    if (queuedPaths && queuedPaths.length > 0) return // Skip if specific videos are queued
+    if (operationId) return // Skip if already processing
+
+    fetch('/api/v1/video/refs')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { frames: Array<{ video_path: string; frame_path: string; candidates?: Array<{ path: string; score: number; rank: number }> }>; has_refs: boolean } | null) => {
+        if (data?.has_refs && data.frames.length > 0) {
+          setRestoredRefs(data.frames)
+          setRestoredFromRefs(true)
+          setViewState('review')
+        }
+      })
+      .catch(() => {
+        // No refs found, stay in setup
+      })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Local state for refs restored from disk (not from processState)
+  const [restoredRefs, setRestoredRefs] = useState<Array<{ video_path: string; frame_path: string; candidates?: Array<{ path: string; score: number; rank: number }> }>>([])
 
   async function handleStart() {
     setIsStarting(true)
@@ -260,16 +283,24 @@ export default function QuickProcess({ queuedPaths }: QuickProcessProps) {
   }
 
   // ---- REVIEW STATE ----
+  const reviewFrames = restoredFromRefs ? restoredRefs : processState.extractedFrames
+  const reviewVideoPaths = restoredFromRefs ? [] : processState.processedVideoPaths
+
   return (
     <div className="quick-process">
       <h3 style={{ color: '#f9fafb', margin: '0 0 0.75rem' }}>Review Extracted Frames</h3>
+      {restoredFromRefs && (
+        <p style={{ color: '#f59e0b', fontSize: '0.85rem', margin: '0 0 0.5rem' }}>
+          Restored from previous run
+        </p>
+      )}
       <p className="page-subtitle">
-        {processState.extractedFrames.length} frames extracted from {processState.processedVideoPaths.length} video{processState.processedVideoPaths.length !== 1 ? 's' : ''}
+        {reviewFrames.length} frames{!restoredFromRefs ? ` extracted from ${reviewVideoPaths.length} video${reviewVideoPaths.length !== 1 ? 's' : ''}` : ' available for review'}
       </p>
       {confirming && <p style={{ color: '#9ca3af' }}>Importing frames...</p>}
       <FrameReviewGrid
-        frames={processState.extractedFrames}
-        skippedVideos={processState.skippedVideos}
+        frames={reviewFrames}
+        skippedVideos={restoredFromRefs ? [] : processState.skippedVideos}
         onConfirm={(selected) => void handleConfirm(selected)}
         onDiscard={(paths, removeVids) => void handleDiscard(paths, removeVids)}
       />

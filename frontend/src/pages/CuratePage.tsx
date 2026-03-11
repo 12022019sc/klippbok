@@ -63,6 +63,12 @@ export default function CuratePage() {
 
   async function handleStart(config: CurationConfigType) {
     try {
+      console.log('[CuratePage] Starting curation with config:', {
+        ...config,
+        selected_ids: (config as Record<string, unknown>).selected_ids
+          ? `${((config as Record<string, unknown>).selected_ids as string[]).length} IDs`
+          : 'None (all images)',
+      })
       const res = await fetch('/api/v1/curation/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

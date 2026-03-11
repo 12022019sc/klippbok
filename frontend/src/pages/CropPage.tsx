@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
@@ -43,8 +43,30 @@ export default function CropPage() {
   const setCropState = useAppStore((s) => s.setCropState)
   const removeCropState = useAppStore((s) => s.removeCropState)
 
-  // Local page state
+  // Local page state — default bucket from active profile (fetched on mount)
   const [bucketSize, setBucketSize] = useState<BucketSize>(1024)
+  const didFetchProfile = useRef(false)
+
+  // Fetch active profile and set bucket size accordingly
+  useEffect(() => {
+    if (didFetchProfile.current) return
+    didFetchProfile.current = true
+
+    Promise.all([
+      fetch('/api/v1/settings/').then((r) => (r.ok ? r.json() : null)),
+      fetch('/api/v1/settings/profiles').then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([settings, profiles]: [{ active_profile?: string } | null, { name: string; base_resolution: number }[] | null]) => {
+        if (!settings?.active_profile || !profiles) return
+        const profile = profiles.find((p) => p.name === settings.active_profile)
+        if (!profile) return
+        // Map base_resolution to nearest valid BucketSize
+        const res = profile.base_resolution
+        const mapped: BucketSize = res <= 512 ? 512 : res <= 768 ? 768 : 1024
+        setBucketSize(mapped)
+      })
+      .catch(() => {})
+  }, [])
   const [allowNonSquare, setAllowNonSquare] = useState<boolean>(true)
   const [isCtrlHeld, setIsCtrlHeld] = useState<boolean>(false)
   const [isAutoCropping, setIsAutoCropping] = useState<boolean>(false)

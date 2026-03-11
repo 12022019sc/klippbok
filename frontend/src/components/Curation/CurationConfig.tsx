@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { CurationConfig as CurationConfigType, CurationMode } from '../../types/curation'
 import { MODEL_TARGET_DEFAULTS } from '../../types/curation'
+import { useAppStore } from '../../stores/appStore'
 
 interface CurationConfigProps {
-  onStart: (config: CurationConfigType) => void
+  onStart: (config: CurationConfigType & { selected_ids?: string[] }) => void
 }
 
 const MODEL_PROFILES: { value: string; label: string; hint: string }[] = [
@@ -15,9 +16,28 @@ const MODEL_PROFILES: { value: string; label: string; hint: string }[] = [
 ]
 
 export default function CurationConfig({ onStart }: CurationConfigProps) {
+  const curationSelectedIds = useAppStore((s) => s.curationSelectedIds)
   const [mode, setMode] = useState<CurationMode>('character')
-  const [modelProfile, setModelProfile] = useState('sdxl')
-  const [targetCount, setTargetCount] = useState(MODEL_TARGET_DEFAULTS['sdxl'])
+  const [modelProfile, setModelProfile] = useState('sd15')
+  const [targetCount, setTargetCount] = useState(MODEL_TARGET_DEFAULTS['sd15'])
+  const didFetchProfile = useRef(false)
+
+  // On mount, fetch active profile from settings and use it if valid
+  useEffect(() => {
+    if (didFetchProfile.current) return
+    didFetchProfile.current = true
+
+    fetch('/api/v1/settings/')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { active_profile?: string } | null) => {
+        if (!data?.active_profile) return
+        const valid = MODEL_PROFILES.some((p) => p.value === data.active_profile)
+        if (valid) {
+          handleProfileChange(data.active_profile!)
+        }
+      })
+      .catch(() => {})
+  }, [])
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [qualityFloor, setQualityFloor] = useState(30)
   const [faceConfidence, setFaceConfidence] = useState(0.5)
@@ -35,7 +55,7 @@ export default function CurationConfig({ onStart }: CurationConfigProps) {
   }
 
   function handleStart() {
-    onStart({
+    const config: CurationConfigType & { selected_ids?: string[] } = {
       mode,
       target_count: targetCount,
       quality_floor_pct: qualityFloor / 100,  // Convert percentage to 0.0-1.0
@@ -44,7 +64,11 @@ export default function CurationConfig({ onStart }: CurationConfigProps) {
       identity_threshold: identityThreshold,
       reference_image_id: null,
       model_profile: modelProfile,
-    })
+    }
+    if (curationSelectedIds && curationSelectedIds.length > 0) {
+      config.selected_ids = curationSelectedIds
+    }
+    onStart(config)
   }
 
   return (
@@ -187,6 +211,17 @@ export default function CurationConfig({ onStart }: CurationConfigProps) {
               style={{ width: '100px' }}
             />
           </div>
+        </div>
+      )}
+
+      {/* Selection Indicator */}
+      {curationSelectedIds && curationSelectedIds.length > 0 ? (
+        <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#1e3a5f', borderRadius: '0.375rem', fontSize: '0.85rem', color: '#93c5fd' }}>
+          Curating {curationSelectedIds.length} selected images
+        </div>
+      ) : (
+        <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#1f2937', borderRadius: '0.375rem', fontSize: '0.85rem', color: '#9ca3af' }}>
+          Curating all images in project
         </div>
       )}
 

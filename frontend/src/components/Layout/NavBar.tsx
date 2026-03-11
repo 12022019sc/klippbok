@@ -16,13 +16,13 @@ export default function NavBar() {
           </NavLink>
         </li>
         <li>
-          <NavLink to="/video" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
-            Video
+          <NavLink to="/cleanup" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            Cleanup
           </NavLink>
         </li>
         <li>
-          <NavLink to="/cleanup" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
-            Cleanup
+          <NavLink to="/video" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            Video
           </NavLink>
         </li>
         <li>

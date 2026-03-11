@@ -13,8 +13,11 @@ validation results.
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from klippbok.dataset.models import SamplePair
 from klippbok.video.models import Severity
@@ -196,6 +199,62 @@ def remove_image_entries(project_dir: Path, paths_to_remove: set[str]) -> int:
         )
 
     return removed_count
+
+
+def prune_dead_entries(project_dir: Path) -> int:
+    """Remove manifest image entries whose files no longer exist on disk.
+
+    Unlike :func:`remove_image_entries`, this does NOT add pruned paths to
+    ``excluded_paths`` — the files were deleted externally, not explicitly
+    excluded by the user.  If the file reappears later, a future import
+    will pick it up.
+
+    Also prunes ``excluded_paths`` entries for files that no longer exist,
+    since there is no point blocking re-import of a deleted file.
+
+    Args:
+        project_dir: Root of the project directory.
+
+    Returns:
+        Number of image entries removed.
+    """
+    existing = load_manifest(project_dir)
+    if not existing or "images" not in existing:
+        return 0
+
+    old_images: list[dict] = existing["images"]
+    alive: list[dict] = []
+    for entry in old_images:
+        path_str = entry.get("path", "")
+        if path_str and (project_dir / path_str).exists():
+            alive.append(entry)
+
+    pruned = len(old_images) - len(alive)
+
+    if pruned == 0:
+        return 0
+
+    existing["images"] = alive
+    existing["updated"] = datetime.now(timezone.utc).isoformat()
+
+    # Also prune excluded_paths for files that no longer exist
+    if "excluded_paths" in existing:
+        existing["excluded_paths"] = [
+            p for p in existing["excluded_paths"]
+            if (project_dir / p).exists()
+        ]
+
+    manifest_path = project_dir / MANIFEST_DIR / MANIFEST_FILE
+    manifest_path.write_text(
+        json.dumps(existing, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    logger.info(
+        "Pruned %d dead entries from manifest (%d remaining)",
+        pruned, len(alive),
+    )
+    return pruned
 
 
 def sample_to_manifest_entry(

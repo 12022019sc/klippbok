@@ -87,13 +87,13 @@
 
 ### Export
 
-- [ ] **EXPT-01**: Export dataset as kohya/sd-scripts folder structure (repeats_trigger class/ format)
-- [ ] **EXPT-02**: Export dataset as ai-toolkit format (YAML config + flat image directory)
-- [ ] **EXPT-03**: Export dataset as OneTrainer format (JSON config + image directory)
-- [ ] **EXPT-04**: Export dataset as SimpleTuner format (multidatabackend.json + image directory)
-- [ ] **EXPT-05**: Each export includes correctly paired image + .txt caption files
-- [ ] **EXPT-06**: Exported images are resized/cropped to target bucket dimensions
-- [ ] **EXPT-07**: Export generates trainer-specific config files (TOML for kohya, YAML for ai-toolkit, JSON for OneTrainer)
+- [x] **EXPT-01**: Export dataset as kohya/sd-scripts folder structure (repeats_trigger class/ format)
+- [x] **EXPT-02**: Export dataset as ai-toolkit format (YAML config + flat image directory)
+- [x] **EXPT-03**: Export dataset as OneTrainer format (JSON config + image directory)
+- [x] **EXPT-04**: Export dataset as SimpleTuner format (multidatabackend.json + image directory)
+- [x] **EXPT-05**: Each export includes correctly paired image + .txt caption files
+- [x] **EXPT-06**: Exported images are resized/cropped to target bucket dimensions
+- [x] **EXPT-07**: Export generates trainer-specific config files (TOML for kohya, YAML for ai-toolkit, JSON for OneTrainer)
 
 ### Architecture
 
@@ -203,13 +203,13 @@
 | CUR-12 | Phase 7.3 | Complete |
 | CUR-13 | Phase 7.3 | Complete |
 | CUR-14 | Phase 7.3 | Complete |
-| EXPT-01 | Phase 8 | Pending |
-| EXPT-02 | Phase 8 | Pending |
-| EXPT-03 | Phase 8 | Pending |
-| EXPT-04 | Phase 8 | Pending |
-| EXPT-05 | Phase 8 | Pending |
-| EXPT-06 | Phase 8 | Pending |
-| EXPT-07 | Phase 8 | Pending |
+| EXPT-01 | Phase 8 | Complete |
+| EXPT-02 | Phase 8 | Complete |
+| EXPT-03 | Phase 8 | Complete |
+| EXPT-04 | Phase 8 | Complete |
+| EXPT-05 | Phase 8 | Complete |
+| EXPT-06 | Phase 8 | Complete |
+| EXPT-07 | Phase 8 | Complete |
 | ARCH-01 | Phase 1 | Complete |
 | ARCH-02 | Phase 1 | Complete |
 | ARCH-03 | Phase 1 | Complete |
