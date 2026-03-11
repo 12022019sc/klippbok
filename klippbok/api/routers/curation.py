@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import json as _json
 import logging
+import threading as _threading
 import uuid
 from pathlib import Path
 
@@ -47,6 +48,7 @@ router = APIRouter(prefix="/curation", tags=["curation"])
 _curation_tasks: dict[str, asyncio.Task] = {}
 _curation_queues: dict[str, asyncio.Queue] = {}
 _curation_results: dict[str, dict] = {}  # op_id -> result dict
+_cancel_events: dict[str, _threading.Event] = {}  # op_id -> cancel signal
 
 
 # ---------------------------------------------------------------------------
@@ -64,6 +66,7 @@ class CurationStartRequest(BaseModel):
     quality_floor_pct: float = Field(default=0.3, ge=0.0, le=1.0, description="Bottom percentile to discard")
     reference_image_id: str | None = Field(default=None, description="Image ID for reference face")
     model_profile: str | None = Field(default=None, description="Model profile: sd15, sdxl, flux, pony, custom")
+    selected_ids: list[str] | None = Field(default=None, description="Image IDs to curate (None = all images)")
 
 
 class RediversifyRequest(BaseModel):
@@ -79,11 +82,29 @@ class RediversifyRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _resolve_image_paths(project_dir: Path) -> list[Path]:
-    """Resolve all image paths from the project manifest.
+def _image_id_from_relpath(relative_path: str) -> str:
+    """Compute image ID: SHA256[:16] of manifest relative path string.
+
+    Must match the gallery convention in images.py — hash the raw relative
+    path string from the manifest, NOT a resolved/canonicalized path.
+
+    Args:
+        relative_path: Path string exactly as stored in manifest.json.
+
+    Returns:
+        16-character hex string.
+    """
+    from klippbok.utils.paths import image_id
+
+    return image_id(relative_path)
+
+
+def _resolve_image_paths(project_dir: Path, selected_ids: list[str] | None = None) -> list[Path]:
+    """Resolve image paths from the project manifest, optionally filtered by IDs.
 
     Args:
         project_dir: Project root directory.
+        selected_ids: If provided, only include images whose ID matches.
 
     Returns:
         List of resolved Path objects for images that exist on disk.
@@ -95,12 +116,50 @@ def _resolve_image_paths(project_dir: Path) -> list[Path]:
     manifest = _json.loads(manifest_path.read_text(encoding="utf-8"))
     images = manifest.get("images", [])
 
-    paths = []
+    filter_set = set(selected_ids) if selected_ids else None
+
+    logger.info(
+        "Resolving image paths: %d manifest entries, filter_set=%s",
+        len(images),
+        f"{len(filter_set)} IDs" if filter_set else "None (all images)",
+    )
+
+    paths: list[Path] = []
+    seen_paths: set[str] = set()  # deduplicate manifest entries
+    matched_count = 0
+
     for entry in images:
         path_str = entry.get("path", "")
+        if path_str in seen_paths:
+            continue
+        seen_paths.add(path_str)
+
         full_path = project_dir / path_str
         if full_path.exists():
+            if filter_set is not None:
+                img_id = _image_id_from_relpath(path_str)
+                if img_id not in filter_set:
+                    continue
+                matched_count += 1
             paths.append(full_path)
+
+    if filter_set is not None:
+        logger.info(
+            "Filter result: %d/%d IDs matched, %d unique paths (manifest had %d entries, %d unique)",
+            matched_count, len(filter_set), len(paths), len(images), len(seen_paths),
+        )
+        if matched_count == 0 and len(filter_set) > 0:
+            sample_filter = list(filter_set)[:3]
+            sample_manifest = [_image_id_from_relpath(e.get("path", "")) for e in images[:3]]
+            logger.warning(
+                "ID mismatch! Sample filter IDs: %s, sample manifest IDs: %s",
+                sample_filter, sample_manifest,
+            )
+    else:
+        logger.info(
+            "No filter applied: %d unique paths (manifest had %d entries, %d unique)",
+            len(paths), len(images), len(seen_paths),
+        )
 
     return paths
 
@@ -114,6 +173,7 @@ async def _run_curation_bg(
     op_id: str,
     project_dir: Path,
     config: CurationConfig,
+    selected_ids: list[str] | None = None,
 ) -> None:
     """Background coroutine that runs the curation pipeline.
 
@@ -122,12 +182,13 @@ async def _run_curation_bg(
     """
     loop = asyncio.get_running_loop()
     queue = _curation_queues[op_id]
+    cancel_event = _cancel_events.get(op_id)
 
     try:
-        # Resolve image paths
+        # Resolve image paths (filtered by selected_ids if provided)
         image_paths = await loop.run_in_executor(
             None,
-            lambda: _resolve_image_paths(project_dir),
+            lambda: _resolve_image_paths(project_dir, selected_ids),
         )
 
         if not image_paths:
@@ -154,6 +215,9 @@ async def _run_curation_bg(
         })
 
         def progress_callback(stage: str, current: int, total: int) -> None:
+            # Check cancellation on every progress tick (runs in worker thread)
+            if cancel_event and cancel_event.is_set():
+                raise InterruptedError("Curation cancelled by user")
             loop.call_soon_threadsafe(
                 queue.put_nowait,
                 {
@@ -188,6 +252,16 @@ async def _run_curation_bg(
             },
         })
 
+    except InterruptedError:
+        logger.info("Curation operation %s cancelled by user", op_id)
+        await queue.put({
+            "event": "curation_error",
+            "data": {
+                "operation_id": op_id,
+                "message": "Curation cancelled",
+            },
+        })
+
     except Exception as exc:
         logger.error("Curation operation %s failed: %s", op_id, exc)
         await queue.put({
@@ -199,6 +273,7 @@ async def _run_curation_bg(
         })
 
     finally:
+        _cancel_events.pop(op_id, None)
         await queue.put(None)
 
 
@@ -262,6 +337,12 @@ async def start_curation(body: CurationStartRequest, request: Request) -> dict:
     if project_dir is None:
         raise HTTPException(status_code=409, detail="No project directory selected")
 
+    logger.info(
+        "Curation start request: mode=%s, selected_ids=%s",
+        body.mode,
+        f"{len(body.selected_ids)} IDs" if body.selected_ids else "None (all images)",
+    )
+
     # Build CurationConfig
     from klippbok.curation.presets import get_target_count_default
 
@@ -277,9 +358,10 @@ async def start_curation(body: CurationStartRequest, request: Request) -> dict:
     op_id = str(uuid.uuid4())
     queue: asyncio.Queue = asyncio.Queue()
     _curation_queues[op_id] = queue
+    _cancel_events[op_id] = _threading.Event()
 
     task = asyncio.create_task(
-        _run_curation_bg(op_id, project_dir, config),
+        _run_curation_bg(op_id, project_dir, config, selected_ids=body.selected_ids),
         name=f"curation-{op_id}",
     )
     _curation_tasks[op_id] = task
@@ -325,6 +407,11 @@ async def cancel_curation(op_id: str) -> dict:
     """
     task = _curation_tasks.pop(op_id, None)
     _curation_queues.pop(op_id, None)
+
+    # Signal the worker thread to stop via cancel event
+    cancel_event = _cancel_events.pop(op_id, None)
+    if cancel_event is not None:
+        cancel_event.set()
 
     if task is None:
         raise HTTPException(status_code=404, detail=f"Curation operation {op_id} not found")

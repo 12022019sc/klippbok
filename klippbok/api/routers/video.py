@@ -1075,6 +1075,61 @@ async def discard_process(body: ProcessDiscardRequest, request: Request) -> dict
     return {"deleted": deleted, "videos_removed": videos_removed}
 
 
+@router.get("/refs")
+async def list_refs(request: Request) -> dict:
+    """List existing refs/ frames and their candidate directories.
+
+    Returns structured data matching ExtractedFrame shape so the frontend
+    can restore the review UI after navigating away and back.
+
+    Returns:
+        {"frames": [...], "has_refs": bool}
+    """
+    project_dir: Path | None = request.app.state.project_dir
+    if project_dir is None:
+        raise HTTPException(status_code=409, detail="No project directory selected")
+
+    refs_dir = project_dir / "refs"
+    if not refs_dir.exists():
+        return {"frames": [], "has_refs": False}
+
+    frames: list[dict] = []
+    for f in sorted(refs_dir.iterdir()):
+        if not f.is_file() or f.name.startswith("."):
+            continue
+        if f.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"}:
+            continue
+
+        stem = f.stem
+        frame_rel = f"refs/{f.name}"
+
+        # Check for candidates directory
+        cand_dir = refs_dir / f"{stem}_candidates"
+        candidates: list[dict] | None = None
+        if cand_dir.exists() and cand_dir.is_dir():
+            candidates = []
+            for cand_file in sorted(cand_dir.glob("rank_*.png")):
+                rel = f"refs/{stem}_candidates/{cand_file.name}"
+                parts = cand_file.stem.split("_")
+                rank = int(parts[1]) if len(parts) >= 2 else 0
+                score = float(parts[3]) if len(parts) >= 4 else 0.0
+                candidates.append({
+                    "path": rel,
+                    "score": score,
+                    "rank": rank,
+                })
+
+        entry: dict = {
+            "video_path": "",  # Unknown — refs persist after processing
+            "frame_path": frame_rel,
+        }
+        if candidates:
+            entry["candidates"] = candidates
+        frames.append(entry)
+
+    return {"frames": frames, "has_refs": len(frames) > 0}
+
+
 @router.get("/process/results/{op_id}")
 async def get_process_results(op_id: str) -> dict:
     """Retrieve stored extraction results for a completed process operation."""
@@ -1098,7 +1153,18 @@ async def serve_process_frame(path: str, request: Request) -> FileResponse:
     if not abs_path.exists() or not abs_path.is_file():
         raise HTTPException(status_code=404, detail=f"Frame not found: {path}")
 
-    return FileResponse(str(abs_path), media_type="image/png")
+    # Generate ETag from path + mtime to bust browser cache across video runs
+    stat = abs_path.stat()
+    etag = hashlib.md5(f"{path}:{stat.st_mtime_ns}".encode()).hexdigest()
+
+    return FileResponse(
+        str(abs_path),
+        media_type="image/png",
+        headers={
+            "Cache-Control": "no-cache, must-revalidate",
+            "ETag": f'"{etag}"',
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1107,7 +1173,8 @@ async def serve_process_frame(path: str, request: Request) -> FileResponse:
 
 def _clip_id_from_relative(relative_path: str) -> str:
     """Generate clip ID from relative path: SHA256[:16] of relative path string."""
-    return hashlib.sha256(relative_path.encode()).hexdigest()[:16]
+    from klippbok.utils.paths import image_id
+    return image_id(relative_path)
 
 
 # Module-level cache: clip_id -> absolute Path, populated by list_clips/scan

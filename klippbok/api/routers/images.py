@@ -7,7 +7,6 @@ Endpoints:
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from pathlib import Path
 
@@ -15,6 +14,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
 
 from klippbok.api.models import GalleryResponse, ImageStatusResponse
+from klippbok.utils.paths import image_id as _image_id, to_manifest_path
 
 logger = logging.getLogger(__name__)
 
@@ -76,18 +76,6 @@ def serve_file(path: str, request: Request) -> FileResponse:
     suffix = file_path.suffix.lower()
     media_type = MEDIA_TYPES.get(suffix, "application/octet-stream")
     return FileResponse(file_path, media_type=media_type)
-
-
-def _image_id(relative_path: str) -> str:
-    """Compute the image ID from its relative path.
-
-    Args:
-        relative_path: Path relative to project root.
-
-    Returns:
-        SHA256 hex digest of the path, truncated to 16 characters.
-    """
-    return hashlib.sha256(relative_path.encode()).hexdigest()[:16]
 
 
 def _entry_to_response(
@@ -235,18 +223,11 @@ def _build_triage_lookup(project_dir: Path) -> dict[str, dict]:
         return {}
 
     lookup: dict[str, dict] = {}
-    project_str = str(project_dir.resolve())
 
     for result in data.get("results", []):
         item_path = result.get("item_path", "")
-        # Normalize: strip project_dir prefix to get relative path
-        resolved = str(Path(item_path).resolve())
-        if resolved.startswith(project_str):
-            rel = resolved[len(project_str):].lstrip("/\\")
-            # Normalize separators to forward slashes (matches manifest)
-            rel = rel.replace("\\", "/")
-        else:
-            rel = item_path
+        # Normalize to manifest-format relative path (forward slashes)
+        rel = to_manifest_path(Path(item_path), project_dir)
 
         lookup[rel] = {
             "classification": result.get("classification"),

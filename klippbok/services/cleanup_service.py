@@ -21,7 +21,6 @@ Exports: classify_item, classify_items, classify_item_by_reference,
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import shutil
@@ -32,6 +31,8 @@ from typing import Any, Callable, Literal
 import cv2
 import numpy as np
 from pydantic import BaseModel
+
+from klippbok.utils.paths import image_id, to_manifest_path
 
 logger = logging.getLogger(__name__)
 
@@ -226,12 +227,11 @@ def classify_item(
     confidence = compute_confidence(clip_score, has_face, clip_threshold)
     label = _classify_label(confidence)
 
-    # Compute item ID from relative path (matches images router convention)
+    # Compute item ID from manifest-format relative path
     if project_dir is not None:
-        relative_path = str(image_path.relative_to(project_dir))
+        item_id = image_id(to_manifest_path(image_path, project_dir))
     else:
-        relative_path = str(image_path)
-    item_id = hashlib.sha256(relative_path.encode()).hexdigest()[:16]
+        item_id = image_id(str(image_path).replace("\\", "/"))
 
     return CleanupClassification(
         item_path=str(image_path),
@@ -302,10 +302,9 @@ def classify_item_by_reference(
     label = _classify_label(confidence)
 
     if project_dir is not None:
-        relative_path = str(image_path.relative_to(project_dir))
+        item_id = image_id(to_manifest_path(image_path, project_dir))
     else:
-        relative_path = str(image_path)
-    item_id = hashlib.sha256(relative_path.encode()).hexdigest()[:16]
+        item_id = image_id(str(image_path).replace("\\", "/"))
 
     return CleanupClassification(
         item_path=str(image_path),
@@ -394,11 +393,10 @@ def classify_items(
                 )
         except Exception as exc:
             logger.warning("Classification failed for %s: %s", item_path, exc)
-            rel = str(item_path.relative_to(project_dir)) if project_dir else str(item_path)
-            item_id = hashlib.sha256(rel.encode()).hexdigest()[:16]
+            fallback_id = image_id(to_manifest_path(item_path, project_dir)) if project_dir else image_id(str(item_path).replace("\\", "/"))
             result = CleanupClassification(
                 item_path=str(item_path),
-                item_id=item_id,
+                item_id=fallback_id,
                 clip_score=0.0,
                 has_face=False,
                 confidence=0.0,
@@ -497,11 +495,10 @@ def classify_items_by_reference(
                 )
         except Exception as exc:
             logger.warning("Classification failed for %s: %s", item_path, exc)
-            rel = str(item_path.relative_to(project_dir)) if project_dir else str(item_path)
-            item_id = hashlib.sha256(rel.encode()).hexdigest()[:16]
+            fallback_id = image_id(to_manifest_path(item_path, project_dir)) if project_dir else image_id(str(item_path).replace("\\", "/"))
             result = CleanupClassification(
                 item_path=str(item_path),
-                item_id=item_id,
+                item_id=fallback_id,
                 clip_score=0.0,
                 has_face=False,
                 confidence=0.0,
@@ -568,11 +565,10 @@ def _classify_video(
 
     if not frame_paths:
         # No frames: treat as low-confidence remove
-        rel = str(video_path.relative_to(project_dir)) if project_dir else str(video_path)
-        item_id = hashlib.sha256(rel.encode()).hexdigest()[:16]
+        vid_id = image_id(to_manifest_path(video_path, project_dir)) if project_dir else image_id(str(video_path).replace("\\", "/"))
         return CleanupClassification(
             item_path=str(video_path),
-            item_id=item_id,
+            item_id=vid_id,
             clip_score=0.0,
             has_face=False,
             confidence=0.0,
@@ -596,11 +592,10 @@ def _classify_video(
         pass
 
     # Return best result but with original video path
-    rel = str(video_path.relative_to(project_dir)) if project_dir else str(video_path)
-    item_id = hashlib.sha256(rel.encode()).hexdigest()[:16]
+    vid_id = image_id(to_manifest_path(video_path, project_dir)) if project_dir else image_id(str(video_path).replace("\\", "/"))
     return CleanupClassification(
         item_path=str(video_path),
-        item_id=item_id,
+        item_id=vid_id,
         clip_score=best_result.clip_score,
         has_face=best_result.has_face,
         confidence=best_result.confidence,
@@ -627,10 +622,9 @@ def _classify_video_by_reference(
         frame_paths = []
 
     if not frame_paths:
-        rel = str(video_path.relative_to(project_dir)) if project_dir else str(video_path)
-        item_id = hashlib.sha256(rel.encode()).hexdigest()[:16]
+        vid_id = image_id(to_manifest_path(video_path, project_dir)) if project_dir else image_id(str(video_path).replace("\\", "/"))
         return CleanupClassification(
-            item_path=str(video_path), item_id=item_id,
+            item_path=str(video_path), item_id=vid_id,
             clip_score=0.0, has_face=False, confidence=0.0, label="remove",
         )
 
@@ -648,10 +642,9 @@ def _classify_video_by_reference(
     except Exception:
         pass
 
-    rel = str(video_path.relative_to(project_dir)) if project_dir else str(video_path)
-    item_id = hashlib.sha256(rel.encode()).hexdigest()[:16]
+    vid_id = image_id(to_manifest_path(video_path, project_dir)) if project_dir else image_id(str(video_path).replace("\\", "/"))
     return CleanupClassification(
-        item_path=str(video_path), item_id=item_id,
+        item_path=str(video_path), item_id=vid_id,
         clip_score=best_result.clip_score, has_face=best_result.has_face,
         confidence=best_result.confidence, label=best_result.label,
     )
@@ -673,7 +666,7 @@ def confirm_removal(
 
     Args:
         project_dir: Project root directory.
-        item_paths: List of relative paths (from manifest) to move.
+        item_paths: List of paths to move (absolute or relative).
 
     Returns:
         {"moved": int, "review_dir": str} with count and review directory path.
@@ -683,18 +676,26 @@ def confirm_removal(
 
     moved_count = 0
     log_entries: list[dict] = []
+    removed_rel_paths: set[str] = set()  # Track relative paths for manifest update
     now = datetime.now(timezone.utc).isoformat()
+    project_dir_resolved = project_dir.resolve()
 
-    for rel_path in item_paths:
-        src = project_dir / rel_path
+    for raw_path in item_paths:
+        # Normalize to absolute path for file operations
+        p = Path(raw_path)
+        src = p if p.is_absolute() else project_dir / p
         if not src.exists():
             logger.warning("File not found for removal: %s", src)
             continue
+
+        # Compute relative path for manifest matching (forward slashes)
+        rel_path = to_manifest_path(src, project_dir)
 
         # Move primary file
         dest = review_dir / src.name
         shutil.move(str(src), str(dest))
         moved_count += 1
+        removed_rel_paths.add(rel_path)
 
         log_entries.append({
             "source": rel_path,
@@ -714,19 +715,24 @@ def confirm_removal(
                     "timestamp": now,
                 })
 
-    # Update manifest: filter out removed paths
+    # Update manifest: filter out removed paths (using relative paths)
     manifest_path = project_dir / ".klippbok" / "manifest.json"
-    if manifest_path.exists():
+    if manifest_path.exists() and removed_rel_paths:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        removed_set = set(item_paths)
+        old_count = len(manifest.get("images", []))
         manifest["images"] = [
             entry for entry in manifest.get("images", [])
-            if entry.get("path") not in removed_set
+            if entry.get("path") not in removed_rel_paths
         ]
+        pruned = old_count - len(manifest["images"])
         manifest["updated"] = now
         manifest_path.write_text(
             json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
+        )
+        logger.info(
+            "Cleanup manifest update: %d entries removed (%d remaining)",
+            pruned, len(manifest["images"]),
         )
 
     # Write/append audit log

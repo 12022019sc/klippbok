@@ -20,7 +20,6 @@ All singletons follow the lazy-loading pattern from face_service._get_face_app()
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from collections.abc import Callable
 from pathlib import Path
@@ -30,6 +29,7 @@ import numpy as np
 
 from klippbok.curation.models import CurationMode, ImageScore, SignalScores
 from klippbok.curation.presets import get_weights
+from klippbok.utils.paths import image_id, to_manifest_path
 
 logger = logging.getLogger(__name__)
 
@@ -125,18 +125,14 @@ def _get_clip_embedder():
 # ---------------------------------------------------------------------------
 
 def _image_id(path: Path, project_dir: Path | None = None) -> str:
-    """Compute SHA256[:16] of relative path string as image ID.
+    """Compute SHA256[:16] of manifest-format relative path string as image ID.
 
-    Must use relative path to match gallery convention in images.py.
+    Uses the canonical image_id() from utils.paths with proper path
+    normalization (forward slashes) to match gallery convention.
     """
     if project_dir is not None:
-        try:
-            rel = str(path.relative_to(project_dir))
-        except ValueError:
-            rel = str(path)
-    else:
-        rel = str(path)
-    return hashlib.sha256(rel.encode()).hexdigest()[:16]
+        return image_id(to_manifest_path(path, project_dir))
+    return image_id(str(path).replace("\\", "/"))
 
 
 def normalize_score(value: float, low: float, high: float) -> float:
@@ -339,8 +335,10 @@ def score_image(
     # --- pyiqa TOPIQ-NR ---
     quality_score = 0.0
     try:
+        import torch as _torch
         pyiqa_model = _get_pyiqa_model()
-        raw_quality = pyiqa_model(str(image_path)).item()
+        with _torch.no_grad():
+            raw_quality = pyiqa_model(str(image_path)).item()
         quality_score = normalize_score(raw_quality, 0.0, 1.0)
     except Exception as e:
         global _pyiqa_warned
@@ -355,15 +353,17 @@ def score_image(
     try:
         import torch as _torch
         model, preprocessor = _get_aesthetic_model()
-        inputs = preprocessor(str(image_path))
-        pv = inputs["pixel_values"]
-        # preprocessor may return list[ndarray] — convert to tensor
-        if isinstance(pv, list):
-            pv = _torch.stack([_torch.from_numpy(a) for a in pv])
-        param = next(model.parameters())
-        pixel_values = pv.to(device=param.device, dtype=param.dtype)
-        output = model(pixel_values)
-        raw_aesthetic = output.logits[0].item()
+        with _torch.no_grad():
+            inputs = preprocessor(str(image_path))
+            pv = inputs["pixel_values"]
+            # preprocessor may return list[ndarray] — convert to tensor
+            if isinstance(pv, list):
+                pv = _torch.stack([_torch.from_numpy(a) for a in pv])
+            param = next(model.parameters())
+            pixel_values = pv.to(device=param.device, dtype=param.dtype)
+            output = model(pixel_values)
+            raw_aesthetic = output.logits[0].item()
+        del pixel_values, output, pv, inputs
         aesthetic_score = normalize_score(raw_aesthetic, 3.0, 8.0)
     except Exception as e:
         global _aesthetic_warned
@@ -382,6 +382,9 @@ def score_image(
         sharpness_whole = normalize_score(raw_sharpness, 50.0, 1000.0)
     except Exception as e:
         logger.debug("Sharpness computation failed: %s", e)
+
+    # Free cv2 image before CLIP pass (different model, different memory pool)
+    del img_bgr
 
     # --- CLIP occlusion ---
     occlusion_score = _compute_occlusion_score(image_path)
@@ -417,10 +420,19 @@ def score_images(
     progress_callback: Callable[[int, int], None] | None = None,
     project_dir: Path | None = None,
 ) -> list[ImageScore]:
-    """Score multiple images sequentially.
+    """Score images using batch-per-model processing to minimize peak VRAM.
 
-    GPU models are already loaded as singletons, so sequential scoring
-    is efficient (no model reloading).
+    Processes all images through each ML model one at a time, unloading each
+    model before loading the next.  This keeps peak VRAM to a single model's
+    weights + one image's working memory (~3-4 GB) instead of loading all four
+    models simultaneously (~6+ GB with per-image accumulation).
+
+    Phase order (one GPU model resident at a time):
+      1. Face detection  — InsightFace / ONNX (~1 GB)
+      2. Quality scoring — pyiqa TOPIQ-NR (~1 GB)
+      3. Aesthetic        — SigLIP backbone (~2.5 GB)
+      4. Sharpness        — CPU-only Laplacian (0 VRAM)
+      5. CLIP occlusion  — CLIP ViT-B/32 (~0.6 GB)
 
     Args:
         image_paths: List of image file paths.
@@ -432,14 +444,210 @@ def score_images(
     Returns:
         List of ImageScore objects in same order as input.
     """
-    total = len(image_paths)
-    results: list[ImageScore] = []
+    import gc
 
-    for i, path in enumerate(image_paths, 1):
-        score = score_image(path, mode, reference_embedding, project_dir=project_dir)
-        results.append(score)
+    import torch
+
+    total = len(image_paths)
+    if total == 0:
+        return []
+
+    global _face_app, _pyiqa_model, _pyiqa_warned
+    global _aesthetic_model, _aesthetic_preprocessor, _aesthetic_warned
+    global _clip_embedder
+
+    def _flush_gpu() -> None:
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    # Progress spans all 5 phases: total_steps = N * 5
+    _NUM_PHASES = 5
+    total_steps = total * _NUM_PHASES
+    step = 0
+
+    def _tick() -> None:
+        nonlocal step
+        step += 1
         if progress_callback is not None:
-            progress_callback(i, total)
+            progress_callback(step, total_steps)
+
+    # Pre-allocate per-image result arrays
+    face_confidences = [0.0] * total
+    face_area_ratios = [0.0] * total
+    identity_sims = [0.0] * total
+    sharpness_faces = [0.0] * total
+    quality_scores_arr = [0.0] * total
+    aesthetic_scores_arr = [0.0] * total
+    sharpness_wholes = [0.0] * total
+    occlusion_scores_arr = [0.5] * total
+
+    # ── Phase 1: Face detection (InsightFace / ONNX) ─────────────────────
+    try:
+        face_app = _get_face_app()
+        for i, path in enumerate(image_paths):
+            try:
+                img_bgr = cv2.imread(str(path))
+                if img_bgr is not None:
+                    h, w = img_bgr.shape[:2]
+                    image_area = h * w
+                    faces = face_app.get(img_bgr)
+                    if faces:
+                        best = max(faces, key=lambda f: f.det_score)
+                        face_confidences[i] = normalize_score(
+                            float(best.det_score), 0.0, 1.0,
+                        )
+                        bbox = best.bbox
+                        fx1, fy1, fx2, fy2 = (float(v) for v in bbox)
+                        face_area = (fx2 - fx1) * (fy2 - fy1)
+                        face_area_ratios[i] = normalize_score(
+                            face_area / image_area, 0.01, 0.5,
+                        )
+                        sharpness_faces[i] = normalize_score(
+                            _compute_face_sharpness(img_bgr, bbox), 50.0, 1000.0,
+                        )
+                        if (
+                            reference_embedding is not None
+                            and hasattr(best, "normed_embedding")
+                        ):
+                            sim = float(np.dot(best.normed_embedding, reference_embedding))
+                            identity_sims[i] = normalize_score(sim, 0.0, 1.0)
+                    del img_bgr
+            except Exception as e:
+                logger.debug("Face detection failed for %s: %s", path, e)
+            _tick()
+    except Exception as e:
+        logger.warning("Face detection phase failed: %s", e)
+        step = total  # skip remaining face ticks in progress
+
+    # InsightFace is ONNX — can't .cpu(); drop scorer's reference and flush
+    _face_app = None
+    _flush_gpu()
+
+    # ── Phase 2: Quality scoring (pyiqa TOPIQ-NR) ────────────────────────
+    try:
+        pyiqa_model = _get_pyiqa_model()
+        for i, path in enumerate(image_paths):
+            try:
+                with torch.no_grad():
+                    raw_quality = pyiqa_model(str(path)).item()
+                quality_scores_arr[i] = normalize_score(raw_quality, 0.0, 1.0)
+            except Exception as e:
+                if not _pyiqa_warned:
+                    logger.warning("pyiqa scoring failed (will default to 0.0): %s", e)
+                    _pyiqa_warned = True
+                else:
+                    logger.debug("pyiqa scoring failed: %s", e)
+            _tick()
+    except Exception as e:
+        logger.warning("pyiqa phase failed: %s", e)
+        step = 2 * total
+
+    # Unload pyiqa from GPU
+    _pyiqa_model = None
+    _flush_gpu()
+
+    # ── Phase 3: Aesthetic scoring (SigLIP backbone) ─────────────────────
+    try:
+        aes_model, preprocessor = _get_aesthetic_model()
+        for i, path in enumerate(image_paths):
+            try:
+                with torch.no_grad():
+                    inputs = preprocessor(str(path))
+                    pv = inputs["pixel_values"]
+                    if isinstance(pv, list):
+                        pv = torch.stack([torch.from_numpy(a) for a in pv])
+                    param = next(aes_model.parameters())
+                    pixel_values = pv.to(device=param.device, dtype=param.dtype)
+                    output = aes_model(pixel_values)
+                    raw_aesthetic = output.logits[0].item()
+                del pixel_values, output, pv, inputs
+                aesthetic_scores_arr[i] = normalize_score(raw_aesthetic, 3.0, 8.0)
+            except Exception as e:
+                if not _aesthetic_warned:
+                    logger.warning("Aesthetic scoring failed (will default to 0.0): %s", e)
+                    _aesthetic_warned = True
+                else:
+                    logger.debug("Aesthetic scoring failed: %s", e)
+            _tick()
+    except Exception as e:
+        logger.warning("Aesthetic phase failed: %s", e)
+        step = 3 * total
+
+    # Unload aesthetic model from GPU
+    _aesthetic_model = None
+    _aesthetic_preprocessor = None
+    _flush_gpu()
+
+    # ── Phase 4: Whole-image sharpness (CPU — no VRAM) ───────────────────
+    for i, path in enumerate(image_paths):
+        try:
+            img_bgr = cv2.imread(str(path))
+            if img_bgr is not None:
+                gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+                laplacian = cv2.Laplacian(gray, cv2.CV_64F)
+                sharpness_wholes[i] = normalize_score(
+                    float(laplacian.var()), 50.0, 1000.0,
+                )
+                del img_bgr
+        except Exception as e:
+            logger.debug("Sharpness computation failed for %s: %s", path, e)
+        _tick()
+
+    # ── Phase 5: CLIP occlusion scoring ──────────────────────────────────
+    try:
+        embedder = _get_clip_embedder()
+        # Pre-compute text embeddings once (same 6 prompts for every image)
+        clear_embs = [embedder.encode_text(p) for p in _OCCLUSION_PROMPTS_CLEAR]
+        occluded_embs = [embedder.encode_text(p) for p in _OCCLUSION_PROMPTS_OCCLUDED]
+
+        for i, path in enumerate(image_paths):
+            try:
+                img_emb = embedder.encode_image(path)
+                clear_avg = sum(
+                    float(np.dot(img_emb, te)) for te in clear_embs
+                ) / len(clear_embs)
+                occluded_avg = sum(
+                    float(np.dot(img_emb, te)) for te in occluded_embs
+                ) / len(occluded_embs)
+                raw = clear_avg - occluded_avg
+                occlusion_scores_arr[i] = normalize_score(raw, -0.1, 0.1)
+            except Exception:
+                logger.debug("CLIP occlusion scoring failed for %s", path)
+            _tick()
+    except Exception as e:
+        logger.warning("CLIP occlusion phase failed: %s", e)
+        step = 5 * total
+
+    # Unload CLIP from GPU
+    _clip_embedder = None
+    _flush_gpu()
+
+    # ── Assemble ImageScore results ──────────────────────────────────────
+    results: list[ImageScore] = []
+    for i, path in enumerate(image_paths):
+        signals = SignalScores(
+            face_confidence=face_confidences[i],
+            face_area_ratio=face_area_ratios[i],
+            identity_similarity=identity_sims[i],
+            quality_score=quality_scores_arr[i],
+            aesthetic_score=aesthetic_scores_arr[i],
+            sharpness_whole=sharpness_wholes[i],
+            sharpness_face=sharpness_faces[i],
+            occlusion_score=occlusion_scores_arr[i],
+        )
+        composite = _compute_composite(signals, mode)
+        try:
+            rel = str(path.relative_to(project_dir)) if project_dir else str(path)
+        except ValueError:
+            rel = str(path)
+        results.append(ImageScore(
+            image_id=_image_id(path, project_dir),
+            relative_path=rel,
+            signals=signals,
+            composite_score=composite,
+            mode=mode,
+        ))
 
     return results
 

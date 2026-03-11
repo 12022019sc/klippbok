@@ -10,7 +10,6 @@ responsive (Pillow image I/O and MediaPipe inference are synchronous).
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from pathlib import Path
 
@@ -22,18 +21,11 @@ from klippbok.api.models import (
     CropApplyRequest,
     CropApplyResult,
 )
+from klippbok.utils.paths import image_id as _image_id
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/crop", tags=["crop"])
-
-
-def _image_id(relative_path: str) -> str:
-    """Compute the SHA256[:16] image ID from a relative path.
-
-    Mirrors the same computation used in the images router and dataset service.
-    """
-    return hashlib.sha256(relative_path.encode()).hexdigest()[:16]
 
 
 def _resolve_image_path(image_id: str, project_dir: Path) -> Path:

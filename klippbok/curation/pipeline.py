@@ -12,7 +12,6 @@ Result persistence:
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -32,6 +31,7 @@ from klippbok.services.face_service import (
     cluster_face_embeddings,
     compute_face_embeddings,
 )
+from klippbok.utils.paths import image_id, to_manifest_path
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +175,7 @@ def _auto_detect_reference(
 
     # Pick the primary reference image ID
     ref_path = largest.primary_reference or largest.image_paths[0]
-    ref_id = hashlib.sha256(ref_path.encode()).hexdigest()[:16]
+    ref_id = image_id(to_manifest_path(Path(ref_path), project_dir))
 
     return centroid, ref_id
 
@@ -201,7 +201,7 @@ def _resolve_reference_embedding(
     if config.reference_image_id is not None:
         # Look up the specific image's face embedding
         for path in image_paths:
-            img_id = hashlib.sha256(str(path).encode()).hexdigest()[:16]
+            img_id = image_id(to_manifest_path(path, project_dir))
             if img_id == config.reference_image_id:
                 embs = compute_face_embeddings([path])
                 if embs:
@@ -259,7 +259,16 @@ def _gather_embeddings(
         pose_list.append(pv[:pose_dim])
     pose_embs = np.array(pose_list, dtype=np.float32)
 
-    # Face embeddings
+    # Unload CLIP from GPU before face pass
+    import gc
+    import torch
+    from klippbok.curation import scorer as _scorer
+    _scorer._clip_embedder = None
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    # Face embeddings (with explicit memory cleanup per image)
     import cv2
     face_app = _get_face_app()
     face_list = []
@@ -275,6 +284,8 @@ def _gather_embeddings(
                         best = max(faces, key=lambda f: f.det_score)
                         if hasattr(best, "normed_embedding"):
                             emb = best.normed_embedding.astype(np.float32)
+                    del faces
+                del img_bgr
             except Exception:
                 pass
         face_list.append(emb)
@@ -307,8 +318,18 @@ def run_curation(
     """
     total = len(image_paths)
 
+    import gc
+    import torch
+
+    def _flush_gpu() -> None:
+        """Force garbage collection and free GPU cache between heavy phases."""
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
     # 1. Resolve reference embedding
     reference_embedding = _resolve_reference_embedding(config, image_paths, project_dir)
+    _flush_gpu()
 
     # 2. Score all images
     if progress_callback:
@@ -319,6 +340,8 @@ def run_curation(
             progress_callback("scoring", current, total)
 
     all_scores = score_images(image_paths, config.mode, reference_embedding, scoring_progress, project_dir=project_dir)
+
+    _flush_gpu()
 
     # 3. Mark duplicates
     mark_duplicates(all_scores, image_paths)

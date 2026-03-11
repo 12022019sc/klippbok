@@ -74,7 +74,10 @@ class TestCleanupStartEndpoint:
         app = create_app(project_dir=project_dir)
         client = TestClient(app)
 
-        resp = client.post("/api/v1/cleanup/start", json={})
+        resp = client.post("/api/v1/cleanup/start", json={
+            "mode": "text",
+            "subject_description": "a woman",
+        })
         assert resp.status_code == 200
         data = resp.json()
         assert "operation_id" in data

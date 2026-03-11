@@ -14,28 +14,17 @@ Key functions:
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+from klippbok.utils.paths import image_id as _image_id
+
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from klippbok.caption.models import CaptionConfig
-
-
-def _image_id(relative_path: str) -> str:
-    """Compute the image ID from its relative path.
-
-    Args:
-        relative_path: Path relative to project root.
-
-    Returns:
-        SHA256 hex digest of the path, truncated to 16 characters.
-    """
-    return hashlib.sha256(relative_path.encode()).hexdigest()[:16]
 
 
 def get_caption_mode_for_project(

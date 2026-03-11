@@ -105,8 +105,8 @@ class TestTriageRunCancel:
         data = response.json()
         assert data["cancelled"] is True
 
-        # Cleanup
-        del triage_router._triage_tasks[op_id]
+        # Cleanup (cancel endpoint already removes the task via .pop())
+        triage_router._triage_tasks.pop(op_id, None)
 
     def test_cancel_returns_404_for_unknown_op_id(self, client: TestClient):
         """POST /triage/run/nonexistent/cancel returns 404."""
@@ -235,7 +235,7 @@ class TestTriageFaceCancel:
         data = response.json()
         assert data["cancelled"] is True
 
-        del triage_router._face_tasks[op_id]
+        triage_router._face_tasks.pop(op_id, None)
 
     def test_cancel_returns_404_for_unknown_op(self, client: TestClient):
         """POST /triage/face/nonexistent/cancel returns 404."""

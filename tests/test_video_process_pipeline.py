@@ -383,7 +383,8 @@ class TestCancelCleansUpTempDir:
         _process_tasks[op_id] = mock_task
         _process_queues[op_id] = asyncio.Queue()
 
-        result = await cancel_process(op_id)
+        mock_request = MagicMock()
+        result = await cancel_process(op_id, mock_request)
 
         assert result["cancelled"] is True
         assert not temp_dir.exists(), "Temp processing dir should be cleaned up"

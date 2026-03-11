@@ -56,7 +56,7 @@ async def start_upscale_operation(body: UpscaleRequest, request: Request) -> dic
         HTTPException 409: If no project directory is selected.
     """
     from klippbok.services.upscale_service import detect_seedvr2
-    from klippbok.api.routers.images import _image_id
+    from klippbok.utils.paths import image_id as _image_id
 
     project_dir: Path | None = request.app.state.project_dir
     if project_dir is None:
@@ -235,7 +235,7 @@ async def apply_upscaled(op_id: str, request: Request) -> dict:
             from klippbok.services.project_service import load_manifest
             from klippbok.services.image_service import probe_image
             from klippbok.image.quality import BLUR_THRESHOLD, compute_blur_score
-            from klippbok.api.routers.images import _image_id
+            from klippbok.utils.paths import image_id as _image_id
             from PIL import Image
             import json
 

@@ -130,7 +130,7 @@ async def _run_joycaption_subprocess(
     """
     import json as _json
 
-    from klippbok.api.routers.images import _image_id
+    from klippbok.utils.paths import image_id as _image_id
     from klippbok.caption.joycaption import run_joycaption_image
     from klippbok.caption.pipeline import DEFAULT_APPEARANCE_BLACKLIST, apply_joycaption_pipeline
     from klippbok.services.caption_service import save_caption
@@ -282,7 +282,7 @@ async def _run_caption_batch(
         op_id: Operation UUID for event payloads.
         project_dir: Project root directory from app state.
     """
-    from klippbok.api.routers.images import _image_id
+    from klippbok.utils.paths import image_id as _image_id
     from klippbok.services.caption_service import caption_image_for_project, save_caption
     from klippbok.services.project_service import load_manifest
 

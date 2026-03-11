@@ -18,7 +18,6 @@ Exports: run_triage, get_triage_results, add_concept_reference, list_concepts,
 
 from __future__ import annotations
 
-import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -78,18 +77,16 @@ class TriageResult(BaseModel):
 def _compute_item_id(path: str | Path, project_dir: Path | None = None) -> str:
     """Compute a stable, URL-safe item ID from a path.
 
-    Uses SHA256[:16] of the *relative* path string (when project_dir is
-    provided), matching the ID scheme used by the images API.  Falls back
-    to the full path string when project_dir is not available.
+    Uses SHA256[:16] of the manifest-format relative path string (when
+    project_dir is provided), matching the ID scheme used by the images API.
+    Falls back to the full path string when project_dir is not available.
     """
+    from klippbok.utils.paths import image_id, to_manifest_path
+
     p = Path(path)
     if project_dir is not None:
-        try:
-            rel = p.relative_to(project_dir)
-            return hashlib.sha256(str(rel).encode()).hexdigest()[:16]
-        except ValueError:
-            pass  # Not relative to project_dir — fall through
-    return hashlib.sha256(str(path).encode()).hexdigest()[:16]
+        return image_id(to_manifest_path(p, project_dir))
+    return image_id(str(path).replace("\\", "/"))
 
 
 def _classify(score: float, threshold: float) -> Literal["match", "borderline", "no_match"]:

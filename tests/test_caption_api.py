@@ -7,22 +7,18 @@ Tests verify:
 """
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from klippbok.utils.paths import image_id as _image_id
+
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _image_id(relative_path: str) -> str:
-    """Compute image ID the same way as the API (SHA256[:16] of relative path)."""
-    return hashlib.sha256(relative_path.encode()).hexdigest()[:16]
 
 
 def _make_project(tmp_path: Path, image_filename: str = "photo.jpg") -> tuple[Path, str]:

@@ -10,6 +10,7 @@ All functions are pure -- no side effects, no state.
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -127,6 +128,7 @@ def batch_import_images(
     recursive: bool = False,
     min_resolution: int = 256,
     max_resolution: int = 4096,
+    progress_callback: Callable[[int, int], None] | None = None,
 ) -> ImageImportReport:
     """Full batch import pipeline: discover, probe, validate, bucket, quality, dedup, persist.
 
@@ -156,7 +158,10 @@ def batch_import_images(
     Returns:
         ImageImportReport with complete results.
     """
-    from klippbok.services.project_service import load_manifest, save_image_entries
+    from klippbok.services.project_service import load_manifest, prune_dead_entries, save_image_entries
+
+    # Step 0: Prune manifest entries for files that no longer exist on disk
+    prune_dead_entries(project_dir)
 
     # Step 1: Load existing manifest for skip set and prior hashes
     manifest = load_manifest(project_dir)
@@ -183,12 +188,14 @@ def batch_import_images(
     project_dir_resolved = project_dir.resolve()
     entries: list[ImageImportEntry] = []
     skipped_existing = 0
+    _last_progress_time = 0.0  # throttle progress callbacks
 
-    for media_path in discovered_paths:
+    for file_idx, media_path in enumerate(discovered_paths):
         try:
-            rel_str = str(media_path.resolve().relative_to(project_dir_resolved))
+            rel = media_path.resolve().relative_to(project_dir_resolved)
+            rel_str = str(rel).replace("\\", "/")
         except ValueError:
-            rel_str = str(media_path)
+            rel_str = str(media_path).replace("\\", "/")
 
         if rel_str in known_paths:
             # Already imported -- skip silently
@@ -197,6 +204,12 @@ def batch_import_images(
                 skipped=True,
             ))
             skipped_existing += 1
+            # Throttled progress callback: every 5 files or every 2 seconds
+            if progress_callback is not None:
+                now = time.monotonic()
+                if file_idx % 5 == 0 or now - _last_progress_time >= 2.0:
+                    progress_callback(file_idx + 1, total_discovered)
+                    _last_progress_time = now
             continue
 
         is_video = media_path.suffix.lower() in SUPPORTED_VIDEO_EXTENSIONS
@@ -204,6 +217,12 @@ def batch_import_images(
         if is_video:
             # Video path: probe via ffprobe, skip image-specific processing
             entries.append(_import_video(media_path))
+            # Throttled progress callback
+            if progress_callback is not None:
+                now = time.monotonic()
+                if file_idx % 5 == 0 or now - _last_progress_time >= 2.0:
+                    progress_callback(file_idx + 1, total_discovered)
+                    _last_progress_time = now
             continue
 
         # Image path: full pipeline (probe, validate, bucket, blur, phash, dedup)
@@ -327,6 +346,13 @@ def batch_import_images(
             skipped=False,
         ))
 
+        # Throttled progress callback for image files
+        if progress_callback is not None:
+            now = time.monotonic()
+            if file_idx % 5 == 0 or now - _last_progress_time >= 2.0:
+                progress_callback(file_idx + 1, total_discovered)
+                _last_progress_time = now
+
     # Step 4: Compute accurate counts
     non_skipped = [e for e in entries if not e.skipped]
     imported = len(non_skipped)  # all non-skipped are "imported" (even with errors)
@@ -355,9 +381,10 @@ def batch_import_images(
     # Step 5: Persist results to manifest
     def _to_rel(p: Path) -> str:
         try:
-            return str(p.resolve().relative_to(project_dir_resolved))
+            rel = p.resolve().relative_to(project_dir_resolved)
+            return str(rel).replace("\\", "/")
         except ValueError:
-            return str(p)
+            return str(p).replace("\\", "/")
 
     manifest_entries: list[dict] = []
     for entry in non_skipped:
