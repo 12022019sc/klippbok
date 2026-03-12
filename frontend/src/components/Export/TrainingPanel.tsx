@@ -49,6 +49,7 @@ export default function TrainingPanel({ presetPath }: TrainingPanelProps) {
   const [isStarting, setIsStarting] = useState(false)
   const [isLaunchingGui, setIsLaunchingGui] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
+  const [showTensorBoard, setShowTensorBoard] = useState(false)
 
   const { gpuBusy, vramUsedMb } = useGpuStatus()
   const { epoch, totalEpochs, isTraining, error, logSnippet, result } = useTrainingEvents(opId)
@@ -210,14 +211,37 @@ export default function TrainingPanel({ presetPath }: TrainingPanelProps) {
             <div className="training-progress-fill" style={{ width: `${progressPct}%` }} />
           </div>
 
-          {/* TensorBoard iframe */}
+          {/* TensorBoard */}
           <div className="tensorboard-container">
-            <p className="tensorboard-label">TensorBoard</p>
-            <iframe
-              src="http://localhost:6006"
-              className="tensorboard-iframe"
-              title="TensorBoard"
-            />
+            <div className="tensorboard-header">
+              <p className="tensorboard-label">TensorBoard</p>
+              <div className="tensorboard-actions">
+                {!showTensorBoard && (
+                  <button
+                    type="button"
+                    className="training-btn training-btn--secondary training-btn--small"
+                    onClick={() => setShowTensorBoard(true)}
+                  >
+                    Load TensorBoard
+                  </button>
+                )}
+                <a
+                  href="http://localhost:6006"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="training-btn training-btn--secondary training-btn--small"
+                >
+                  Open in New Tab
+                </a>
+              </div>
+            </div>
+            {showTensorBoard && (
+              <iframe
+                src="http://localhost:6006"
+                className="tensorboard-iframe"
+                title="TensorBoard"
+              />
+            )}
           </div>
 
           <button
@@ -251,14 +275,37 @@ export default function TrainingPanel({ presetPath }: TrainingPanelProps) {
             </p>
           </div>
 
-          {/* TensorBoard remains visible after training */}
+          {/* TensorBoard remains available after training */}
           <div className="tensorboard-container">
-            <p className="tensorboard-label">TensorBoard</p>
-            <iframe
-              src="http://localhost:6006"
-              className="tensorboard-iframe"
-              title="TensorBoard"
-            />
+            <div className="tensorboard-header">
+              <p className="tensorboard-label">TensorBoard</p>
+              <div className="tensorboard-actions">
+                {!showTensorBoard && (
+                  <button
+                    type="button"
+                    className="training-btn training-btn--secondary training-btn--small"
+                    onClick={() => setShowTensorBoard(true)}
+                  >
+                    Load TensorBoard
+                  </button>
+                )}
+                <a
+                  href="http://localhost:6006"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="training-btn training-btn--secondary training-btn--small"
+                >
+                  Open in New Tab
+                </a>
+              </div>
+            </div>
+            {showTensorBoard && (
+              <iframe
+                src="http://localhost:6006"
+                className="tensorboard-iframe"
+                title="TensorBoard"
+              />
+            )}
           </div>
 
           <button

@@ -530,10 +530,10 @@ class TestGenerateOneTrainerExport:
         # workspace_dir and cache_dir must be set
         assert "workspace_dir" in data
         assert "cache_dir" in data
-        # concept_file_name should be relative (not absolute)
-        assert not data["concept_file_name"].startswith("/")
-        assert not data["concept_file_name"].startswith("C:")
-        assert data["concept_file_name"] == "training_concepts/MyChar.json"
+        # concept_file_name must be absolute (OneTrainer resolves relative to its own CWD)
+        assert "training_concepts" in data["concept_file_name"]
+        assert "MyChar.json" in data["concept_file_name"]
+        assert "\\" not in data["concept_file_name"]  # forward slashes only
         # resolution must be a string
         assert isinstance(data["resolution"], str)
 

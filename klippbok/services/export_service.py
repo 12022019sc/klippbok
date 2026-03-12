@@ -501,7 +501,7 @@ def generate_onetrainer_export(
     # Overlay klippbok-specific workspace fields
     training_preset["workspace_dir"] = workspace_dir_fwd
     training_preset["cache_dir"] = cache_dir_fwd
-    training_preset["concept_file_name"] = f"training_concepts/{config.concept_name}.json"
+    training_preset["concept_file_name"] = _to_fwd(concept_path.resolve())
     training_preset["output_model_destination"] = lora_output_fwd
     training_preset["save_filename_prefix"] = f"{config.concept_name}_epoch"
     training_preset["resolution"] = str(resolution)
