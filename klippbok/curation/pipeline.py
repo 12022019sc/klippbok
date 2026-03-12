@@ -259,9 +259,14 @@ def _gather_embeddings(
         pose_list.append(pv[:pose_dim])
     pose_embs = np.array(pose_list, dtype=np.float32)
 
-    # Unload CLIP from GPU before face pass
+    # Unload CLIP from GPU before face pass — must delete local ref too
     import gc
     import torch
+    try:
+        embedder._model.cpu()
+    except Exception:
+        pass
+    del embedder
     from klippbok.curation import scorer as _scorer
     _scorer._clip_embedder = None
     gc.collect()
@@ -290,6 +295,18 @@ def _gather_embeddings(
                 pass
         face_list.append(emb)
     face_embs = np.array(face_list, dtype=np.float32)
+
+    # Clean up face_app — no longer needed after embedding extraction
+    del face_app
+    _scorer._face_app = None
+    try:
+        from klippbok.services import face_service as _fs
+        _fs._face_app = None
+    except Exception:
+        pass
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
     return clip_embs, pose_embs, face_embs
 
@@ -329,15 +346,28 @@ def run_curation(
 
     # 1. Resolve reference embedding
     reference_embedding = _resolve_reference_embedding(config, image_paths, project_dir)
+    # Free face_service singleton loaded during auto-detection — scoring
+    # creates its own lightweight InsightFace with only detection+recognition.
+    try:
+        from klippbok.services import face_service as _fs
+        _fs._face_app = None
+    except Exception:
+        pass
     _flush_gpu()
 
     # 2. Score all images
+    #    score_images reports progress as (step, total_steps) where
+    #    total_steps = N_images * 5 phases.  Translate back to image scale
+    #    so the frontend shows e.g. "scoring: 120/343" not "scoring: 600/1715".
+    _NUM_SCORING_PHASES = 5
     if progress_callback:
         progress_callback("scoring", 0, total)
 
-    def scoring_progress(current: int, total: int) -> None:
+    def scoring_progress(current: int, _total_steps: int) -> None:
         if progress_callback:
-            progress_callback("scoring", current, total)
+            # Convert phase-level ticks to image-level progress
+            image_progress = min(current // _NUM_SCORING_PHASES, total)
+            progress_callback("scoring", image_progress, total)
 
     all_scores = score_images(image_paths, config.mode, reference_embedding, scoring_progress, project_dir=project_dir)
 

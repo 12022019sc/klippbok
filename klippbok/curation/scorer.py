@@ -49,11 +49,27 @@ _aesthetic_warned = False
 
 
 def _get_face_app():
-    """Return InsightFace FaceAnalysis singleton (GPU-aware)."""
+    """Return InsightFace FaceAnalysis singleton for curation.
+
+    Only loads detection + recognition modules (skips landmark and
+    genderage models that curation doesn't use), saving ~1 GB VRAM
+    and 3 ONNX sessions.
+    """
     global _face_app
     if _face_app is None:
-        from klippbok.services.face_service import _get_face_app as _get_shared_face_app
-        _face_app = _get_shared_face_app()
+        import insightface
+
+        app = insightface.app.FaceAnalysis(
+            name="buffalo_l",
+            allowed_modules=["detection", "recognition"],
+        )
+        try:
+            import onnxruntime
+            has_gpu = "CUDAExecutionProvider" in onnxruntime.get_available_providers()
+        except ImportError:
+            has_gpu = False
+        app.prepare(ctx_id=0 if has_gpu else -1)
+        _face_app = app
     return _face_app
 
 
@@ -456,10 +472,16 @@ def score_images(
     global _aesthetic_model, _aesthetic_preprocessor, _aesthetic_warned
     global _clip_embedder
 
-    def _flush_gpu() -> None:
+    def _flush_gpu(phase: str = "") -> None:
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+            if phase:
+                free_gb, total_gb = (v / (1024 ** 3) for v in torch.cuda.mem_get_info())
+                logger.info(
+                    "VRAM after %s: %.2f / %.2f GB free",
+                    phase, free_gb, total_gb,
+                )
 
     # Progress spans all 5 phases: total_steps = N * 5
     _NUM_PHASES = 5
@@ -483,6 +505,7 @@ def score_images(
     occlusion_scores_arr = [0.5] * total
 
     # ── Phase 1: Face detection (InsightFace / ONNX) ─────────────────────
+    face_app = None
     try:
         face_app = _get_face_app()
         for i, path in enumerate(image_paths):
@@ -520,11 +543,19 @@ def score_images(
         logger.warning("Face detection phase failed: %s", e)
         step = total  # skip remaining face ticks in progress
 
-    # InsightFace is ONNX — can't .cpu(); drop scorer's reference and flush
+    # InsightFace is ONNX — can't .cpu(); must delete ALL references to free GPU
+    del face_app
     _face_app = None
-    _flush_gpu()
+    # Also clear face_service's singleton in case _auto_detect_reference loaded it
+    try:
+        from klippbok.services import face_service as _fs
+        _fs._face_app = None
+    except Exception:
+        pass
+    _flush_gpu("face unload")
 
     # ── Phase 2: Quality scoring (pyiqa TOPIQ-NR) ────────────────────────
+    pyiqa_model = None
     try:
         pyiqa_model = _get_pyiqa_model()
         for i, path in enumerate(image_paths):
@@ -538,16 +569,28 @@ def score_images(
                     _pyiqa_warned = True
                 else:
                     logger.debug("pyiqa scoring failed: %s", e)
+            # Release cached CUDA blocks every image — without this,
+            # PyTorch's caching allocator accumulates ~0.12 GB/image
+            # and OOMs around image 70 on 16 GB VRAM.
+            torch.cuda.empty_cache()
             _tick()
     except Exception as e:
         logger.warning("pyiqa phase failed: %s", e)
         step = 2 * total
 
-    # Unload pyiqa from GPU
+    # Unload pyiqa from GPU — move to CPU first for instant VRAM release
+    if pyiqa_model is not None:
+        try:
+            pyiqa_model.cpu()
+        except Exception:
+            pass
+    del pyiqa_model
     _pyiqa_model = None
-    _flush_gpu()
+    _flush_gpu("pyiqa unload")
 
     # ── Phase 3: Aesthetic scoring (SigLIP backbone) ─────────────────────
+    aes_model = None
+    preprocessor = None
     try:
         aes_model, preprocessor = _get_aesthetic_model()
         for i, path in enumerate(image_paths):
@@ -569,15 +612,22 @@ def score_images(
                     _aesthetic_warned = True
                 else:
                     logger.debug("Aesthetic scoring failed: %s", e)
+            torch.cuda.empty_cache()
             _tick()
     except Exception as e:
         logger.warning("Aesthetic phase failed: %s", e)
         step = 3 * total
 
-    # Unload aesthetic model from GPU
+    # Unload aesthetic model from GPU — move to CPU first for instant VRAM release
+    if aes_model is not None:
+        try:
+            aes_model.cpu()
+        except Exception:
+            pass
+    del aes_model, preprocessor
     _aesthetic_model = None
     _aesthetic_preprocessor = None
-    _flush_gpu()
+    _flush_gpu("aesthetic unload")
 
     # ── Phase 4: Whole-image sharpness (CPU — no VRAM) ───────────────────
     for i, path in enumerate(image_paths):
@@ -595,6 +645,7 @@ def score_images(
         _tick()
 
     # ── Phase 5: CLIP occlusion scoring ──────────────────────────────────
+    embedder = None
     try:
         embedder = _get_clip_embedder()
         # Pre-compute text embeddings once (same 6 prompts for every image)
@@ -614,14 +665,21 @@ def score_images(
                 occlusion_scores_arr[i] = normalize_score(raw, -0.1, 0.1)
             except Exception:
                 logger.debug("CLIP occlusion scoring failed for %s", path)
+            torch.cuda.empty_cache()
             _tick()
     except Exception as e:
         logger.warning("CLIP occlusion phase failed: %s", e)
         step = 5 * total
 
-    # Unload CLIP from GPU
+    # Unload CLIP from GPU — move model to CPU first for instant VRAM release
+    if embedder is not None:
+        try:
+            embedder._model.cpu()
+        except Exception:
+            pass
+    del embedder
     _clip_embedder = None
-    _flush_gpu()
+    _flush_gpu("CLIP unload")
 
     # ── Assemble ImageScore results ──────────────────────────────────────
     results: list[ImageScore] = []
