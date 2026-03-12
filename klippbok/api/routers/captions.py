@@ -167,28 +167,33 @@ async def _run_joycaption_subprocess(
     completed = 0
     errors = 0
     failed_ids: list[str] = []
+    stderr_lines: list[str] = []  # Collect non-JSON output for error reporting
 
-    # Read stdout in executor to avoid blocking the event loop
+    # Stream stdout line-by-line via executor so SSE events fire in real time.
+    # Previous approach buffered ALL lines before processing — no live progress.
     loop = asyncio.get_running_loop()
 
-    def _read_lines():
-        """Read all lines from subprocess stdout (blocking)."""
-        lines = []
+    def _read_line():
+        """Read a single line from subprocess stdout (blocking)."""
         if proc.stdout:
-            for line in proc.stdout:
-                lines.append(line.strip())
-        return lines
+            return proc.stdout.readline()
+        return ""
 
-    # Read lines in a background thread
-    lines = await loop.run_in_executor(None, _read_lines)
-
-    for line in lines:
+    while True:
+        line = await loop.run_in_executor(None, _read_line)
+        if not line:
+            break
+        line = line.strip()
         if not line:
             continue
+
         try:
             msg = _json.loads(line)
         except _json.JSONDecodeError:
-            logger.debug("JoyCaption non-JSON output: %s", line)
+            # Surface non-JSON output (Python tracebacks, warnings) —
+            # previously these were swallowed at DEBUG level.
+            logger.warning("JoyCaption subprocess: %s", line)
+            stderr_lines.append(line)
             continue
 
         msg_type = msg.get("type")
@@ -259,7 +264,19 @@ async def _run_joycaption_subprocess(
     await loop.run_in_executor(None, proc.wait)
 
     if proc.returncode != 0 and completed == 0:
-        logger.error("JoyCaption subprocess exited with code %d", proc.returncode)
+        # Surface subprocess errors to the user via SSE, not just the log
+        detail = stderr_lines[-3:] if stderr_lines else [f"exit code {proc.returncode}"]
+        logger.error(
+            "JoyCaption subprocess failed (exit %d): %s",
+            proc.returncode, "\n".join(stderr_lines[-5:]),
+        )
+        await queue.put(CaptionProgress(
+            operation_id=op_id,
+            current=0,
+            total=total,
+            message=f"JoyCaption crashed: {' | '.join(detail)}",
+            status="error",
+        ))
 
     return completed, errors, failed_ids
 

@@ -290,13 +290,20 @@ async def start_export(body: ExportStartRequest, request: Request) -> dict:
     if project_dir is None:
         raise HTTPException(status_code=409, detail="No project directory selected")
 
+    # Resolve output_dir against project_dir — frontend sends relative paths
+    # like "./export/onetrainer/" which must land inside the project, not the
+    # server's CWD.
+    output_dir = Path(body.output_path)
+    if not output_dir.is_absolute():
+        output_dir = project_dir / output_dir
+
     config = ExportConfig(
         trainer=body.trainer,
         repeats=body.repeats,
         trigger_word=body.trigger_word,
         class_name=body.class_name,
         concept_name=body.concept_name,
-        output_dir=Path(body.output_path),
+        output_dir=output_dir,
     )
 
     op_id = uuid.uuid4().hex[:8]
@@ -394,7 +401,7 @@ async def get_train_status() -> dict:
 
 
 @router.post("/train/start")
-async def start_training(body: TrainStartRequest) -> dict:
+async def start_training(body: TrainStartRequest, request: Request) -> dict:
     """Start a headless OneTrainer training operation.
 
     Detects OneTrainer, reads the preset from body.preset_path, applies
@@ -404,15 +411,21 @@ async def start_training(body: TrainStartRequest) -> dict:
 
     Args:
         body: TrainStartRequest with preset_path and training parameters.
+        request: FastAPI request (for project_dir).
 
     Returns:
         {"op_id": str}
 
     Raises:
         HTTPException 400: If OneTrainer not configured or preset not found.
+        HTTPException 409: If no project directory is selected.
     """
     from klippbok.services.global_config_service import load_global_config
     from klippbok.services.onetrainer_service import detect_onetrainer, launch_onetrainer_headless
+
+    project_dir: Path | None = request.app.state.project_dir
+    if project_dir is None:
+        raise HTTPException(status_code=409, detail="No project directory selected")
 
     global_config = load_global_config()
     configured_path = global_config.get("onetrainer", {}).get("onetrainer_path")
@@ -424,7 +437,11 @@ async def start_training(body: TrainStartRequest) -> dict:
             detail="OneTrainer not configured. Set the install path in Settings.",
         )
 
+    # Resolve preset path against project_dir — frontend sends relative paths
+    # like "export/onetrainer/training_preset.json"
     preset_path = Path(body.preset_path)
+    if not preset_path.is_absolute():
+        preset_path = project_dir / preset_path
     if not preset_path.is_file():
         raise HTTPException(
             status_code=400,
@@ -463,10 +480,12 @@ async def start_training(body: TrainStartRequest) -> dict:
     _train_start_times[op_id] = time.time()
 
     loop = asyncio.get_running_loop()
-    # launch_onetrainer_headless is synchronous — run in executor to avoid blocking
+    # launch_onetrainer_headless is synchronous — run in executor to avoid blocking.
+    # Pass the running loop explicitly because get_event_loop() returns a wrong
+    # loop inside thread pool workers (Python 3.10+ deprecation).
     await loop.run_in_executor(
         None,
-        lambda: launch_onetrainer_headless(ot_root, active_preset_path, queue, op_id),
+        lambda: launch_onetrainer_headless(ot_root, active_preset_path, queue, op_id, loop=loop),
     )
 
     logger.info("Started OneTrainer training operation %s", op_id)

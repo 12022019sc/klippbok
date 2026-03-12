@@ -336,6 +336,49 @@ def generate_aitoolkit_export(
 
 
 # ---------------------------------------------------------------------------
+# OneTrainer preset loading
+# ---------------------------------------------------------------------------
+
+
+def _load_onetrainer_base_preset() -> dict:
+    """Load the SD 1.5 Lora Character - Prodigy preset as the base template.
+
+    OneTrainer's ``train.py`` CLI requires a fully-hydrated config (150+ keys
+    with ``__version``). This loads the user's preferred preset directly from
+    the OneTrainer installation.
+
+    Returns:
+        Dict of the full OneTrainer training config.
+
+    Raises:
+        FileNotFoundError: If the preset is not found at the expected path.
+    """
+    from klippbok.services.global_config_service import load_global_config
+
+    global_cfg = load_global_config()
+    configured_path = global_cfg.get("onetrainer", {}).get("onetrainer_path")
+
+    from klippbok.services.onetrainer_service import detect_onetrainer
+    ot_root = detect_onetrainer(configured_path)
+    if ot_root is None:
+        raise FileNotFoundError(
+            "OneTrainer not found. Configure the install path in Settings."
+        )
+
+    preset_path = ot_root / "training_presets" / "SD 1.5 Lora Character - Prodigy.json"
+    if not preset_path.is_file():
+        raise FileNotFoundError(
+            f"OneTrainer preset not found: {preset_path}. "
+            "Ensure 'SD 1.5 Lora Character - Prodigy.json' exists in "
+            "OneTrainer's training_presets/ directory."
+        )
+
+    data = json.loads(preset_path.read_text(encoding="utf-8"))
+    logger.info("Loaded OneTrainer base preset: %s", preset_path.name)
+    return data
+
+
+# ---------------------------------------------------------------------------
 # OneTrainer generator
 # ---------------------------------------------------------------------------
 
@@ -413,43 +456,21 @@ def generate_onetrainer_export(
         json.dumps(concept, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
 
-    # training_preset.json — Prodigy preset template (SD1.5 Lora Character)
-    # Based on user's "SD 1.5 Lora Character - Prodigy" preset.
-    # TODO: set base_model_name to actual SD1.5 checkpoint path.
-    training_preset = {
-        "model_type": "STABLE_DIFFUSION",
-        # TODO: set base_model_name to your SD1.5 checkpoint path
-        "base_model_name": "TODO: path/to/sd15_model.safetensors",
-        "concept_file_name": concept_file_fwd,
-        "output_model_destination": lora_output_fwd,
-        "lora_output": lora_output_fwd,
-        "output_model_format": "SAFETENSORS",
-        "train_dtype": "FLOAT_16",
-        "fallback_train_dtype": "BFLOAT_16",
-        "optimizer": {
-            "optimizer": "PRODIGY",
-            "weight_decay": 0.01,
-            "decouple": True,
-            "use_bias_correction": True,
-            "betas": [0.9, 0.99],
-            "safeguard_warmup": False,
-            "d_coef": 1.0,
-        },
-        "learning_rate_scheduler": "CONSTANT",
-        "learning_rate": 1.0,
-        "learning_rate_warmup_steps": 0,
-        "train_unet": True,
-        "train_text_encoder": False,
-        "network_type": "LORA",
-        "network_rank": 64,
-        "network_alpha": 32.0,
-        "resolution": resolution,
-        "num_epochs": 7,
-        "batch_size": 2,
-        "gradient_checkpointing": True,
-        "tensorboard": True,
-        "tensorboard_port": 6006,
-    }
+    # training_preset.json — Load a fully-hydrated preset from OneTrainer's
+    # training_presets/ directory as the base template. OneTrainer's train.py
+    # CLI requires a complete config with __version and all fields; partial
+    # presets (like the built-in #-prefixed ones) crash during config migration.
+    training_preset = _load_onetrainer_base_preset()
+
+    # Overlay klippbok-specific fields
+    training_preset["concept_file_name"] = concept_file_fwd
+    training_preset["output_model_destination"] = lora_output_fwd
+    # Some presets use "lora_output" as well
+    if "lora_output" in training_preset:
+        training_preset["lora_output"] = lora_output_fwd
+    training_preset["resolution"] = resolution
+    training_preset["tensorboard"] = True
+    training_preset["tensorboard_port"] = 6006
 
     preset_path = config.output_dir / "training_preset.json"
     preset_path.write_text(

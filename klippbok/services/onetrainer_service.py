@@ -112,6 +112,7 @@ def launch_onetrainer_headless(
     preset_path: Path,
     queue: asyncio.Queue,
     op_id: str,
+    loop: asyncio.AbstractEventLoop | None = None,
 ) -> None:
     """Launch OneTrainer headless training as a subprocess.
 
@@ -124,6 +125,9 @@ def launch_onetrainer_headless(
         preset_path: Path to the ``.json`` training preset/config file.
         queue: asyncio.Queue to receive training progress events.
         op_id: Unique operation identifier for event routing.
+        loop: The running asyncio event loop. Must be provided when called
+            from a thread pool (e.g. via run_in_executor) because
+            asyncio.get_event_loop() returns a wrong/new loop in worker threads.
 
     Raises:
         RuntimeError: If the OneTrainer venv Python executable is not found.
@@ -158,7 +162,10 @@ def launch_onetrainer_headless(
     )
     _ot_procs[op_id] = proc
 
-    loop = asyncio.get_event_loop()
+    # Use the caller-provided loop — asyncio.get_event_loop() returns a
+    # wrong loop when called from a thread pool worker (run_in_executor).
+    if loop is None:
+        loop = asyncio.get_event_loop()
     reader_thread = threading.Thread(
         target=_ot_stdout_reader,
         args=(proc, queue, loop, op_id),
