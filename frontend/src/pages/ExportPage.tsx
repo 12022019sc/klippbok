@@ -28,6 +28,7 @@ interface ExportConfig {
 }
 
 function defaultOutputPath(trainer: string): string {
+  if (trainer === 'onetrainer') return './training/'
   return `./export/${trainer}/`
 }
 
@@ -44,6 +45,7 @@ export default function ExportPage() {
   const [isValidating, setIsValidating] = useState(false)
   const [proceedWithIssues, setProceedWithIssues] = useState(false)
   const [opId, setOpId] = useState<string | null>(null)
+  const [exportStartError, setExportStartError] = useState<string | null>(null)
 
   const { progress, result, error, isExporting } = useExportEvents(opId)
 
@@ -98,15 +100,16 @@ export default function ExportPage() {
   }
 
   const hasIssues = (validation?.issues.length ?? 0) > 0
-  const hasNoCandiates = (validation?.candidates ?? 0) === 0
+  const hasNoCandidates = (validation?.candidates ?? 0) === 0
   const canExport =
     !isExporting &&
-    !hasNoCandiates &&
+    !hasNoCandidates &&
     !isValidating &&
     (proceedWithIssues || !hasIssues)
 
   const handleExport = async () => {
     if (!canExport) return
+    setExportStartError(null)
 
     try {
       const resp = await fetch('/api/v1/export/start', {
@@ -124,14 +127,14 @@ export default function ExportPage() {
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ detail: 'Export failed' }))
-        console.error('Export start failed:', err)
+        setExportStartError(err.detail || 'Export failed')
         return
       }
 
       const data = await resp.json()
       setOpId(data.op_id)
     } catch (err) {
-      console.error('Export request failed:', err)
+      setExportStartError(err instanceof Error ? err.message : 'Export request failed')
     }
   }
 
@@ -185,6 +188,9 @@ export default function ExportPage() {
               Fix caption issues above or click "Proceed anyway" to export with warnings.
             </span>
           )}
+          {exportStartError && (
+            <p className="export-error-message">{exportStartError}</p>
+          )}
         </div>
 
         {/* Section: Progress */}
@@ -202,7 +208,7 @@ export default function ExportPage() {
         {/* Section: Training Panel — visible only after successful export (result non-null) */}
         {result !== null && trainer === 'onetrainer' && (
           <section className="export-section">
-            <TrainingPanel presetPath={`${result.output_dir}/training_preset.json`} />
+            <TrainingPanel presetPath={result.preset_path ?? `${result.output_dir}/config/training_preset.json`} />
           </section>
         )}
       </div>

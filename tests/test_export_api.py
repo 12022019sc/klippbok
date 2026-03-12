@@ -185,6 +185,7 @@ class TestExportStartEndpoint:
             image_count=2,
             config_path=project_dir / "kohya_config.toml",
             output_dir=project_dir / "export",
+            preset_path=None,
         )
 
         app = create_app(project_dir=project_dir)
@@ -486,6 +487,39 @@ class TestTrainLaunchGuiEndpoint:
 
         assert resp.status_code == 200
         assert resp.json()["status"] == "launched"
+
+    def test_launch_gui_forwards_preset_path(
+        self, tmp_path: Path
+    ) -> None:
+        """POST /export/train/launch-gui forwards preset_path to launch_onetrainer_gui."""
+        project_dir = _setup_project(tmp_path)
+        app = create_app(project_dir=project_dir)
+        client = TestClient(app)
+
+        fake_ot_root = tmp_path / "OneTrainer"
+        mock_launch = MagicMock(return_value=None)
+
+        with (
+            patch(
+                "klippbok.services.global_config_service.load_global_config",
+                return_value={},
+            ),
+            patch(
+                "klippbok.services.onetrainer_service.detect_onetrainer",
+                return_value=fake_ot_root,
+            ),
+            patch(
+                "klippbok.services.onetrainer_service.launch_onetrainer_gui",
+                mock_launch,
+            ),
+        ):
+            resp = client.post(
+                "/api/v1/export/train/launch-gui",
+                json={"preset_path": "/some/preset.json"},
+            )
+
+        assert resp.status_code == 200
+        mock_launch.assert_called_once_with(fake_ot_root, preset_path=Path("/some/preset.json"))
 
     def test_launch_gui_returns_400_when_onetrainer_not_configured(
         self, tmp_path: Path

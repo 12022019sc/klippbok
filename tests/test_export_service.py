@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -430,6 +430,10 @@ class TestGenerateAiToolkitExport:
 # ---------------------------------------------------------------------------
 
 
+@patch(
+    "klippbok.services.export_service._load_onetrainer_base_preset",
+    return_value={"__version": 3, "resolution": "512"},
+)
 class TestGenerateOneTrainerExport:
     def _setup(self, tmp_path: Path) -> tuple[Path, Path, list[dict]]:
         project_dir = tmp_path / "mycharacter"
@@ -442,7 +446,7 @@ class TestGenerateOneTrainerExport:
         entries = [_crop_entry("crop/img1.jpg", "1girl, smile")]
         return project_dir, output_dir, entries
 
-    def test_creates_images_and_output_folders(self, tmp_path: Path) -> None:
+    def test_creates_workspace_directory_structure(self, _mock: MagicMock, tmp_path: Path) -> None:
         project_dir, output_dir, entries = self._setup(tmp_path)
         from klippbok.services.export_service import ExportConfig, generate_onetrainer_export
 
@@ -450,64 +454,97 @@ class TestGenerateOneTrainerExport:
             trainer="onetrainer", concept_name="MyChar", output_dir=output_dir
         )
         generate_onetrainer_export(entries, project_dir, config, None)
-        assert (output_dir / "images").exists()
+        # Workspace directories
+        assert (output_dir / "dataset" / "images").exists()
+        assert (output_dir / "training_concepts").exists()
+        assert (output_dir / "training_samples").exists()
+        assert (output_dir / "cache").exists()
         assert (output_dir / "output").exists()
-        assert (output_dir / "images" / "img1.jpg").exists()
+        assert (output_dir / "backup").exists()
+        assert (output_dir / "save").exists()
+        assert (output_dir / "samples").exists()
+        assert (output_dir / "tensorboard").exists()
+        assert (output_dir / "config").exists()
+        # Images land in dataset/images/
+        assert (output_dir / "dataset" / "images" / "img1.jpg").exists()
 
-    def test_writes_concept_json(self, tmp_path: Path) -> None:
+    def test_writes_concept_json_v2_schema(self, _mock: MagicMock, tmp_path: Path) -> None:
         project_dir, output_dir, entries = self._setup(tmp_path)
         from klippbok.services.export_service import ExportConfig, generate_onetrainer_export
 
         config = ExportConfig(
             trainer="onetrainer", concept_name="MyChar", repeats=7, output_dir=output_dir
         )
-        result_path = generate_onetrainer_export(entries, project_dir, config, None)
-        concept_path = output_dir / "concept.json"
+        concept_path, preset_path = generate_onetrainer_export(entries, project_dir, config, None)
+        assert concept_path == output_dir / "training_concepts" / "MyChar.json"
         assert concept_path.exists()
-        assert result_path == concept_path
 
         data = json.loads(concept_path.read_text(encoding="utf-8"))
         assert isinstance(data, list)
         assert len(data) == 1
         concept = data[0]
+        assert concept["__version"] == 2
         assert concept["name"] == "MyChar"
         assert concept["type"] == "STANDARD"
         assert "/" in concept["path"]  # forward slashes
-        assert concept["balancing"] == "REPEATS"
-        assert concept["repeats"] == 7
+        # v2 schema: balancing is float, balancing_strategy is the enum
+        assert concept["balancing"] == 7.0
+        assert isinstance(concept["balancing"], float)
+        assert concept["balancing_strategy"] == "REPEATS"
+        # image_variations and text_variations are ints, not arrays
+        assert concept["image_variations"] == 1
+        assert isinstance(concept["image_variations"], int)
+        assert concept["text_variations"] == 1
+        # image and text sub-objects exist
+        assert "image" in concept
+        assert concept["image"]["__version"] == 0
+        assert "text" in concept
+        assert concept["text"]["__version"] == 0
+        assert concept["text"]["prompt_source"] == "sample"
+        assert concept["loss_weight"] == 1.0
+        assert concept["include_subdirectories"] is False
 
-    def test_concept_json_has_prompt_source(self, tmp_path: Path) -> None:
+    def test_concept_json_has_prompt_source_in_text(self, _mock: MagicMock, tmp_path: Path) -> None:
         project_dir, output_dir, entries = self._setup(tmp_path)
         from klippbok.services.export_service import ExportConfig, generate_onetrainer_export
 
         config = ExportConfig(trainer="onetrainer", concept_name="Test", output_dir=output_dir)
         generate_onetrainer_export(entries, project_dir, config, None)
-        data = json.loads((output_dir / "concept.json").read_text(encoding="utf-8"))
+        concept_path = output_dir / "training_concepts" / "Test.json"
+        data = json.loads(concept_path.read_text(encoding="utf-8"))
         concept = data[0]
-        assert concept.get("prompt_source") == "sample" or (
-            "text" in concept and concept["text"].get("prompt_source") == "sample"
-        )
+        assert concept["text"]["prompt_source"] == "sample"
 
-    def test_writes_training_preset_json(self, tmp_path: Path) -> None:
+    def test_writes_training_preset_json(self, _mock: MagicMock, tmp_path: Path) -> None:
         project_dir, output_dir, entries = self._setup(tmp_path)
         from klippbok.services.export_service import ExportConfig, generate_onetrainer_export
 
         config = ExportConfig(trainer="onetrainer", concept_name="MyChar", output_dir=output_dir)
-        generate_onetrainer_export(entries, project_dir, config, None)
-        preset_path = output_dir / "training_preset.json"
+        concept_path, preset_path = generate_onetrainer_export(entries, project_dir, config, None)
+        assert preset_path == output_dir / "config" / "training_preset.json"
         assert preset_path.exists()
 
         data = json.loads(preset_path.read_text(encoding="utf-8"))
         assert "concept_file_name" in data
         assert "output_model_destination" in data
+        # workspace_dir and cache_dir must be set
+        assert "workspace_dir" in data
+        assert "cache_dir" in data
+        # concept_file_name should be relative (not absolute)
+        assert not data["concept_file_name"].startswith("/")
+        assert not data["concept_file_name"].startswith("C:")
+        assert data["concept_file_name"] == "training_concepts/MyChar.json"
+        # resolution must be a string
+        assert isinstance(data["resolution"], str)
 
-    def test_concept_path_uses_forward_slashes(self, tmp_path: Path) -> None:
+    def test_concept_path_uses_forward_slashes(self, _mock: MagicMock, tmp_path: Path) -> None:
         project_dir, output_dir, entries = self._setup(tmp_path)
         from klippbok.services.export_service import ExportConfig, generate_onetrainer_export
 
         config = ExportConfig(trainer="onetrainer", concept_name="MyChar", output_dir=output_dir)
         generate_onetrainer_export(entries, project_dir, config, None)
-        data = json.loads((output_dir / "concept.json").read_text(encoding="utf-8"))
+        concept_path = output_dir / "training_concepts" / "MyChar.json"
+        data = json.loads(concept_path.read_text(encoding="utf-8"))
         assert "\\" not in data[0]["path"]
 
 
@@ -548,7 +585,11 @@ class TestPerformExport:
         assert result.status == "ok"
         assert result.image_count == 1
 
-    def test_performs_onetrainer_export(self, tmp_path: Path) -> None:
+    @patch(
+        "klippbok.services.export_service._load_onetrainer_base_preset",
+        return_value={"__version": 3, "resolution": "512"},
+    )
+    def test_performs_onetrainer_export(self, _mock: MagicMock, tmp_path: Path) -> None:
         project_dir, _ = self._setup_project(tmp_path)
         output_dir = tmp_path / "export"
         from klippbok.services.export_service import ExportConfig, ExportResult, perform_export
@@ -557,6 +598,8 @@ class TestPerformExport:
         result = perform_export(project_dir, config, None)
         assert result.status == "ok"
         assert result.image_count == 1
+        assert result.preset_path is not None
+        assert result.preset_path.exists()
 
     def test_creates_output_dir_if_missing(self, tmp_path: Path) -> None:
         project_dir, _ = self._setup_project(tmp_path)

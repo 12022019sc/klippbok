@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import random
 import shutil
 from pathlib import Path
 from typing import Callable, Literal
@@ -69,6 +70,7 @@ class ExportResult(BaseModel):
     image_count: int = Field(description="Number of images copied.")
     config_path: Path = Field(description="Path to the generated trainer config file.")
     output_dir: Path = Field(description="Directory where files were exported.")
+    preset_path: Path | None = Field(default=None, description="Path to training preset (OneTrainer only).")
 
 
 # ---------------------------------------------------------------------------
@@ -388,19 +390,23 @@ def generate_onetrainer_export(
     project_dir: Path,
     config: ExportConfig,
     progress_cb: Callable[[int, int], None] | None,
-) -> Path:
-    """Generate OneTrainer folder structure, concept.json, and training_preset.json.
+) -> tuple[Path, Path]:
+    """Generate OneTrainer workspace structure, concept.json, and training_preset.json.
 
-    Creates:
-      {output_dir}/images/
-        *.jpg / ...
-        *.txt
-      {output_dir}/output/       (LoRA output directory)
-      {output_dir}/concept.json
-      {output_dir}/training_preset.json
+    Creates the full OneTrainer workspace layout:
+      {output_dir}/dataset/images/     ← images + caption .txt files
+      {output_dir}/training_concepts/  ← concept.json
+      {output_dir}/training_samples/
+      {output_dir}/cache/
+      {output_dir}/output/             ← LoRA output
+      {output_dir}/backup/
+      {output_dir}/save/
+      {output_dir}/samples/
+      {output_dir}/tensorboard/
+      {output_dir}/config/             ← training_preset.json
 
-    The training_preset.json is based on the user's "SD 1.5 Lora Character - Prodigy"
-    preset: rank 64, 7 epochs, batch 2, Prodigy optimizer, 768px resolution.
+    The concept.json uses OneTrainer v2 schema with proper image/text sub-objects,
+    integer image_variations/text_variations, and float balancing.
 
     Args:
         entries: Image entries to export (source="crop").
@@ -409,49 +415,79 @@ def generate_onetrainer_export(
         progress_cb: Optional progress callback.
 
     Returns:
-        Path to concept.json.
+        Tuple of (concept_path, preset_path).
     """
-    image_dir = config.output_dir / "images"
+    # Create OneTrainer workspace directories
+    workspace_dirs = [
+        "dataset/images",
+        "training_concepts",
+        "training_samples",
+        "cache",
+        "output",
+        "backup",
+        "save",
+        "samples",
+        "tensorboard",
+        "config",
+    ]
+    for subdir in workspace_dirs:
+        (config.output_dir / subdir).mkdir(parents=True, exist_ok=True)
+
+    image_dir = config.output_dir / "dataset" / "images"
     lora_output_dir = config.output_dir / "output"
-    image_dir.mkdir(parents=True, exist_ok=True)
-    lora_output_dir.mkdir(parents=True, exist_ok=True)
 
     _copy_images_with_captions(entries, project_dir, image_dir, progress_cb)
 
     image_dir_fwd = _to_fwd(image_dir.resolve())
+    workspace_dir_fwd = _to_fwd(config.output_dir.resolve())
+    cache_dir_fwd = _to_fwd((config.output_dir / "cache").resolve())
     lora_output_fwd = _to_fwd((lora_output_dir / f"{config.concept_name}.safetensors").resolve())
-    concept_file_fwd = _to_fwd((config.output_dir / "concept.json").resolve())
 
     defaults = get_export_defaults(project_dir)
     resolution = defaults["resolution"]
 
-    # concept.json — OneTrainer concept array
+    # concept.json — OneTrainer v2 schema
     concept = [
         {
+            "__version": 2,
             "name": config.concept_name,
             "type": "STANDARD",
             "path": image_dir_fwd,
+            "seed": random.randint(-2**31, 2**31 - 1),
+            "enabled": True,
+            "include_subdirectories": False,
+            "image_variations": 1,
+            "text_variations": 1,
+            "balancing": float(config.repeats),
+            "balancing_strategy": "REPEATS",
+            "loss_weight": 1.0,
+            "image": {
+                "__version": 0,
+                "enable_crop_jitter": False,
+                "enable_random_flip": False,
+                "enable_fixed_flip": False,
+                "enable_random_rotate": False,
+                "enable_random_brightness": False,
+                "enable_random_contrast": False,
+                "enable_random_saturation": False,
+                "enable_random_hue": False,
+                "enable_resolution_override": False,
+            },
             "text": {
+                "__version": 0,
                 "prompt_source": "sample",
                 "prompt_path": "",
                 "caption_ext": ".txt",
+                "enable_tag_shuffling": False,
+                "tag_delimiter": ",",
+                "keep_tags_count": 1,
+                "tag_dropout": 0.0,
+                "enable_ucg": False,
             },
-            "image_variations": [
-                {
-                    "width": resolution,
-                    "height": resolution,
-                    "depth": 1,
-                    "aspect_ratio_bucketing": True,
-                    "resolution": resolution * resolution,
-                }
-            ],
-            "balancing": "REPEATS",
-            "repeats": config.repeats,
-            "enabled": True,
         }
     ]
 
-    concept_path = config.output_dir / "concept.json"
+    concept_path = config.output_dir / "training_concepts" / f"{config.concept_name}.json"
     concept_path.write_text(
         json.dumps(concept, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
@@ -462,22 +498,22 @@ def generate_onetrainer_export(
     # presets (like the built-in #-prefixed ones) crash during config migration.
     training_preset = _load_onetrainer_base_preset()
 
-    # Overlay klippbok-specific fields
-    training_preset["concept_file_name"] = concept_file_fwd
+    # Overlay klippbok-specific workspace fields
+    training_preset["workspace_dir"] = workspace_dir_fwd
+    training_preset["cache_dir"] = cache_dir_fwd
+    training_preset["concept_file_name"] = f"training_concepts/{config.concept_name}.json"
     training_preset["output_model_destination"] = lora_output_fwd
-    # Some presets use "lora_output" as well
-    if "lora_output" in training_preset:
-        training_preset["lora_output"] = lora_output_fwd
-    training_preset["resolution"] = resolution
+    training_preset["save_filename_prefix"] = f"{config.concept_name}_epoch"
+    training_preset["resolution"] = str(resolution)
     training_preset["tensorboard"] = True
     training_preset["tensorboard_port"] = 6006
 
-    preset_path = config.output_dir / "training_preset.json"
+    preset_path = config.output_dir / "config" / "training_preset.json"
     preset_path.write_text(
         json.dumps(training_preset, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
 
-    return concept_path
+    return concept_path, preset_path
 
 
 # ---------------------------------------------------------------------------
@@ -504,18 +540,21 @@ def perform_export(
 
     config.output_dir.mkdir(parents=True, exist_ok=True)
 
-    generators = {
-        "kohya": generate_kohya_export,
-        "aitoolkit": generate_aitoolkit_export,
-        "onetrainer": generate_onetrainer_export,
-    }
+    preset_path: Path | None = None
 
-    generator = generators[config.trainer]
-    config_path = generator(entries, project_dir, config, progress_cb)
+    if config.trainer == "onetrainer":
+        config_path, preset_path = generate_onetrainer_export(
+            entries, project_dir, config, progress_cb
+        )
+    elif config.trainer == "kohya":
+        config_path = generate_kohya_export(entries, project_dir, config, progress_cb)
+    else:
+        config_path = generate_aitoolkit_export(entries, project_dir, config, progress_cb)
 
     return ExportResult(
         status="ok",
         image_count=len(entries),
         config_path=config_path,
         output_dir=config.output_dir,
+        preset_path=preset_path,
     )

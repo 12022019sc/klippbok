@@ -100,7 +100,11 @@ export default function TrainingPanel({ presetPath }: TrainingPanelProps) {
   async function handleLaunchGui() {
     setIsLaunchingGui(true)
     try {
-      await fetch('/api/v1/export/train/launch-gui', { method: 'POST' })
+      await fetch('/api/v1/export/train/launch-gui', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ preset_path: presetPath }),
+      })
     } catch (err) {
       console.error('Launch GUI error:', err)
     } finally {

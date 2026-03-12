@@ -10,6 +10,7 @@ export interface ExportResult {
   image_count: number
   config_path: string
   output_dir: string
+  preset_path: string | null
 }
 
 export interface ExportEventState {
@@ -86,6 +87,7 @@ export function useExportEvents(opId: string | null): ExportEventState {
           image_count?: number
           config_path?: string
           output_dir?: string
+          preset_path?: string | null
         }
         setState({
           progress: {
@@ -97,6 +99,7 @@ export function useExportEvents(opId: string | null): ExportEventState {
             image_count: data.image_count ?? 0,
             config_path: data.config_path ?? '',
             output_dir: data.output_dir ?? '',
+            preset_path: data.preset_path ?? null,
           },
           error: null,
           isExporting: false,

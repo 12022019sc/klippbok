@@ -61,6 +61,7 @@ _export_queues: dict[str, asyncio.Queue] = {}
 # Module-level state for training operations
 _train_queues: dict[str, asyncio.Queue] = {}
 _train_start_times: dict[str, float] = {}
+_active_preset_paths: dict[str, Path] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -152,6 +153,7 @@ async def _run_export_bg(
                 "image_count": result.image_count,
                 "config_path": str(result.config_path),
                 "output_dir": str(result.output_dir),
+                "preset_path": str(result.preset_path) if result.preset_path else None,
             },
         })
 
@@ -420,22 +422,13 @@ async def start_training(body: TrainStartRequest, request: Request) -> dict:
         HTTPException 400: If OneTrainer not configured or preset not found.
         HTTPException 409: If no project directory is selected.
     """
-    from klippbok.services.global_config_service import load_global_config
-    from klippbok.services.onetrainer_service import detect_onetrainer, launch_onetrainer_headless
+    from klippbok.services.onetrainer_service import launch_onetrainer_headless
 
     project_dir: Path | None = request.app.state.project_dir
     if project_dir is None:
         raise HTTPException(status_code=409, detail="No project directory selected")
 
-    global_config = load_global_config()
-    configured_path = global_config.get("onetrainer", {}).get("onetrainer_path")
-
-    ot_root = detect_onetrainer(configured_path)
-    if ot_root is None:
-        raise HTTPException(
-            status_code=400,
-            detail="OneTrainer not configured. Set the install path in Settings.",
-        )
+    ot_root = _detect_ot_root()
 
     # Resolve preset path against project_dir — frontend sends relative paths
     # like "export/onetrainer/training_preset.json"
@@ -457,15 +450,15 @@ async def start_training(body: TrainStartRequest, request: Request) -> dict:
             detail=f"Failed to read preset file: {exc}",
         ) from exc
 
-    # Apply training parameter overrides
+    # Apply training parameter overrides (OneTrainer field names)
     if body.base_model_path:
         preset_data["base_model_name"] = body.base_model_path
-    preset_data["network_rank"] = body.lora_rank
-    preset_data["network_alpha"] = float(body.lora_alpha)
-    preset_data["num_epochs"] = body.epochs
+    preset_data["lora_rank"] = body.lora_rank
+    preset_data["lora_alpha"] = float(body.lora_alpha)
+    preset_data["epochs"] = body.epochs
     preset_data["batch_size"] = body.batch_size
     preset_data["learning_rate"] = body.learning_rate
-    preset_data["resolution"] = body.resolution
+    preset_data["resolution"] = str(body.resolution)
 
     # Write modified preset next to the original
     active_preset_path = preset_path.parent / "training_preset_active.json"
@@ -478,6 +471,7 @@ async def start_training(body: TrainStartRequest, request: Request) -> dict:
     queue: asyncio.Queue = asyncio.Queue()
     _train_queues[op_id] = queue
     _train_start_times[op_id] = time.time()
+    _active_preset_paths[op_id] = active_preset_path
 
     loop = asyncio.get_running_loop()
     # launch_onetrainer_headless is synchronous — run in executor to avoid blocking.
@@ -547,19 +541,17 @@ async def training_events(op_id: str) -> EventSourceResponse:
                     )
                 elif event_type == "training_done":
                     duration = time.time() - start_time
-                    # Try to find the LoRA output path from the active preset
+                    # Look up the LoRA output path from the stored active preset
                     lora_path: str | None = None
-                    try:
-                        active_preset_candidates = list(
-                            Path(".").rglob("training_preset_active.json")
-                        )
-                        if active_preset_candidates:
+                    stored_preset = _active_preset_paths.pop(op_id, None)
+                    if stored_preset and stored_preset.is_file():
+                        try:
                             preset_data = _json.loads(
-                                active_preset_candidates[0].read_text(encoding="utf-8")
+                                stored_preset.read_text(encoding="utf-8")
                             )
                             lora_path = preset_data.get("output_model_destination")
-                    except Exception:
-                        pass
+                        except Exception:
+                            pass
 
                     yield ServerSentEvent(
                         event="training_done",
@@ -598,15 +590,16 @@ async def stop_training(op_id: str) -> dict:
     return {"stopped": stopped}
 
 
-@router.post("/train/launch-gui")
-async def launch_training_gui() -> dict:
-    """Launch the OneTrainer GUI (detached, no tracking).
+class LaunchGuiRequest(BaseModel):
+    """Optional request body for launching OneTrainer GUI with a preset."""
 
-    Returns:
-        {"status": "launched"} or {"status": "not_configured"}
-    """
+    preset_path: str | None = None
+
+
+def _detect_ot_root() -> Path:
+    """Detect OneTrainer installation root, raising HTTPException if not found."""
     from klippbok.services.global_config_service import load_global_config
-    from klippbok.services.onetrainer_service import detect_onetrainer, launch_onetrainer_gui
+    from klippbok.services.onetrainer_service import detect_onetrainer
 
     global_config = load_global_config()
     configured_path = global_config.get("onetrainer", {}).get("onetrainer_path")
@@ -617,9 +610,28 @@ async def launch_training_gui() -> dict:
             status_code=400,
             detail="OneTrainer not configured. Set the install path in Settings.",
         )
+    return ot_root
+
+
+@router.post("/train/launch-gui")
+async def launch_training_gui(body: LaunchGuiRequest | None = None) -> dict:
+    """Launch the OneTrainer GUI (detached, no tracking).
+
+    Optionally accepts a preset_path to pre-load a training preset.
+
+    Returns:
+        {"status": "launched"} or {"status": "not_configured"}
+    """
+    from klippbok.services.onetrainer_service import launch_onetrainer_gui
+
+    ot_root = _detect_ot_root()
+
+    resolved_preset: Path | None = None
+    if body and body.preset_path:
+        resolved_preset = Path(body.preset_path)
 
     try:
-        launch_onetrainer_gui(ot_root)
+        launch_onetrainer_gui(ot_root, preset_path=resolved_preset)
         logger.info("Launched OneTrainer GUI (ot_root=%s)", ot_root)
         return {"status": "launched"}
     except Exception as exc:
