@@ -26,7 +26,7 @@ from klippbok.curation.models import (
     ImageScore,
     PipelineSummary,
 )
-from klippbok.curation.scorer import mark_duplicates, score_images
+from klippbok.curation.scorer import _compute_composite, mark_duplicates, rank_normalize, score_images
 from klippbok.services.face_service import (
     cluster_face_embeddings,
     compute_face_embeddings,
@@ -312,6 +312,40 @@ def _gather_embeddings(
 
 
 # ---------------------------------------------------------------------------
+# Quality floor
+# ---------------------------------------------------------------------------
+
+
+def _apply_quality_floor(
+    scores: list[ImageScore],
+    config: CurationConfig,
+) -> None:
+    """Apply two-tier quality floor to scored images in-place.
+
+    Hard floor: excludes images with raw_composite_score below config.hard_floor.
+    Soft floor: flags images below the quality_floor_pct percentile of ranked
+    composite scores (among non-hard-excluded images).
+
+    Args:
+        scores: List of ImageScore objects. Modified in-place.
+        config: Curation configuration with hard_floor and quality_floor_pct.
+    """
+    # Hard floor: absolute exclusion based on raw composite
+    for s in scores:
+        if s.raw_composite_score < config.hard_floor:
+            s.floor_status = "hard_floor"
+
+    # Soft floor: advisory flag based on ranked composite percentile
+    remaining = [s for s in scores if s.floor_status != "hard_floor"]
+    if remaining and config.quality_floor_pct > 0:
+        composites = np.array([s.composite_score for s in remaining])
+        soft_cutoff = float(np.percentile(composites, config.quality_floor_pct * 100))
+        for s in remaining:
+            if s.composite_score < soft_cutoff:
+                s.floor_status = "soft_floor"
+
+
+# ---------------------------------------------------------------------------
 # Main pipeline
 # ---------------------------------------------------------------------------
 
@@ -373,24 +407,27 @@ def run_curation(
 
     _flush_gpu()
 
-    # 3. Mark duplicates
+    # 3. Mark duplicates (union-find grouping)
     mark_duplicates(all_scores, image_paths)
+
+    # 3b. Rank-normalize signals and recompute composite
+    rank_normalize(all_scores)
+    for s in all_scores:
+        s.raw_composite_score = s.composite_score  # preserve raw
+        s.composite_score = _compute_composite(s.ranked_signals, config.mode)
 
     # Build score-to-path mapping
     score_to_path: dict[str, Path] = {}
     for score, path in zip(all_scores, image_paths):
         score_to_path[score.image_id] = path
 
-    # 4. Quality floor: remove bottom N% by composite score AND duplicates
-    composites = np.array([s.composite_score for s in all_scores])
-    if len(composites) > 0 and config.quality_floor_pct > 0:
-        cutoff = float(np.percentile(composites, config.quality_floor_pct * 100))
-    else:
-        cutoff = 0.0
+    # 4. Two-tier quality floor
+    _apply_quality_floor(all_scores, config)
 
+    # 5. Build pool: exclude hard floor and dedup non-representatives
     passed_scores = [
         s for s in all_scores
-        if s.composite_score >= cutoff and not s.signals.is_duplicate
+        if s.floor_status != "hard_floor" and s.dedup_kept
     ]
 
     # 5. Gather embeddings for passed images
@@ -418,6 +455,8 @@ def run_curation(
         total_scanned=total,
         passed_quality=len(passed_scores),
         selected=len(selected_ids),
+        hard_excluded=sum(1 for s in all_scores if s.floor_status == "hard_floor"),
+        soft_flagged=sum(1 for s in all_scores if s.floor_status == "soft_floor"),
     )
 
     result = CurationResult(

@@ -42,11 +42,10 @@ def _make_score(image_id: str, composite: float, is_dup: bool = False) -> ImageS
 class TestQualityFloor:
     """Quality floor filtering: bottom N% by composite score are removed."""
 
-    def test_quality_floor_removes_bottom_30_pct(self, tmp_path: Path) -> None:
-        """10 images with floor=0.3 -> bottom 30% removed -> 7 pass."""
+    def test_hard_floor_excludes_garbage(self, tmp_path: Path) -> None:
+        """Hard floor at 0.15 excludes only images with raw composite below it."""
         from klippbok.curation.pipeline import run_curation
 
-        # Create 10 fake image files
         image_paths = []
         for i in range(10):
             p = tmp_path / f"img_{i:02d}.jpg"
@@ -55,9 +54,8 @@ class TestQualityFloor:
 
         # Scores: 0.1, 0.2, 0.3, ..., 1.0
         scores = [_make_score(f"id{i:02d}", (i + 1) * 0.1) for i in range(10)]
-        config = CurationConfig(mode="character", target_count=5, quality_floor_pct=0.3)
+        config = CurationConfig(mode="character", target_count=5, quality_floor_pct=0.3, hard_floor=0.15)
 
-        # Mock all external dependencies
         with (
             patch("klippbok.curation.pipeline.score_images", return_value=scores),
             patch("klippbok.curation.pipeline.mark_duplicates"),
@@ -71,13 +69,14 @@ class TestQualityFloor:
         ):
             result = run_curation(image_paths, tmp_path, config)
 
-        # Bottom 30% means images with composite <= 30th percentile are removed
-        # 7 should pass quality floor
-        assert result.summary.passed_quality == 7
+        # Only id00 (raw composite 0.1) is below hard floor 0.15
+        # Soft floor flags but doesn't exclude from pool
+        assert result.summary.hard_excluded == 1
+        assert result.summary.passed_quality == 9
         assert result.summary.total_scanned == 10
 
-    def test_duplicates_removed_before_diversity(self, tmp_path: Path) -> None:
-        """Duplicate-flagged images should be excluded from passed_quality count."""
+    def test_dedup_non_reps_excluded_from_pool(self, tmp_path: Path) -> None:
+        """Dedup non-representatives (dedup_kept=False) excluded from pool."""
         from klippbok.curation.pipeline import run_curation
 
         image_paths = []
@@ -86,19 +85,29 @@ class TestQualityFloor:
             p.write_bytes(b"fake")
             image_paths.append(p)
 
-        # 5 images: 3 normal, 2 duplicates (one high-score dup still excluded)
+        # 5 images: 3 normal, 2 dedup non-reps
         scores = [
             _make_score("id0", 0.9),
             _make_score("id1", 0.8),
             _make_score("id2", 0.7),
-            _make_score("id3", 0.6, is_dup=True),
-            _make_score("id4", 0.5, is_dup=True),
+            _make_score("id3", 0.6),
+            _make_score("id4", 0.5),
         ]
+
+        def mock_mark_duplicates(scores_list, paths):
+            """Simulate union-find: id3 and id4 are non-representatives."""
+            scores_list[3].dedup_kept = False
+            scores_list[3].dedup_group_id = "id0"
+            scores_list[3].signals.is_duplicate = True
+            scores_list[4].dedup_kept = False
+            scores_list[4].dedup_group_id = "id0"
+            scores_list[4].signals.is_duplicate = True
+
         config = CurationConfig(mode="character", target_count=3, quality_floor_pct=0.0)
 
         with (
             patch("klippbok.curation.pipeline.score_images", return_value=scores),
-            patch("klippbok.curation.pipeline.mark_duplicates"),
+            patch("klippbok.curation.pipeline.mark_duplicates", side_effect=mock_mark_duplicates),
             patch("klippbok.curation.pipeline.select_diverse_subset",
                   side_effect=lambda scores, tc, clip, pose, face, **kw: [s.image_id for s in scores[:tc]]),
             patch("klippbok.curation.pipeline._resolve_reference_embedding", return_value=None),
@@ -109,7 +118,7 @@ class TestQualityFloor:
         ):
             result = run_curation(image_paths, tmp_path, config)
 
-        # Dupes excluded: only 3 pass
+        # Dedup non-reps excluded: only 3 pass
         assert result.summary.passed_quality == 3
 
 
@@ -127,9 +136,9 @@ class TestSummaryStats:
             image_paths.append(p)
 
         scores = [_make_score(f"id{i}", (i + 1) * 0.1) for i in range(10)]
-        config = CurationConfig(mode="character", target_count=4, quality_floor_pct=0.3)
+        config = CurationConfig(mode="character", target_count=4, quality_floor_pct=0.3, hard_floor=0.15)
 
-        selected_ids = ["id03", "id04", "id05", "id06"]
+        selected_ids = ["id3", "id4", "id5", "id6"]
 
         with (
             patch("klippbok.curation.pipeline.score_images", return_value=scores),
@@ -144,7 +153,9 @@ class TestSummaryStats:
             result = run_curation(image_paths, tmp_path, config)
 
         assert result.summary.total_scanned == 10
-        assert result.summary.passed_quality == 7
+        # Only id0 (raw 0.1) hard-excluded; rest pass (soft floor flags, doesn't exclude)
+        assert result.summary.hard_excluded == 1
+        assert result.summary.passed_quality == 9
         assert result.summary.selected == 4
 
 
@@ -296,3 +307,58 @@ class TestRediversify:
         assert result.selected_ids == new_selected
         assert result.pinned_ids == ["id0"]
         assert result.excluded_ids == ["id9"]
+
+
+class TestTwoTierFloor:
+    """Tests for hard floor + soft floor logic."""
+
+    def _make_score(self, image_id: str, raw_composite: float, ranked_composite: float) -> ImageScore:
+        return ImageScore(
+            image_id=image_id,
+            relative_path=f"{image_id}.jpg",
+            raw_composite_score=raw_composite,
+            composite_score=ranked_composite,
+            mode="character",
+        )
+
+    def test_hard_floor_excludes_low_raw_composite(self):
+        """Images with raw composite below hard floor get floor_status='hard_floor'."""
+        from klippbok.curation.pipeline import _apply_quality_floor
+
+        scores = [
+            self._make_score("good", 0.6, 0.8),
+            self._make_score("bad", 0.1, 0.2),   # below 0.15 hard floor
+        ]
+        config = CurationConfig(hard_floor=0.15, quality_floor_pct=0.0)
+        _apply_quality_floor(scores, config)
+
+        assert scores[0].floor_status == "passed"
+        assert scores[1].floor_status == "hard_floor"
+
+    def test_soft_floor_flags_but_doesnt_exclude(self):
+        """Soft floor flags images but leaves floor_status != 'hard_floor'."""
+        from klippbok.curation.pipeline import _apply_quality_floor
+
+        scores = [
+            self._make_score("top", 0.9, 0.9),
+            self._make_score("mid", 0.5, 0.5),
+            self._make_score("low", 0.3, 0.1),  # raw 0.3 above hard floor, ranked 0.1
+        ]
+        config = CurationConfig(hard_floor=0.15, quality_floor_pct=0.5)
+        _apply_quality_floor(scores, config)
+
+        assert scores[0].floor_status == "passed"
+        soft_count = sum(1 for s in scores if s.floor_status == "soft_floor")
+        hard_count = sum(1 for s in scores if s.floor_status == "hard_floor")
+        assert hard_count == 0  # none below raw 0.15
+        assert soft_count >= 1  # at least one below soft cutoff
+
+    def test_all_good_images_no_hard_exclusion(self):
+        """In a high-quality dataset, zero images should be hard-excluded."""
+        from klippbok.curation.pipeline import _apply_quality_floor
+
+        scores = [self._make_score(str(i), 0.5 + i * 0.05, 0.5 + i * 0.05) for i in range(10)]
+        config = CurationConfig(hard_floor=0.15)
+        _apply_quality_floor(scores, config)
+
+        assert all(s.floor_status != "hard_floor" for s in scores)
