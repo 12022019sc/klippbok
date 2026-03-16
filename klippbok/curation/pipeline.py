@@ -519,6 +519,17 @@ def rediversify(
     stored_ids = emb_data["image_ids"]
     scores_list = [result.scores[sid] for sid in stored_ids if sid in result.scores]
 
+    # Guard: drop pinned IDs not present in embeddings (hard-floor excluded
+    # or dedup non-representatives don't have cached embeddings)
+    stored_id_set = set(stored_ids)
+    dropped_pins = [pid for pid in pinned_ids if pid not in stored_id_set]
+    if dropped_pins:
+        logger.warning(
+            "Dropping %d pinned IDs not in embeddings (hard-floor or dedup non-rep): %s",
+            len(dropped_pins), dropped_pins[:5],
+        )
+    valid_pinned = [pid for pid in pinned_ids if pid in stored_id_set]
+
     # Filter embeddings to match available scores
     available_mask = [sid in result.scores for sid in stored_ids]
     clip_embs = emb_data["clip"][available_mask]
@@ -531,7 +542,7 @@ def rediversify(
         clip_embs,
         pose_embs,
         face_embs,
-        pinned_ids=pinned_ids,
+        pinned_ids=valid_pinned,
         excluded_ids=excluded_ids,
     )
 
