@@ -68,6 +68,21 @@ class ImageScore(BaseModel):
     mode: CurationMode = "character"
     """Mode used to compute composite_score."""
 
+    raw_composite_score: float = 0.0
+    """Composite from raw signals — preserves absolute quality for hard floor."""
+
+    ranked_signals: SignalScores = Field(default_factory=SignalScores)
+    """Percentile-ranked signal scores (0.0 = worst in dataset, 1.0 = best)."""
+
+    floor_status: Literal["passed", "soft_floor", "hard_floor"] = "passed"
+    """Quality floor classification."""
+
+    dedup_group_id: str | None = None
+    """Duplicate group key (None = unique image, string = group ID)."""
+
+    dedup_kept: bool = True
+    """Whether this image is the representative of its dedup group."""
+
 
 class DiversityWeights(BaseModel):
     """Weights for embedding concatenation in diversity selection."""
@@ -103,6 +118,9 @@ class CurationConfig(BaseModel):
     identity_threshold: float = Field(default=0.4, ge=0.0, le=1.0)
     """Minimum identity similarity to reference embedding."""
 
+    hard_floor: float = Field(default=0.15, ge=0.0, le=1.0)
+    """Absolute raw composite threshold — images below are always excluded."""
+
     reference_image_id: str | None = None
     """Image ID of the identity reference (for character mode)."""
 
@@ -134,6 +152,12 @@ class PipelineSummary(BaseModel):
 
     selected: int = 0
     """Images selected for the final subset."""
+
+    hard_excluded: int = 0
+    """Images below hard quality floor."""
+
+    soft_flagged: int = 0
+    """Images below soft quality floor (still eligible for selection)."""
 
     diversity_metrics: DiversityMetrics | None = None
     """Diversity statistics for the selected subset."""

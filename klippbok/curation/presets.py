@@ -39,6 +39,14 @@ STYLE_WEIGHTS: dict[str, float] = {
 _DEFAULT_TARGET_COUNT: int = 60
 """Fallback target count for unknown/custom model architectures."""
 
+HARD_FLOOR_DEFAULT: float = 0.15
+"""Absolute raw composite threshold for hard quality floor.
+Images below this are always excluded regardless of dataset quality."""
+
+CURATION_PHASH_THRESHOLD: int = 6
+"""pHash Hamming distance threshold for curation dedup.
+Tighter than import validation (10) to catch only true near-duplicates."""
+
 
 def get_target_count_default(model_name: str | None) -> int:
     """Return the default target image count for a model architecture.

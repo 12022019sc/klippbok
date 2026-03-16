@@ -41,19 +41,20 @@ def compute_phash(image_path: Path | str) -> str:
     return str(h)
 
 
-def are_near_duplicates(hash_hex_a: str, hash_hex_b: str) -> bool:
+def are_near_duplicates(hash_hex_a: str, hash_hex_b: str, threshold: int = PHASH_THRESHOLD) -> bool:
     """Check if two images are near-duplicates by pHash distance.
 
     Args:
         hash_hex_a: Hex string of first image's pHash.
         hash_hex_b: Hex string of second image's pHash.
+        threshold: Maximum Hamming distance to consider as duplicates.
 
     Returns:
-        True if Hamming distance <= PHASH_THRESHOLD.
+        True if Hamming distance <= threshold.
     """
     ha = imagehash.hex_to_hash(hash_hex_a)
     hb = imagehash.hex_to_hash(hash_hex_b)
-    return bool((ha - hb) <= PHASH_THRESHOLD)
+    return bool((ha - hb) <= threshold)
 
 
 def select_keeper(images: list[ImageMetadata]) -> ImageMetadata:
