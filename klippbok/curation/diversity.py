@@ -98,6 +98,17 @@ def select_diverse_subset(
     # Clip to non-negative (FacilityLocation requires non-negative similarities)
     sim_matrix = np.clip(sim_matrix, 0.0, None)
 
+    # Quality-weight the similarity matrix so FacilityLocation prefers
+    # high-quality representatives.  S_qw[i,j] = S[i,j] * sqrt(q_i * q_j)
+    # dampens contributions from low-quality images without zeroing them out.
+    quality = np.array(
+        [scores[idx].composite_score for idx in selectable_pool_indices],
+        dtype=np.float64,
+    )
+    quality = np.clip(quality, 0.0, 1.0)
+    quality_weights = np.sqrt(np.outer(quality, quality))
+    sim_matrix = sim_matrix * quality_weights
+
     # Run FacilityLocation selection
     try:
         from apricot import FacilityLocationSelection
