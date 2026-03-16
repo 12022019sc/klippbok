@@ -169,7 +169,7 @@ Add a `threshold` parameter to `are_near_duplicates()` in `image/dedup.py` (defa
 def are_near_duplicates(hash_hex_a: str, hash_hex_b: str, threshold: int = PHASH_THRESHOLD) -> bool:
 ```
 
-`mark_duplicates()` in `scorer.py` calls `are_near_duplicates(h_a, h_b, threshold=6)`.
+`mark_duplicates()` in `scorer.py` uses the constant `CURATION_PHASH_THRESHOLD = 6` and passes it as `are_near_duplicates(h_a, h_b, threshold=CURATION_PHASH_THRESHOLD)`. Import stays via `image_service` re-export (threshold kwarg passes through).
 
 **3b. Group instead of auto-discard:**
 
@@ -266,6 +266,19 @@ pool = [s for s in all_scores if s.floor_status != "hard_floor" and s.dedup_kept
 
 Non-representatives are tracked in the result for UI display but excluded from diversity selection.
 
+**3d. Explicit composite recomputation after ranking:**
+
+In `pipeline.py`, after `rank_normalize()` populates `ranked_signals`, the ranked composite must be explicitly computed and stored:
+
+```python
+# After rank_normalize(all_scores):
+for s in all_scores:
+    s.raw_composite_score = s.composite_score  # preserve raw
+    s.composite_score = _compute_composite(s.ranked_signals, config.mode)
+```
+
+Note: `face_area_ratio` is copied as-is from raw signals to `ranked_signals` (not rank-normalized) because it already represents a meaningful physical ratio. `_compute_composite` reads it from whichever `SignalScores` it receives, so the raw value is used in both raw and ranked composites. This is intentional.
+
 ## Files Modified
 
 | File | Changes |
@@ -299,6 +312,12 @@ Non-representatives are tracked in the result for UI display but excluded from d
 ## Rediversify Compatibility
 
 `rediversify()` loads cached `ImageScore` objects and re-runs diversity selection. Since `floor_status` and `dedup_kept` are persisted in the JSON, rediversify does NOT need to re-evaluate floor or dedup — it uses the cached values. Only the diversity selection (pin/exclude) is re-run.
+
+**Embedding coverage:** `save_embeddings()` saves embeddings only for pool images (`floor_status != "hard_floor" and dedup_kept`). If a user pins an image that was hard-floor excluded or is a dedup non-representative, its embedding won't exist in the npz file. To handle this:
+- `rediversify()` silently drops pinned IDs not present in the embeddings, with a `logger.warning`
+- The API response includes a `dropped_pins: list[str]` field so the frontend can inform the user
+
+This is the simplest safe approach. Saving embeddings for ALL images would increase npz file size and require running CLIP on images we know are bad — not worth the cost.
 
 ## Testing Strategy
 
