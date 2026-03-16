@@ -376,11 +376,13 @@ def score_image(
     face_area_ratio = 0.0
     identity_similarity = 0.0
     sharpness_face = 0.0
+    face_count = 0
 
     try:
         face_app = _get_face_app()
         faces = face_app.get(img_bgr)
         if faces:
+            face_count = len(faces)
             best_face = max(faces, key=lambda f: f.det_score)
             face_confidence = normalize_score(float(best_face.det_score), 0.0, 1.0)
 
@@ -467,6 +469,7 @@ def score_image(
         sharpness_whole=sharpness_whole,
         sharpness_face=sharpness_face,
         occlusion_score=occlusion_score,
+        face_count=face_count,
     )
 
     # --- Composite ---
@@ -555,6 +558,7 @@ def score_images(
     aesthetic_scores_arr = [0.0] * total
     sharpness_wholes = [0.0] * total
     occlusion_scores_arr = [0.5] * total
+    face_counts = [0] * total
 
     # ── Phase 1: Face detection (InsightFace / ONNX) ─────────────────────
     face_app = None
@@ -568,6 +572,7 @@ def score_images(
                     image_area = h * w
                     faces = face_app.get(img_bgr)
                     if faces:
+                        face_counts[i] = len(faces)
                         best = max(faces, key=lambda f: f.det_score)
                         face_confidences[i] = normalize_score(
                             float(best.det_score), 0.0, 1.0,
@@ -745,6 +750,7 @@ def score_images(
             sharpness_whole=sharpness_wholes[i],
             sharpness_face=sharpness_faces[i],
             occlusion_score=occlusion_scores_arr[i],
+            face_count=face_counts[i],
         )
         composite = _compute_composite(signals, mode)
         try:

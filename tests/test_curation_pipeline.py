@@ -33,10 +33,12 @@ def _make_score(image_id: str, composite: float, is_dup: bool = False) -> ImageS
         relative_path=f"images/{image_id}.jpg",
         signals=SignalScores(
             face_confidence=max(composite, 0.6),
+            face_area_ratio=0.2,
             identity_similarity=max(composite, 0.5),
             quality_score=composite,
             aesthetic_score=composite,
             sharpness_whole=composite,
+            face_count=1,
             is_duplicate=is_dup,
         ),
         composite_score=composite,
@@ -329,10 +331,12 @@ class TestCharacterGates:
             relative_path=f"{image_id}.jpg",
             signals=SignalScores(
                 face_confidence=face_confidence,
+                face_area_ratio=0.2,
                 identity_similarity=identity_similarity,
                 quality_score=composite,
                 aesthetic_score=composite,
                 sharpness_whole=composite,
+                face_count=1,
             ),
             composite_score=composite,
             raw_composite_score=composite,
@@ -415,6 +419,80 @@ class TestCharacterGates:
         assert scores[1].floor_status == "hard_floor"  # wrong person
         assert scores[0].floor_status != "hard_floor"   # good match
         assert scores[2].floor_status != "hard_floor"   # marginal but above threshold
+
+    def test_multi_person_excluded(self, tmp_path: Path) -> None:
+        """Images with multiple faces detected are hard-excluded in character mode."""
+        from klippbok.curation.pipeline import run_curation
+
+        image_paths = [tmp_path / f"img_{i}.jpg" for i in range(3)]
+        for p in image_paths:
+            p.write_bytes(b"fake")
+
+        scores = [
+            self._make_score("solo", 0.8, face_confidence=0.9, identity_similarity=0.7),
+            self._make_score("group", 0.7, face_confidence=0.8, identity_similarity=0.6),
+            self._make_score("duo", 0.6, face_confidence=0.7, identity_similarity=0.5),
+        ]
+        scores[1].signals.face_count = 3  # group photo
+        scores[2].signals.face_count = 2  # two people
+        config = CurationConfig(
+            mode="character", target_count=3, quality_floor_pct=0.0, hard_floor=0.0,
+        )
+
+        with (
+            patch("klippbok.curation.pipeline.score_images", return_value=scores),
+            patch("klippbok.curation.pipeline.mark_duplicates"),
+            patch("klippbok.curation.pipeline.rank_normalize"),
+            patch("klippbok.curation.pipeline._compute_composite", side_effect=lambda s, m: 0.5),
+            patch("klippbok.curation.pipeline.select_diverse_subset",
+                  side_effect=lambda scores, tc, clip, pose, face, **kw: [s.image_id for s in scores[:tc]]),
+            patch("klippbok.curation.pipeline._resolve_reference_embedding", return_value=None),
+            patch("klippbok.curation.pipeline._gather_embeddings",
+                  return_value=(np.zeros((3, 512)), np.zeros((3, 20)), np.zeros((3, 512)))),
+            patch("klippbok.curation.pipeline.save_results"),
+            patch("klippbok.curation.pipeline.save_embeddings"),
+        ):
+            result = run_curation(image_paths, tmp_path, config)
+
+        assert scores[1].floor_status == "hard_floor"  # group
+        assert scores[2].floor_status == "hard_floor"  # duo
+        assert scores[0].floor_status != "hard_floor"   # solo
+
+    def test_distant_subject_excluded(self, tmp_path: Path) -> None:
+        """Images with tiny face_area_ratio are hard-excluded in character mode."""
+        from klippbok.curation.pipeline import run_curation
+
+        image_paths = [tmp_path / f"img_{i}.jpg" for i in range(2)]
+        for p in image_paths:
+            p.write_bytes(b"fake")
+
+        scores = [
+            self._make_score("close", 0.8, face_confidence=0.9, identity_similarity=0.7),
+            self._make_score("distant", 0.6, face_confidence=0.7, identity_similarity=0.5),
+        ]
+        scores[0].signals.face_area_ratio = 0.2   # close-up
+        scores[1].signals.face_area_ratio = 0.02   # distant subject, below 0.05 gate
+        config = CurationConfig(
+            mode="character", target_count=2, quality_floor_pct=0.0, hard_floor=0.0,
+        )
+
+        with (
+            patch("klippbok.curation.pipeline.score_images", return_value=scores),
+            patch("klippbok.curation.pipeline.mark_duplicates"),
+            patch("klippbok.curation.pipeline.rank_normalize"),
+            patch("klippbok.curation.pipeline._compute_composite", side_effect=lambda s, m: 0.5),
+            patch("klippbok.curation.pipeline.select_diverse_subset",
+                  side_effect=lambda scores, tc, clip, pose, face, **kw: [s.image_id for s in scores[:tc]]),
+            patch("klippbok.curation.pipeline._resolve_reference_embedding", return_value=None),
+            patch("klippbok.curation.pipeline._gather_embeddings",
+                  return_value=(np.zeros((2, 512)), np.zeros((2, 20)), np.zeros((2, 512)))),
+            patch("klippbok.curation.pipeline.save_results"),
+            patch("klippbok.curation.pipeline.save_embeddings"),
+        ):
+            result = run_curation(image_paths, tmp_path, config)
+
+        assert scores[1].floor_status == "hard_floor"  # distant
+        assert scores[0].floor_status != "hard_floor"   # close-up
 
     def test_gates_skip_in_style_mode(self, tmp_path: Path) -> None:
         """In style mode, identity/face gates should NOT apply."""

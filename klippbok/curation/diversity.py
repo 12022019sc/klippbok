@@ -99,14 +99,15 @@ def select_diverse_subset(
     sim_matrix = np.clip(sim_matrix, 0.0, None)
 
     # Quality-weight the similarity matrix so FacilityLocation prefers
-    # high-quality representatives.  S_qw[i,j] = S[i,j] * sqrt(q_i * q_j)
-    # dampens contributions from low-quality images without zeroing them out.
+    # high-quality representatives.  S_qw[i,j] = S[i,j] * (q_i * q_j)
+    # Squaring each quality (vs sqrt) aggressively dampens low-quality images:
+    #   q=0.5 → weight 0.25 (was 0.5 with sqrt), q=0.8 → weight 0.64 (was 0.8).
     quality = np.array(
         [scores[idx].composite_score for idx in selectable_pool_indices],
         dtype=np.float64,
     )
     quality = np.clip(quality, 0.0, 1.0)
-    quality_weights = np.sqrt(np.outer(quality, quality))
+    quality_weights = np.outer(quality, quality)
     sim_matrix = sim_matrix * quality_weights
 
     # Run FacilityLocation selection

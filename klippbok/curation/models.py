@@ -43,6 +43,9 @@ class SignalScores(BaseModel):
     occlusion_score: float = Field(default=0.0, ge=0.0, le=1.0)
     """CLIP zero-shot occlusion detection (0=occluded, 1=clear)."""
 
+    face_count: int = Field(default=0, ge=0)
+    """Number of faces detected by InsightFace."""
+
     pose_vector: list[float] = Field(default_factory=list)
     """Pose joint angles (~20-D), each normalized to [0, 1]."""
 

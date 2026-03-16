@@ -424,8 +424,9 @@ def run_curation(
     # 4. Two-tier quality floor
     _apply_quality_floor(all_scores, config)
 
-    # 4b. Character-mode gates: reject images without a usable face or wrong person.
-    #     Uses raw signal values (pre-rank) so gates are absolute, not relative.
+    # 4b. Character-mode gates: reject images that clearly aren't usable
+    #     for single-subject LoRA training.  Uses raw signal values (pre-rank)
+    #     so gates are absolute, not relative.
     identity_gated = 0
     if config.mode == "character":
         for s in all_scores:
@@ -437,9 +438,17 @@ def run_curation(
             elif s.signals.identity_similarity < config.identity_threshold:
                 s.floor_status = "hard_floor"
                 identity_gated += 1
+            elif s.signals.face_count > 1:
+                s.floor_status = "hard_floor"
+                identity_gated += 1
+            elif s.signals.face_area_ratio < 0.05:
+                # Face occupies less than ~3.5% of image area — too distant
+                s.floor_status = "hard_floor"
+                identity_gated += 1
         if identity_gated:
             logger.info(
-                "Character gates excluded %d images (low face confidence or wrong identity)",
+                "Character gates excluded %d images "
+                "(low face confidence, wrong identity, multi-person, or distant subject)",
                 identity_gated,
             )
 
