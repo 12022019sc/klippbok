@@ -536,6 +536,40 @@ class TestGenerateOneTrainerExport:
         assert "\\" not in data["concept_file_name"]  # forward slashes only
         # resolution must be a string
         assert isinstance(data["resolution"], str)
+        # sample_definition_file_name must be absolute and point to correct file
+        assert "training_samples" in data["sample_definition_file_name"]
+        assert "MyChar.json" in data["sample_definition_file_name"]
+        assert "\\" not in data["sample_definition_file_name"]
+        assert data["sample_after"] == 1
+        assert data["samples_to_tensorboard"] is True
+
+    def test_writes_sample_definition_file(self, _mock: MagicMock, tmp_path: Path) -> None:
+        project_dir, output_dir, entries = self._setup(tmp_path)
+        from klippbok.services.export_service import ExportConfig, generate_onetrainer_export
+
+        config = ExportConfig(
+            trainer="onetrainer",
+            concept_name="MyChar",
+            trigger_word="mychar",
+            class_name="person",
+            output_dir=output_dir,
+        )
+        generate_onetrainer_export(entries, project_dir, config, None)
+        sample_path = output_dir / "training_samples" / "MyChar.json"
+        assert sample_path.exists()
+
+        data = json.loads(sample_path.read_text(encoding="utf-8"))
+        assert isinstance(data, list)
+        assert len(data) == 3
+        # Each sample uses trigger word and class name in prompts
+        for sample in data:
+            assert sample["__version"] == 0
+            assert "mychar" in sample["prompt"]
+            assert "person" in sample["prompt"]
+            assert sample["height"] == 512
+            assert sample["width"] == 512
+            assert sample["diffusion_steps"] == 20
+            assert isinstance(sample["seed"], int)
 
     def test_concept_path_uses_forward_slashes(self, _mock: MagicMock, tmp_path: Path) -> None:
         project_dir, output_dir, entries = self._setup(tmp_path)

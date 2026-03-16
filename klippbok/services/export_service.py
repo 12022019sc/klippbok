@@ -441,7 +441,7 @@ def generate_onetrainer_export(
     image_dir_fwd = _to_fwd(image_dir.resolve())
     workspace_dir_fwd = _to_fwd(config.output_dir.resolve())
     cache_dir_fwd = _to_fwd((config.output_dir / "cache").resolve())
-    lora_output_fwd = _to_fwd((lora_output_dir / f"{config.concept_name}.safetensors").resolve())
+    lora_output_fwd = _to_fwd((lora_output_dir / f"{config.trigger_word}.safetensors").resolve())
 
     defaults = get_export_defaults(project_dir)
     resolution = defaults["resolution"]
@@ -492,6 +492,56 @@ def generate_onetrainer_export(
         json.dumps(concept, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
 
+    # sample_definition.json — Prompts for generating preview images during
+    # training. OneTrainer renders these at each sample_after interval and
+    # writes them to TensorBoard so you can visually judge LoRA quality.
+    trigger = config.trigger_word
+    cls = config.class_name
+    sample_prompts = [
+        f"{trigger}, {cls}, portrait, looking at camera, soft lighting, simple background",
+        f"{trigger}, {cls}, upper body, casual clothing, natural lighting, outdoors",
+        f"{trigger}, {cls}, close-up, detailed face, studio lighting, neutral background",
+    ]
+    neg_prompt = (
+        "blurry, low quality, deformed, ugly, bad anatomy, "
+        "watermark, text, extra limbs, mutated hands"
+    )
+    sample_seeds = [42, 1337, 7890]
+    sample_definition = [
+        {
+            "__version": 0,
+            "enabled": True,
+            "prompt": prompt,
+            "negative_prompt": neg_prompt,
+            "height": resolution,
+            "width": resolution,
+            "frames": 1,
+            "length": 10.0,
+            "seed": seed,
+            "random_seed": False,
+            "diffusion_steps": 20,
+            "cfg_scale": 5.0,
+            "noise_scheduler": "DPMPP_SDE_KARRAS",
+            "text_encoder_1_layer_skip": 0,
+            "text_encoder_2_layer_skip": 0,
+            "text_encoder_2_sequence_length": None,
+            "text_encoder_3_layer_skip": 0,
+            "text_encoder_4_layer_skip": 0,
+            "transformer_attention_mask": False,
+            "force_last_timestep": False,
+            "sample_inpainting": False,
+            "base_image_path": "",
+            "mask_image_path": "",
+        }
+        for prompt, seed in zip(sample_prompts, sample_seeds)
+    ]
+
+    sample_def_path = config.output_dir / "training_samples" / f"{config.concept_name}.json"
+    sample_def_path.write_text(
+        json.dumps(sample_definition, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
     # training_preset.json — Load a fully-hydrated preset from OneTrainer's
     # training_presets/ directory as the base template. OneTrainer's train.py
     # CLI requires a complete config with __version and all fields; partial
@@ -506,7 +556,13 @@ def generate_onetrainer_export(
     training_preset["save_filename_prefix"] = f"{config.concept_name}_epoch"
     training_preset["resolution"] = str(resolution)
     training_preset["tensorboard"] = True
+    training_preset["tensorboard_expose"] = False
+    training_preset["tensorboard_always_on"] = False  # False = OneTrainer launches TB subprocess
     training_preset["tensorboard_port"] = 6006
+    training_preset["sample_definition_file_name"] = _to_fwd(sample_def_path.resolve())
+    training_preset["sample_after"] = 1
+    training_preset["sample_after_unit"] = "EPOCH"
+    training_preset["samples_to_tensorboard"] = True
 
     preset_path = config.output_dir / "config" / "training_preset.json"
     preset_path.write_text(
