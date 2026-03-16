@@ -168,6 +168,57 @@ def normalize_score(value: float, low: float, high: float) -> float:
     return max(0.0, min(1.0, normalized))
 
 
+_RANKED_SIGNAL_NAMES: list[str] = [
+    "face_confidence",
+    "identity_similarity",
+    "quality_score",
+    "aesthetic_score",
+    "sharpness_whole",
+    "sharpness_face",
+    "occlusion_score",
+]
+"""Signal dimensions that get percentile rank normalization."""
+
+
+def rank_normalize(scores: list[ImageScore]) -> None:
+    """Convert raw signal values to percentile ranks in-place.
+
+    For each signal dimension, compute the percentile rank across all
+    images. Ties get averaged rank. Results stored in ranked_signals.
+    face_area_ratio is copied as-is (meaningful physical ratio, not ranked).
+
+    Args:
+        scores: List of ImageScore objects. Modified in-place.
+    """
+    from scipy.stats import rankdata
+
+    n = len(scores)
+    if n == 0:
+        return
+
+    if n == 1:
+        scores[0].ranked_signals = scores[0].signals.model_copy()
+        for name in _RANKED_SIGNAL_NAMES:
+            setattr(scores[0].ranked_signals, name, 1.0)
+        scores[0].ranked_signals.face_area_ratio = scores[0].signals.face_area_ratio
+        return
+
+    # Initialize ranked_signals from raw signals
+    for s in scores:
+        s.ranked_signals = s.signals.model_copy()
+
+    for name in _RANKED_SIGNAL_NAMES:
+        raw_values = [getattr(s.signals, name) for s in scores]
+        ranks = rankdata(raw_values, method="average")
+        for i, s in enumerate(scores):
+            normalized_rank = (ranks[i] - 1) / (n - 1)
+            setattr(s.ranked_signals, name, normalized_rank)
+
+    # face_area_ratio: copy as-is (already set by model_copy, but explicit)
+    for s in scores:
+        s.ranked_signals.face_area_ratio = s.signals.face_area_ratio
+
+
 def _compute_face_sharpness(
     img_bgr: np.ndarray,
     bbox: np.ndarray,

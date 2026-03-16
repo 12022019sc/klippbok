@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from klippbok.curation.models import ImageScore, SignalScores
-from klippbok.curation.scorer import normalize_score, score_image
+from klippbok.curation.scorer import normalize_score, rank_normalize, score_image
 
 
 class TestNormalizeScore:
@@ -197,3 +197,75 @@ class TestScoreImage:
         assert result.signals.face_area_ratio == 0.0
         assert result.signals.identity_similarity == 0.0
         assert result.signals.sharpness_face == 0.0
+
+
+class TestRankNormalize:
+    """Tests for percentile rank normalization."""
+
+    def _make_score(self, **signal_kwargs: float) -> ImageScore:
+        """Helper: create ImageScore with specific signal values."""
+        signals = SignalScores(**signal_kwargs)
+        return ImageScore(
+            image_id="test",
+            relative_path="test.jpg",
+            signals=signals,
+            composite_score=0.5,
+            mode="character",
+        )
+
+    def test_single_image_gets_max_rank(self) -> None:
+        """Single image should get rank 1.0 on all dimensions."""
+        scores = [self._make_score(face_confidence=0.3, quality_score=0.7)]
+        rank_normalize(scores)
+        assert scores[0].ranked_signals.face_confidence == pytest.approx(1.0)
+        assert scores[0].ranked_signals.quality_score == pytest.approx(1.0)
+
+    def test_two_images_rank_ordering(self) -> None:
+        """Higher raw value should get higher rank."""
+        scores = [
+            self._make_score(quality_score=0.2),
+            self._make_score(quality_score=0.8),
+        ]
+        scores[0].image_id = "a"
+        scores[1].image_id = "b"
+        rank_normalize(scores)
+        assert scores[0].ranked_signals.quality_score == pytest.approx(0.0)
+        assert scores[1].ranked_signals.quality_score == pytest.approx(1.0)
+
+    def test_ties_get_averaged_rank(self) -> None:
+        """Tied values should get the same (averaged) rank."""
+        scores = [
+            self._make_score(aesthetic_score=0.5),
+            self._make_score(aesthetic_score=0.5),
+            self._make_score(aesthetic_score=0.9),
+        ]
+        for i, s in enumerate(scores):
+            s.image_id = str(i)
+        rank_normalize(scores)
+        # Two tied at 0.5 share rank positions 1 and 2 → avg rank 1.5
+        # Normalized: (1.5 - 1) / (3 - 1) = 0.25
+        assert scores[0].ranked_signals.aesthetic_score == pytest.approx(0.25)
+        assert scores[1].ranked_signals.aesthetic_score == pytest.approx(0.25)
+        assert scores[2].ranked_signals.aesthetic_score == pytest.approx(1.0)
+
+    def test_face_area_ratio_copied_not_ranked(self) -> None:
+        """face_area_ratio should be copied as-is, not rank-normalized."""
+        scores = [
+            self._make_score(face_area_ratio=0.1),
+            self._make_score(face_area_ratio=0.4),
+        ]
+        scores[0].image_id = "a"
+        scores[1].image_id = "b"
+        rank_normalize(scores)
+        assert scores[0].ranked_signals.face_area_ratio == pytest.approx(0.1)
+        assert scores[1].ranked_signals.face_area_ratio == pytest.approx(0.4)
+
+    def test_five_images_uniform_distribution(self) -> None:
+        """Five distinct values should produce evenly spaced ranks."""
+        scores = [self._make_score(sharpness_whole=v) for v in [0.1, 0.3, 0.5, 0.7, 0.9]]
+        for i, s in enumerate(scores):
+            s.image_id = str(i)
+        rank_normalize(scores)
+        expected = [0.0, 0.25, 0.5, 0.75, 1.0]
+        for s, exp in zip(scores, expected):
+            assert s.ranked_signals.sharpness_whole == pytest.approx(exp)
