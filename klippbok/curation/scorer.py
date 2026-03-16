@@ -28,7 +28,8 @@ import cv2
 import numpy as np
 
 from klippbok.curation.models import CurationMode, ImageScore, SignalScores
-from klippbok.curation.presets import get_weights
+from klippbok.curation.presets import CURATION_PHASH_THRESHOLD, get_weights
+from klippbok.image.dedup import are_near_duplicates, compute_phash
 from klippbok.utils.paths import image_id, to_manifest_path
 
 logger = logging.getLogger(__name__)
@@ -765,17 +766,18 @@ def mark_duplicates(
     scores: list[ImageScore],
     image_paths: list[Path],
 ) -> None:
-    """Mark near-duplicate images using pHash comparison.
+    """Group near-duplicate images using pHash + union-find.
 
-    For each duplicate pair, the lower-scoring image gets is_duplicate=True.
-    Mutates scores in-place.
+    For each duplicate group, the highest-composite-score image is
+    kept as the representative. Others get dedup_kept=False and
+    signals.is_duplicate=True (backwards compat).
+
+    Uses CURATION_PHASH_THRESHOLD (6) — tighter than import validation (10).
 
     Args:
         scores: List of ImageScore objects (must match image_paths order).
         image_paths: Corresponding image file paths.
     """
-    from klippbok.services.image_service import are_near_duplicates, compute_phash
-
     n = len(scores)
     if n != len(image_paths):
         raise ValueError("scores and image_paths must have the same length")
@@ -789,17 +791,46 @@ def mark_duplicates(
         except Exception:
             hashes.append(None)
 
-    # Pairwise comparison
+    # Union-find with path compression
+    parent = list(range(n))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]  # path compression
+            i = parent[i]
+        return i
+
+    def union(i: int, j: int) -> None:
+        ri, rj = find(i), find(j)
+        if ri != rj:
+            parent[ri] = rj
+
+    # Pairwise comparison with tighter curation threshold
     for i in range(n):
-        if hashes[i] is None or scores[i].signals.is_duplicate:
+        if hashes[i] is None:
             continue
         for j in range(i + 1, n):
-            if hashes[j] is None or scores[j].signals.is_duplicate:
+            if hashes[j] is None:
                 continue
-            if are_near_duplicates(hashes[i], hashes[j]):
-                # Mark the lower-scoring one as duplicate
-                if scores[i].composite_score >= scores[j].composite_score:
-                    scores[j].signals.is_duplicate = True
-                else:
-                    scores[i].signals.is_duplicate = True
-                    break  # This image is now marked, no need to check more
+            if are_near_duplicates(hashes[i], hashes[j], threshold=CURATION_PHASH_THRESHOLD):
+                union(i, j)
+
+    # Build groups from union-find roots
+    groups: dict[int, list[int]] = {}
+    for i in range(n):
+        root = find(i)
+        groups.setdefault(root, []).append(i)
+
+    # Assign group IDs and select representatives
+    for root, members in groups.items():
+        if len(members) < 2:
+            continue  # unique image, no group assignment needed
+        group_id = scores[root].image_id
+        best_idx = max(members, key=lambda i: scores[i].composite_score)
+        for i in members:
+            scores[i].dedup_group_id = group_id
+            if i == best_idx:
+                scores[i].dedup_kept = True
+            else:
+                scores[i].dedup_kept = False
+                scores[i].signals.is_duplicate = True  # backwards compat

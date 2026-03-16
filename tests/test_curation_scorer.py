@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from klippbok.curation.models import ImageScore, SignalScores
-from klippbok.curation.scorer import normalize_score, rank_normalize, score_image
+from klippbok.curation.scorer import mark_duplicates, normalize_score, rank_normalize, score_image
 
 
 class TestNormalizeScore:
@@ -269,3 +269,107 @@ class TestRankNormalize:
         expected = [0.0, 0.25, 0.5, 0.75, 1.0]
         for s, exp in zip(scores, expected):
             assert s.ranked_signals.sharpness_whole == pytest.approx(exp)
+
+
+class TestMarkDuplicatesGroups:
+    """Tests for union-find dedup grouping."""
+
+    def _make_score(self, image_id: str, composite: float) -> ImageScore:
+        return ImageScore(
+            image_id=image_id,
+            relative_path=f"{image_id}.jpg",
+            composite_score=composite,
+            mode="character",
+        )
+
+    @patch("klippbok.curation.scorer.compute_phash")
+    @patch("klippbok.curation.scorer.are_near_duplicates")
+    def test_group_assignment(self, mock_dup, mock_hash, tmp_path):
+        """Matching images should share a dedup_group_id."""
+        scores = [self._make_score("a", 0.8), self._make_score("b", 0.6)]
+        paths = [tmp_path / "a.jpg", tmp_path / "b.jpg"]
+        for p in paths:
+            p.touch()
+        mock_hash.side_effect = ["hash_a", "hash_b"]
+        mock_dup.return_value = True
+
+        mark_duplicates(scores, paths)
+
+        assert scores[0].dedup_group_id is not None
+        assert scores[0].dedup_group_id == scores[1].dedup_group_id
+
+    @patch("klippbok.curation.scorer.compute_phash")
+    @patch("klippbok.curation.scorer.are_near_duplicates")
+    def test_highest_composite_kept(self, mock_dup, mock_hash, tmp_path):
+        """Highest composite in group should be dedup_kept=True."""
+        scores = [self._make_score("a", 0.8), self._make_score("b", 0.6)]
+        paths = [tmp_path / "a.jpg", tmp_path / "b.jpg"]
+        for p in paths:
+            p.touch()
+        mock_hash.side_effect = ["hash_a", "hash_b"]
+        mock_dup.return_value = True
+
+        mark_duplicates(scores, paths)
+
+        assert scores[0].dedup_kept is True   # higher composite
+        assert scores[1].dedup_kept is False   # lower composite
+
+    @patch("klippbok.curation.scorer.compute_phash")
+    @patch("klippbok.curation.scorer.are_near_duplicates")
+    def test_backwards_compat_is_duplicate(self, mock_dup, mock_hash, tmp_path):
+        """Non-kept images should have signals.is_duplicate=True."""
+        scores = [self._make_score("a", 0.8), self._make_score("b", 0.6)]
+        paths = [tmp_path / "a.jpg", tmp_path / "b.jpg"]
+        for p in paths:
+            p.touch()
+        mock_hash.side_effect = ["hash_a", "hash_b"]
+        mock_dup.return_value = True
+
+        mark_duplicates(scores, paths)
+
+        assert scores[0].signals.is_duplicate is False
+        assert scores[1].signals.is_duplicate is True
+
+    @patch("klippbok.curation.scorer.compute_phash")
+    @patch("klippbok.curation.scorer.are_near_duplicates")
+    def test_transitive_grouping(self, mock_dup, mock_hash, tmp_path):
+        """A-B match + B-C match should group all three (transitive closure)."""
+        scores = [
+            self._make_score("a", 0.5),
+            self._make_score("b", 0.9),
+            self._make_score("c", 0.3),
+        ]
+        paths = [tmp_path / f"{x}.jpg" for x in "abc"]
+        for p in paths:
+            p.touch()
+        mock_hash.side_effect = ["h1", "h2", "h3"]
+
+        def dup_check(h1, h2, threshold=10):
+            pair = frozenset([h1, h2])
+            return pair in [frozenset(["h1", "h2"]), frozenset(["h2", "h3"])]
+        mock_dup.side_effect = dup_check
+
+        mark_duplicates(scores, paths)
+
+        assert scores[0].dedup_group_id == scores[1].dedup_group_id == scores[2].dedup_group_id
+        assert scores[1].dedup_kept is True
+        assert scores[0].dedup_kept is False
+        assert scores[2].dedup_kept is False
+
+    @patch("klippbok.curation.scorer.compute_phash")
+    @patch("klippbok.curation.scorer.are_near_duplicates")
+    def test_unique_images_no_group(self, mock_dup, mock_hash, tmp_path):
+        """Non-matching images should have no group."""
+        scores = [self._make_score("a", 0.8), self._make_score("b", 0.6)]
+        paths = [tmp_path / "a.jpg", tmp_path / "b.jpg"]
+        for p in paths:
+            p.touch()
+        mock_hash.side_effect = ["hash_a", "hash_b"]
+        mock_dup.return_value = False
+
+        mark_duplicates(scores, paths)
+
+        assert scores[0].dedup_group_id is None
+        assert scores[1].dedup_group_id is None
+        assert scores[0].dedup_kept is True
+        assert scores[1].dedup_kept is True
