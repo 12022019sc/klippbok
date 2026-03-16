@@ -445,6 +445,10 @@ def run_curation(
                 # Face occupies less than ~3.5% of image area — too distant
                 s.floor_status = "hard_floor"
                 identity_gated += 1
+            elif s.signals.is_grayscale:
+                # B&W images lack color information needed for LoRA training
+                s.floor_status = "hard_floor"
+                identity_gated += 1
         if identity_gated:
             logger.info(
                 "Character gates excluded %d images "
@@ -452,10 +456,13 @@ def run_curation(
                 identity_gated,
             )
 
-    # 5. Build pool: exclude hard floor and dedup non-representatives
+    # 5. Build pool: exclude hard floor, soft floor, and dedup non-representatives.
+    #    Soft-floor exclusion is safe when the pool is large relative to target
+    #    (typical: 400+ images → 50 target). This raises the quality floor of
+    #    selected images by removing the bottom quality_floor_pct of the dataset.
     passed_scores = [
         s for s in all_scores
-        if s.floor_status != "hard_floor" and s.dedup_kept
+        if s.floor_status not in ("hard_floor", "soft_floor") and s.dedup_kept
     ]
 
     # 5. Gather embeddings for passed images

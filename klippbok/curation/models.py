@@ -46,6 +46,9 @@ class SignalScores(BaseModel):
     face_count: int = Field(default=0, ge=0)
     """Number of faces detected by InsightFace."""
 
+    is_grayscale: bool = False
+    """Whether the image is grayscale / black-and-white."""
+
     pose_vector: list[float] = Field(default_factory=list)
     """Pose joint angles (~20-D), each normalized to [0, 1]."""
 

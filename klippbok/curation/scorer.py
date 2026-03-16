@@ -445,11 +445,15 @@ def score_image(
 
     # --- Whole-image sharpness (Laplacian) ---
     sharpness_whole = 0.0
+    is_grayscale = False
     try:
         gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
         laplacian = cv2.Laplacian(gray, cv2.CV_64F)
         raw_sharpness = float(laplacian.var())
         sharpness_whole = normalize_score(raw_sharpness, 10.0, 500.0)
+        # Grayscale detection: check HSV saturation channel
+        hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+        is_grayscale = float(hsv[:, :, 1].mean()) < 15.0
     except Exception as e:
         logger.debug("Sharpness computation failed: %s", e)
 
@@ -470,6 +474,7 @@ def score_image(
         sharpness_face=sharpness_face,
         occlusion_score=occlusion_score,
         face_count=face_count,
+        is_grayscale=is_grayscale,
     )
 
     # --- Composite ---
@@ -559,6 +564,7 @@ def score_images(
     sharpness_wholes = [0.0] * total
     occlusion_scores_arr = [0.5] * total
     face_counts = [0] * total
+    grayscale_flags = [False] * total
 
     # ── Phase 1: Face detection (InsightFace / ONNX) ─────────────────────
     face_app = None
@@ -696,6 +702,8 @@ def score_images(
                 sharpness_wholes[i] = normalize_score(
                     float(laplacian.var()), 10.0, 500.0,
                 )
+                hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+                grayscale_flags[i] = float(hsv[:, :, 1].mean()) < 15.0
                 del img_bgr
         except Exception as e:
             logger.debug("Sharpness computation failed for %s: %s", path, e)
@@ -751,6 +759,7 @@ def score_images(
             sharpness_face=sharpness_faces[i],
             occlusion_score=occlusion_scores_arr[i],
             face_count=face_counts[i],
+            is_grayscale=grayscale_flags[i],
         )
         composite = _compute_composite(signals, mode)
         try:

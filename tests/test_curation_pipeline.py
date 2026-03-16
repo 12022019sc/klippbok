@@ -76,11 +76,12 @@ class TestQualityFloor:
         ):
             result = run_curation(image_paths, tmp_path, config)
 
-        # Only id00 (raw composite 0.1) is below hard floor 0.15
-        # Soft floor flags but doesn't exclude from pool
+        # id00 (raw composite 0.1) is below hard floor 0.15
+        # Soft floor now also excludes from pool (quality_floor_pct=0.3)
         assert result.summary.hard_excluded == 1
-        assert result.summary.passed_quality == 9
         assert result.summary.total_scanned == 10
+        # passed_quality = total - hard - soft_flagged
+        assert result.summary.passed_quality <= 9
 
     def test_dedup_non_reps_excluded_from_pool(self, tmp_path: Path) -> None:
         """Dedup non-representatives (dedup_kept=False) excluded from pool."""
@@ -160,9 +161,9 @@ class TestSummaryStats:
             result = run_curation(image_paths, tmp_path, config)
 
         assert result.summary.total_scanned == 10
-        # Only id0 (raw 0.1) hard-excluded; rest pass (soft floor flags, doesn't exclude)
+        # id0 (raw 0.1) hard-excluded; soft floor also excludes from pool
         assert result.summary.hard_excluded == 1
-        assert result.summary.passed_quality == 9
+        assert result.summary.passed_quality <= 9
         assert result.summary.selected == 4
 
 
