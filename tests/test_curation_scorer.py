@@ -199,6 +199,30 @@ class TestScoreImage:
         assert result.signals.sharpness_face == 0.0
 
 
+class TestSharpnessNormalization:
+    """Verify sharpness normalization uses correct range (10-500)."""
+
+    def test_laplacian_30_produces_nonzero_score(self) -> None:
+        """A Laplacian variance of 30 (slightly blurry) should not be zero."""
+        result = normalize_score(30.0, 10.0, 500.0)
+        assert result > 0.0
+        assert result == pytest.approx((30.0 - 10.0) / (500.0 - 10.0))
+
+    def test_laplacian_250_produces_midrange_score(self) -> None:
+        """A Laplacian variance of 250 (normal frame) should score ~0.49."""
+        result = normalize_score(250.0, 10.0, 500.0)
+        assert 0.4 < result < 0.6
+
+    def test_laplacian_500_plus_scores_one(self) -> None:
+        """A Laplacian variance >= 500 should score 1.0."""
+        assert normalize_score(500.0, 10.0, 500.0) == pytest.approx(1.0)
+        assert normalize_score(1000.0, 10.0, 500.0) == pytest.approx(1.0)
+
+    def test_laplacian_below_10_scores_zero(self) -> None:
+        """A Laplacian variance below 10 (extremely blurry) should score 0.0."""
+        assert normalize_score(5.0, 10.0, 500.0) == pytest.approx(0.0)
+
+
 class TestRankNormalize:
     """Tests for percentile rank normalization."""
 

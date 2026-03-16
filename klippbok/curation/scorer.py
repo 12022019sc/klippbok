@@ -391,7 +391,7 @@ def score_image(
 
             # Face sharpness
             raw_face_sharp = _compute_face_sharpness(img_bgr, bbox)
-            sharpness_face = normalize_score(raw_face_sharp, 50.0, 1000.0)
+            sharpness_face = normalize_score(raw_face_sharp, 10.0, 500.0)
 
             # Identity similarity
             if reference_embedding is not None and hasattr(best_face, "normed_embedding"):
@@ -447,7 +447,7 @@ def score_image(
         gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
         laplacian = cv2.Laplacian(gray, cv2.CV_64F)
         raw_sharpness = float(laplacian.var())
-        sharpness_whole = normalize_score(raw_sharpness, 50.0, 1000.0)
+        sharpness_whole = normalize_score(raw_sharpness, 10.0, 500.0)
     except Exception as e:
         logger.debug("Sharpness computation failed: %s", e)
 
@@ -579,7 +579,7 @@ def score_images(
                             face_area / image_area, 0.01, 0.5,
                         )
                         sharpness_faces[i] = normalize_score(
-                            _compute_face_sharpness(img_bgr, bbox), 50.0, 1000.0,
+                            _compute_face_sharpness(img_bgr, bbox), 10.0, 500.0,
                         )
                         if (
                             reference_embedding is not None
@@ -689,7 +689,7 @@ def score_images(
                 gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
                 laplacian = cv2.Laplacian(gray, cv2.CV_64F)
                 sharpness_wholes[i] = normalize_score(
-                    float(laplacian.var()), 50.0, 1000.0,
+                    float(laplacian.var()), 10.0, 500.0,
                 )
                 del img_bgr
         except Exception as e:

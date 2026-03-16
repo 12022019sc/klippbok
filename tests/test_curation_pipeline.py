@@ -23,12 +23,17 @@ from klippbok.curation.models import (
 
 
 def _make_score(image_id: str, composite: float, is_dup: bool = False) -> ImageScore:
-    """Helper to create an ImageScore with a specific composite value."""
+    """Helper to create an ImageScore with a specific composite value.
+
+    Sets face_confidence and identity_similarity above default character-mode
+    gate thresholds so these images aren't spuriously excluded.
+    """
     return ImageScore(
         image_id=image_id,
         relative_path=f"images/{image_id}.jpg",
         signals=SignalScores(
-            face_confidence=composite,
+            face_confidence=max(composite, 0.6),
+            identity_similarity=max(composite, 0.5),
             quality_score=composite,
             aesthetic_score=composite,
             sharpness_whole=composite,
@@ -307,6 +312,147 @@ class TestRediversify:
         assert result.selected_ids == new_selected
         assert result.pinned_ids == ["id0"]
         assert result.excluded_ids == ["id9"]
+
+
+class TestCharacterGates:
+    """Character-mode identity/face gates exclude wrong-person and no-face images."""
+
+    def _make_score(
+        self,
+        image_id: str,
+        composite: float,
+        face_confidence: float = 0.9,
+        identity_similarity: float = 0.8,
+    ) -> ImageScore:
+        return ImageScore(
+            image_id=image_id,
+            relative_path=f"{image_id}.jpg",
+            signals=SignalScores(
+                face_confidence=face_confidence,
+                identity_similarity=identity_similarity,
+                quality_score=composite,
+                aesthetic_score=composite,
+                sharpness_whole=composite,
+            ),
+            composite_score=composite,
+            raw_composite_score=composite,
+            mode="character",
+        )
+
+    def test_low_face_confidence_excluded(self, tmp_path: Path) -> None:
+        """Images with face_confidence below threshold are hard-excluded."""
+        from klippbok.curation.pipeline import run_curation
+
+        image_paths = [tmp_path / f"img_{i}.jpg" for i in range(4)]
+        for p in image_paths:
+            p.write_bytes(b"fake")
+
+        scores = [
+            self._make_score("good1", 0.8, face_confidence=0.9, identity_similarity=0.7),
+            self._make_score("good2", 0.7, face_confidence=0.6, identity_similarity=0.6),
+            self._make_score("noface", 0.5, face_confidence=0.1, identity_similarity=0.0),  # below 0.5
+            self._make_score("blender", 0.4, face_confidence=0.0, identity_similarity=0.0),  # no face at all
+        ]
+        config = CurationConfig(
+            mode="character", target_count=3, quality_floor_pct=0.0, hard_floor=0.0,
+            face_confidence_threshold=0.5, identity_threshold=0.4,
+        )
+
+        with (
+            patch("klippbok.curation.pipeline.score_images", return_value=scores),
+            patch("klippbok.curation.pipeline.mark_duplicates"),
+            patch("klippbok.curation.pipeline.rank_normalize"),
+            patch("klippbok.curation.pipeline._compute_composite", side_effect=lambda s, m: 0.5),
+            patch("klippbok.curation.pipeline.select_diverse_subset",
+                  side_effect=lambda scores, tc, clip, pose, face, **kw: [s.image_id for s in scores[:tc]]),
+            patch("klippbok.curation.pipeline._resolve_reference_embedding", return_value=None),
+            patch("klippbok.curation.pipeline._gather_embeddings",
+                  return_value=(np.zeros((4, 512)), np.zeros((4, 20)), np.zeros((4, 512)))),
+            patch("klippbok.curation.pipeline.save_results"),
+            patch("klippbok.curation.pipeline.save_embeddings"),
+        ):
+            result = run_curation(image_paths, tmp_path, config)
+
+        # noface and blender should be hard-excluded by the face gate
+        assert scores[2].floor_status == "hard_floor"
+        assert scores[3].floor_status == "hard_floor"
+        assert scores[0].floor_status != "hard_floor"
+        assert scores[1].floor_status != "hard_floor"
+
+    def test_low_identity_excluded(self, tmp_path: Path) -> None:
+        """Images with identity_similarity below threshold are hard-excluded."""
+        from klippbok.curation.pipeline import run_curation
+
+        image_paths = [tmp_path / f"img_{i}.jpg" for i in range(3)]
+        for p in image_paths:
+            p.write_bytes(b"fake")
+
+        scores = [
+            self._make_score("match", 0.8, face_confidence=0.9, identity_similarity=0.7),
+            self._make_score("wrong_person", 0.7, face_confidence=0.8, identity_similarity=0.2),  # below 0.4
+            self._make_score("marginal", 0.6, face_confidence=0.7, identity_similarity=0.5),
+        ]
+        config = CurationConfig(
+            mode="character", target_count=3, quality_floor_pct=0.0, hard_floor=0.0,
+            face_confidence_threshold=0.5, identity_threshold=0.4,
+        )
+
+        with (
+            patch("klippbok.curation.pipeline.score_images", return_value=scores),
+            patch("klippbok.curation.pipeline.mark_duplicates"),
+            patch("klippbok.curation.pipeline.rank_normalize"),
+            patch("klippbok.curation.pipeline._compute_composite", side_effect=lambda s, m: 0.5),
+            patch("klippbok.curation.pipeline.select_diverse_subset",
+                  side_effect=lambda scores, tc, clip, pose, face, **kw: [s.image_id for s in scores[:tc]]),
+            patch("klippbok.curation.pipeline._resolve_reference_embedding", return_value=None),
+            patch("klippbok.curation.pipeline._gather_embeddings",
+                  return_value=(np.zeros((3, 512)), np.zeros((3, 20)), np.zeros((3, 512)))),
+            patch("klippbok.curation.pipeline.save_results"),
+            patch("klippbok.curation.pipeline.save_embeddings"),
+        ):
+            result = run_curation(image_paths, tmp_path, config)
+
+        assert scores[1].floor_status == "hard_floor"  # wrong person
+        assert scores[0].floor_status != "hard_floor"   # good match
+        assert scores[2].floor_status != "hard_floor"   # marginal but above threshold
+
+    def test_gates_skip_in_style_mode(self, tmp_path: Path) -> None:
+        """In style mode, identity/face gates should NOT apply."""
+        from klippbok.curation.pipeline import run_curation
+
+        image_paths = [tmp_path / f"img_{i}.jpg" for i in range(2)]
+        for p in image_paths:
+            p.write_bytes(b"fake")
+
+        scores = [
+            self._make_score("noface", 0.5, face_confidence=0.0, identity_similarity=0.0),
+            self._make_score("good", 0.8, face_confidence=0.9, identity_similarity=0.9),
+        ]
+        # Override mode to style
+        for s in scores:
+            s.mode = "style"
+        config = CurationConfig(
+            mode="style", target_count=2, quality_floor_pct=0.0, hard_floor=0.0,
+        )
+
+        with (
+            patch("klippbok.curation.pipeline.score_images", return_value=scores),
+            patch("klippbok.curation.pipeline.mark_duplicates"),
+            patch("klippbok.curation.pipeline.rank_normalize"),
+            patch("klippbok.curation.pipeline._compute_composite", side_effect=lambda s, m: 0.5),
+            patch("klippbok.curation.pipeline.select_diverse_subset",
+                  side_effect=lambda scores, tc, clip, pose, face, **kw: [s.image_id for s in scores[:tc]]),
+            patch("klippbok.curation.pipeline._resolve_reference_embedding", return_value=None),
+            patch("klippbok.curation.pipeline._gather_embeddings",
+                  return_value=(np.zeros((2, 512)), np.zeros((2, 20)), np.zeros((2, 512)))),
+            patch("klippbok.curation.pipeline.save_results"),
+            patch("klippbok.curation.pipeline.save_embeddings"),
+        ):
+            result = run_curation(image_paths, tmp_path, config)
+
+        # Neither should be hard-excluded — style mode ignores face/identity gates
+        assert scores[0].floor_status != "hard_floor"
+        assert scores[1].floor_status != "hard_floor"
 
 
 class TestTwoTierFloor:

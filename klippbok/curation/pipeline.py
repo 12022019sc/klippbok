@@ -424,6 +424,25 @@ def run_curation(
     # 4. Two-tier quality floor
     _apply_quality_floor(all_scores, config)
 
+    # 4b. Character-mode gates: reject images without a usable face or wrong person.
+    #     Uses raw signal values (pre-rank) so gates are absolute, not relative.
+    identity_gated = 0
+    if config.mode == "character":
+        for s in all_scores:
+            if s.floor_status == "hard_floor":
+                continue  # already excluded
+            if s.signals.face_confidence < config.face_confidence_threshold:
+                s.floor_status = "hard_floor"
+                identity_gated += 1
+            elif s.signals.identity_similarity < config.identity_threshold:
+                s.floor_status = "hard_floor"
+                identity_gated += 1
+        if identity_gated:
+            logger.info(
+                "Character gates excluded %d images (low face confidence or wrong identity)",
+                identity_gated,
+            )
+
     # 5. Build pool: exclude hard floor and dedup non-representatives
     passed_scores = [
         s for s in all_scores
