@@ -1,7 +1,7 @@
 # Curation Scoring Overhaul — Design Spec
 
 **Date:** 2026-03-16
-**Status:** Draft
+**Status:** Reviewed (v2 — fixes from spec review)
 **Scope:** `klippbok/curation/` module — scorer, pipeline, models, presets
 
 ## Problem Statement
@@ -78,27 +78,43 @@ def rank_normalize(scores: list[ImageScore]) -> None:
         s.ranked_signals.face_area_ratio = s.signals.face_area_ratio
 ```
 
-**Composite computation** now uses `ranked_signals` instead of raw `signals`. The existing `_compute_composite()` function is called with ranked values. Weight presets (`CHARACTER_WEIGHTS`, `STYLE_WEIGHTS`) remain unchanged.
+**Two composites — raw and ranked:**
+
+The existing per-image `_compute_composite()` call in `score_images()` stays and produces a **raw composite** (`raw_composite_score`). After `rank_normalize()`, a second composite is computed from ranked signals and stored as `composite_score`. This separation is critical because:
+- `raw_composite_score` preserves absolute quality information → used by the **hard floor** (Section 2)
+- `composite_score` (rank-based) is stable and relative → used for **soft floor**, **diversity selection**, **dedup representative choice**, and **UI display**
+
+Weight presets (`CHARACTER_WEIGHTS`, `STYLE_WEIGHTS`) remain unchanged — applied to both raw and ranked composites.
 
 **Model changes (`ImageScore`):**
 ```python
 ranked_signals: SignalScores = Field(default_factory=SignalScores)
 """Percentile-ranked signal scores (0.0 = worst in dataset, 1.0 = best)."""
+
+raw_composite_score: float = 0.0
+"""Composite from raw signals — preserves absolute quality for hard floor."""
 ```
+
+The existing `composite_score` field is repurposed to hold the rank-based composite. Old serialized results that lack `raw_composite_score` default to 0.0 (backwards-compatible; hard floor won't retroactively exclude them since they were already processed).
 
 **Signal fallback for missing detections:**
 - Raw signal stays at 0.0 when InsightFace finds no face
 - Rank naturally places it at the bottom without catastrophic cliff — if 5 out of 100 images have no face, they cluster at rank ~0.02 instead of all being exactly 0.0
 - CLIP occlusion failures: raw defaults to 0.5, rank places it at median naturally
 
+**Small dataset behavior (n < 5):**
+- n=1: all ranks set to 1.0 (single image is trivially best)
+- n=2-4: ranks produce coarse quantization (e.g., {0.0, 1.0} for n=2), but the raw composite is still available for absolute quality assessment via the hard floor. The ranked composite is used for relative ordering and diversity, which is less sensitive to quantization at small scales.
+
 ### 2. Two-Tier Quality Floor
 
 **Location:** `curation/pipeline.py` (floor logic), `curation/models.py` (new fields), `curation/presets.py` (constant)
 
-**Hard floor:**
-- Absolute composite threshold: `HARD_FLOOR_DEFAULT = 0.15`
+**Hard floor — operates on raw composite (absolute quality):**
+- Absolute threshold against `raw_composite_score`: `HARD_FLOOR_DEFAULT = 0.15`
 - Images below this are always excluded from the diversity pool
 - Catches genuinely bad images: corrupt, completely blurry, wrong subject entirely
+- Because it uses `raw_composite_score` (not rank-based), it reflects absolute quality — a dataset of 100 excellent images will have zero hard-floor exclusions
 - Stored in `CurationConfig.hard_floor` (default 0.15)
 
 **Soft floor:**
@@ -113,9 +129,9 @@ floor_status: Literal["passed", "soft_floor", "hard_floor"] = "passed"
 
 **Pipeline logic:**
 ```python
-# Hard floor: absolute exclusion
+# Hard floor: absolute exclusion (uses RAW composite, not ranked)
 for s in all_scores:
-    if s.composite_score < config.hard_floor:
+    if s.raw_composite_score < config.hard_floor:
         s.floor_status = "hard_floor"
 
 # Soft floor: advisory flag
@@ -144,11 +160,16 @@ soft_flagged: int = 0
 
 **Location:** `curation/scorer.py` (mark_duplicates), `curation/models.py` (new fields)
 
-**3a. Tighten pHash threshold:**
+**3a. Tighten pHash threshold (curation-scoped):**
 
-Change `PHASH_THRESHOLD` from 10 to 6 in `image/dedup.py`. This matches the dHash threshold in `dataset/quality.py` and limits dedup to true near-duplicates (re-encoded, resized, minor crop) rather than "similar angle, same person."
+Add a `threshold` parameter to `are_near_duplicates()` in `image/dedup.py` (default stays at `PHASH_THRESHOLD = 10` for import validation backwards compat). The curation `mark_duplicates()` passes `threshold=6` explicitly. This limits curation dedup to true near-duplicates (re-encoded, resized, minor crop) without affecting import validation behavior.
 
-Note: `mark_duplicates()` in `scorer.py` imports `are_near_duplicates` from `image_service.py` which delegates to `image/dedup.py`. The threshold change propagates automatically.
+```python
+# image/dedup.py — add threshold parameter
+def are_near_duplicates(hash_hex_a: str, hash_hex_b: str, threshold: int = PHASH_THRESHOLD) -> bool:
+```
+
+`mark_duplicates()` in `scorer.py` calls `are_near_duplicates(h_a, h_b, threshold=6)`.
 
 **3b. Group instead of auto-discard:**
 
@@ -178,16 +199,61 @@ Wait — `is_duplicate` currently lives on `SignalScores` as a plain `bool` fiel
 2. Add `dedup_group_id` and `dedup_kept` to `ImageScore`
 3. In `mark_duplicates()`, set all three: `dedup_group_id`, `dedup_kept`, and `signals.is_duplicate` (for backwards compat)
 
-**New `mark_duplicates()` logic:**
-```python
-def mark_duplicates(scores, image_paths):
-    # Compute pHashes (unchanged)
-    # Union-find grouping (unchanged, uses tightened threshold)
+**New `mark_duplicates()` logic — union-find rewrite:**
 
-    # For each group:
-    #   - Assign dedup_group_id = image_id of first member
+The current `mark_duplicates()` in `scorer.py` has no transitive grouping — it's a simple pairwise comparison with early break. This must be replaced with a proper union-find to ensure transitive closure (if A matches B and B matches C, all three are in one group).
+
+```python
+CURATION_PHASH_THRESHOLD: int = 6
+
+def mark_duplicates(scores, image_paths):
+    # 1. Compute pHashes for all images (unchanged)
+
+    # 2. Union-find with path compression (NEW — replaces pairwise logic)
+    parent = list(range(n))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]  # path compression
+            i = parent[i]
+        return i
+
+    def union(i: int, j: int) -> None:
+        ri, rj = find(i), find(j)
+        if ri != rj:
+            parent[ri] = rj
+
+    for i in range(n):
+        if hashes[i] is None:
+            continue
+        for j in range(i + 1, n):
+            if hashes[j] is None:
+                continue
+            if are_near_duplicates(hashes[i], hashes[j], threshold=CURATION_PHASH_THRESHOLD):
+                union(i, j)
+
+    # 3. Build groups from union-find roots
+    groups: dict[int, list[int]] = {}
+    for i in range(n):
+        root = find(i)
+        groups.setdefault(root, []).append(i)
+
+    # 4. For each group with 2+ members:
+    #   - Assign dedup_group_id = image_id of root member
     #   - Find member with highest composite_score → dedup_kept = True
     #   - All others: dedup_kept = False, signals.is_duplicate = True
+    for root, members in groups.items():
+        if len(members) < 2:
+            continue
+        group_id = scores[root].image_id
+        best_idx = max(members, key=lambda i: scores[i].composite_score)
+        for i in members:
+            scores[i].dedup_group_id = group_id
+            if i == best_idx:
+                scores[i].dedup_kept = True
+            else:
+                scores[i].dedup_kept = False
+                scores[i].signals.is_duplicate = True  # backwards compat
 ```
 
 **3c. Pipeline integration:**
@@ -204,11 +270,11 @@ Non-representatives are tracked in the result for UI display but excluded from d
 
 | File | Changes |
 |------|---------|
-| `curation/models.py` | Add `ranked_signals` field to `ImageScore`. Add `floor_status`, `dedup_group_id`, `dedup_kept` to `ImageScore`. Add `hard_floor` to `CurationConfig`. Add `hard_excluded`, `soft_flagged` to `PipelineSummary`. |
-| `curation/scorer.py` | Add `rank_normalize()` function. Change `mark_duplicates()` to build groups with representative selection. |
+| `curation/models.py` | Add `ranked_signals`, `raw_composite_score`, `floor_status`, `dedup_group_id`, `dedup_kept` to `ImageScore`. Add `hard_floor` to `CurationConfig`. Add `hard_excluded`, `soft_flagged` to `PipelineSummary`. |
+| `curation/scorer.py` | Add `rank_normalize()` function. Rewrite `mark_duplicates()` with union-find grouping and representative selection. Existing per-image composite becomes `raw_composite_score`; ranked composite computed after `rank_normalize()`. |
 | `curation/presets.py` | Add `HARD_FLOOR_DEFAULT = 0.15`. |
-| `curation/pipeline.py` | Call `rank_normalize()` after `score_images()`. Replace single-cutoff floor with two-tier logic. Filter dedup non-representatives from diversity pool. Update `PipelineSummary` counts. |
-| `image/dedup.py` | Change `PHASH_THRESHOLD` from 10 to 6. |
+| `curation/pipeline.py` | Call `rank_normalize()` after `score_images()`, recompute `composite_score` from ranked signals. Hard floor checks `raw_composite_score`. Replace single-cutoff floor with two-tier logic. Filter dedup non-representatives from diversity pool. Update `PipelineSummary` counts. |
+| `image/dedup.py` | Add `threshold` parameter to `are_near_duplicates()` (default unchanged at 10). |
 | `api/routers/curation.py` | Pass `hard_floor` from config to pipeline (minor wiring). |
 
 ## Files NOT Modified
@@ -226,6 +292,13 @@ Non-representatives are tracked in the result for UI display but excluded from d
 - `quality_floor_pct` still exists and functions as the soft floor.
 - `signals.is_duplicate` still set for any code reading it.
 - API response shape gains new fields but no fields removed.
+- `are_near_duplicates()` gains an optional `threshold` parameter — existing callers (import validation) are unaffected.
+- `raw_composite_score` defaults to 0.0 in old results — hard floor won't retroactively exclude them.
+- **Composite scores are not comparable across old/new runs** — old composites were raw-signal-based, new composites are rank-based. This is acceptable because curation results are ephemeral (re-run per session), not cross-session comparable.
+
+## Rediversify Compatibility
+
+`rediversify()` loads cached `ImageScore` objects and re-runs diversity selection. Since `floor_status` and `dedup_kept` are persisted in the JSON, rediversify does NOT need to re-evaluate floor or dedup — it uses the cached values. Only the diversity selection (pin/exclude) is re-run.
 
 ## Testing Strategy
 
